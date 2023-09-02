@@ -59,6 +59,14 @@ class MultiAgentPickAndPlace:
             )
             pygame.display.set_caption("Multi-Agent Pick and Place")
 
+            self.agent_icons = [
+                pygame.image.load("agent1.png"),  # Replace with the actual image file paths
+                pygame.image.load("agent2.png"),
+            ]
+
+
+            
+
     def _validate_actions(self, actions):
         for action in actions:
             if action not in self.action_space:
@@ -304,6 +312,21 @@ class MultiAgentPickAndPlace:
                 self.screen, BLACK, (0, y), (self.width * self.cell_size, y)
             )
 
+        # # Draw agents with icon images
+        # for idx, agent in enumerate(self.agents):
+        #     x, y = agent.position
+        #     agent_icon = self.agent_icons[idx] if idx < len(self.agent_icons) else None
+        #     if agent_icon:
+        #         cell_center = (
+        #             x * self.cell_size + self.cell_size // 2,
+        #             y * self.cell_size + self.cell_size // 2
+        #         )
+        #         scaling_factor = 0.8 
+        #         icon_size = int(self.cell_size * scaling_factor)
+        #         agent_icon_resized = pygame.transform.scale(agent_icon, (icon_size, icon_size))
+        #         agent_icon_rect = agent_icon_resized.get_rect(center=cell_center)
+        #         self.screen.blit(agent_icon_resized, agent_icon_rect)
+       
         # Draw agents
         for agent in self.agents:
             x, y = agent.position

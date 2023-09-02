@@ -150,8 +150,51 @@ class TestPassingLogic(unittest.TestCase):
 
 
 if __name__ == "__main__":
-    unittest.main()
 
-    
+    # unittest.main()
 
-    
+    initial_state = {
+        "agents": [
+            {"position": (1, 1), "picker": True, "carrying_object": 0},
+            {"position": (3, 3), "picker": False, "carrying_object": None},
+            {"position": (4, 4), "picker": True, "carrying_object": None},
+        ],
+        "objects": [{"position": (1, 0), "id": 0}],
+        "goals": [(0, 3), (3, 3), (0, 2)],
+    }
+
+    environment = MultiAgentPickAndPlace(
+        width=5,
+        length=5,
+        n_agents=3,
+        n_pickers=2,
+        initial_state=initial_state,
+        enable_rendering=True,
+    )
+
+    print(environment.print_state())
+
+    time_steps = [
+        ["move_right", "move_up", "move_left"],  # Agents move
+        ["move_down", "move_left", "move_left"],  # Agents move
+        ["move_down", "move_left", "pass"],  # Agents move and pass
+        ["move_down", "move_left", "move_left"],  # Agents move
+        ["pass", "move_left", "move_up"],  # Agents pass and move
+        ["move_left", "move_up", "move_up"],  # Agents move
+        ["move_up", "move_left", "move_up"],  # Agents move
+        ["move_up", "move_left", "move_left"],  # Agents move
+    ]
+
+    for step, actions in enumerate(time_steps):
+        rewards = environment.step(actions)
+        print(f"\nStep {step + 1} - Actions: {actions}")
+        for idx, reward in enumerate(rewards):
+            print(f"Agent {idx + 1} - Reward: {reward}")
+        environment.render()
+
+        if environment.done:
+            print("\nTask solved!")
+            break
+
+    print("Final state:")
+    environment.print_state()
