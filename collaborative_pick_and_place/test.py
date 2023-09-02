@@ -49,8 +49,10 @@ class TestPassingLogic(unittest.TestCase):
              "goals": [(3, 4), (5, 4), (6, 5), (7, 6)],
          }
          env = MultiAgentPickAndPlace(10, 10, 4, 4, initial_state=initial_state)
+         print(env.print_state())
          actions = ["move_down", "move_right", "move_right", "move_right"]
          env.step(actions)
+         print(env.print_state())
          self.assertTrue(env.done, "Termination condition not recognized.")
 
     def test_pass_object_between_two_agents(self):
