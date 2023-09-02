@@ -13,6 +13,7 @@ BLUE = (0, 0, 255)
 GREEN = (0, 255, 0)
 BLACK = (0, 0, 0)
 GRAY = (200, 200, 200)
+LIGHT_GRAY = (200, 200, 200)
 YELLOW = (255, 255, 0)
 
 class Agent:
@@ -119,7 +120,6 @@ class MultiAgentPickAndPlace:
 
         # Assign goals with distinct positions
         self.goals = [all_positions.pop() for _ in range(self.n_agents)]
-
 
 
     def initialize_from_state(self, initial_state):
@@ -342,20 +342,14 @@ class MultiAgentPickAndPlace:
 
     def _check_termination(self):
         goal_positions = set(self.goals)
-        agent_positions_with_objects = [
-            (agent.position, agent.carrying_object)
-            for agent in self.agents
-            if agent.carrying_object is not None
-        ]
+        object_positions = [obj.position for obj in self.objects]
 
-        if agent_positions_with_objects and all(
-            pos in goal_positions for pos, obj_id in agent_positions_with_objects
-        ) and len(set(obj_id for _, obj_id in agent_positions_with_objects)) == len(
-            agent_positions_with_objects
-        ):
+        # Check if all object positions are in goal positions
+        if all(pos in goal_positions for pos in object_positions):
             self.done = True
             return REWARD_COMPLETION
         return 0
+
 
 
     def _handle_drops(self):
@@ -404,7 +398,7 @@ class MultiAgentPickAndPlace:
             x, y = goal
             pygame.draw.rect(
                 self.screen,
-                GRAY,
+                LIGHT_GRAY,
                 (
                     x * self.cell_size + self.cell_size // 3,
                     y * self.cell_size + self.cell_size // 3,
