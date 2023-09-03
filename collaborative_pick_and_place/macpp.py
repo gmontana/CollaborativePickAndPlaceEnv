@@ -1,5 +1,6 @@
 import random
 import pygame
+import json 
 
 ANIMATION_DELAY = 150
 REWARD_STEP = -1
@@ -106,11 +107,13 @@ class MultiAgentPickAndPlace:
         '''
         Return the hashed current state
         '''
-        agent_states = tuple(agent.get_state() for agent in self.agents)
-        object_states = tuple(obj.get_state() for obj in self.objects)
+        agent_states = tuple(json.dumps(agent.get_state()) for agent in self.agents)
+        object_states = tuple(json.dumps(obj.get_state()) for obj in self.objects)
         goals = tuple(self.goals)
         combined_state = agent_states + object_states + goals
         return hash(combined_state)
+
+
 
     def get_action_space(self):
         '''
