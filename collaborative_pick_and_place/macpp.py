@@ -2,7 +2,7 @@ import random
 import pygame
 import json 
 
-ANIMATION_DELAY = 150
+ANIMATION_DELAY = 200
 
 REWARD_STEP = -1
 REWARD_GOOD_PASS = 5

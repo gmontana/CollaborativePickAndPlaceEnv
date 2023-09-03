@@ -23,9 +23,7 @@ def load_and_play_policy(config_file, num_play_episodes, num_max_steps):
 
     for _ in range(num_play_episodes):
         success, total_return, total_steps = q_learning.execute(num_max_steps)
-
-    # Print play results using f-string for clarity
-    print(f"Success: {success} | Total steps: {total_steps} | Total return: {total_return}.")
+        print(f"Success: {success} | Total steps: {total_steps} | Total return: {total_return}.")
 
 if __name__ == "__main__":
 
