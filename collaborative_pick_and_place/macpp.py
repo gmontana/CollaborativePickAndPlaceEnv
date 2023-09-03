@@ -22,7 +22,7 @@ BLACK = (0, 0, 0)
 GRAY = (200, 200, 200)
 LIGHT_GRAY = (200, 200, 200)
 YELLOW = (255, 255, 0)
-
+ 
 class Agent:
     def __init__(self, position, picker, carrying_object=None):
         self.position = position
@@ -112,7 +112,7 @@ class MultiAgentPickAndPlace:
 
     def _validate_actions(self, actions):
         for action in actions:
-            if action not in self.action_space:
+            if action not in self.get_action_space():
                 raise ValueError(f"Unrecognized action: {action}.")
 
 
@@ -532,7 +532,8 @@ class MultiAgentPickAndPlace:
         pygame.display.flip()
         pygame.time.wait(ANIMATION_DELAY)
 
-    def save_video(self, video_filename):
-        if self.enable_rendering and self.video_save_path:
-            imageio.mimsave(self.video_save_path, self.frames, fps=ANIMATION_FPS)
+    def save_video(self, video_path):
+        if self.video_save_path is not None and len(self.frames) > 0:
+            imageio.mimsave(video_path, self.frames, fps=ANIMATION_FPS)  # Use video_path here
+            self.frames = []
 
