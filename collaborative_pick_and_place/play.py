@@ -1,34 +1,37 @@
+import hydra
+from omegaconf import DictConfig
 from macpp import MultiAgentPickAndPlace
 from q_learning import QTable, QLearning
-from train import initialize_environment
-import yaml
-import os
+import imageio
 
-def load_and_play_policy(config_file, num_play_episodes, num_max_steps):
-    
-    if not os.path.exists(config_file):
-        raise FileNotFoundError(f"Configuration file '{config_file}' not found!")
+@hydra.main(config_name="config")
+def load_and_play_policy(cfg: DictConfig):
+    # Set rendering to True for playing
+    cfg.env_enable_rendering = True
 
-    with open(config_file, 'r') as f:
-        config = yaml.safe_load(f)
+    # Initialize environment
+    env = MultiAgentPickAndPlace(
+        cell_size=cfg.cell_size,
+        width=cfg.env_width,
+        length=cfg.env_length,
+        n_agents=cfg.env_n_agents,
+        n_pickers=cfg.env_n_pickers,
+        n_objects=cfg.env_n_objects,
+        enable_rendering=cfg.env_enable_rendering
+    )
 
-    config['env_enable_rendering'] = True
-
-    env = initialize_environment(config)
-
+    # Load the Q-table
     loaded_q_table = QTable(n_agents=env.n_agents, action_space=env.get_action_space())
-    loaded_q_table.load_q_table(config['q_table_filename'])  
+    loaded_q_table.load_q_table(cfg.q_table_filename)
 
-    q_learning = QLearning(env)  
+    # Initialize Q-learning agent
+    q_learning = QLearning(env)
 
-    for _ in range(num_play_episodes):
-        success, total_return, total_steps = q_learning.execute(num_max_steps)
+    # Play the game
+    for _ in range(cfg.num_play_episodes):
+        success, total_return, total_steps = q_learning.execute(cfg.num_max_steps)
         print(f"Success: {success} | Total steps: {total_steps} | Total return: {total_return}.")
 
 if __name__ == "__main__":
-
-    config_file = "config.yaml"
-    num_play_episodes = 10
-    num_max_steps = 50
-    load_and_play_policy(config_file, num_play_episodes, num_max_steps)
+    load_and_play_policy()
 
