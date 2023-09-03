@@ -67,17 +67,26 @@ class MultiAgentPickAndPlace:
         self.objects = []
         self.goals = []
         self.initial_state = initial_state
+
+        # Define actions and done flag
+        self.action_space = ["move_up", "move_down", "move_left", "move_right", "pass"]
+        self.done = False
+
+        # Set the number of objects (and goals)
+        if n_objects is None:
+            self.n_objects = self.n_agents
+        else:
+            self.n_objects = n_objects 
+
+        # Use a random state unless a predefined state is provided
         if initial_state is None:
             self.random_initialize()
         else:
             self.initialize_from_state(initial_state)
 
-        self.action_space = ["move_up", "move_down", "move_left", "move_right", "pass"]
-        self.done = False
-
         # Check whether the grid size is sufficiently large 
-        total_cells = width * length
-        total_entities = n_agents + n_agents + 1 
+        total_cells = self.width * self.length
+        total_entities = self.n_agents + self.n_objects 
         if total_entities > total_cells: 
             raise ValueError("Grid size not sufficiently large to contain all the entities.")
 
@@ -120,8 +129,7 @@ class MultiAgentPickAndPlace:
         object_states = tuple(json.dumps(obj.get_state()) for obj in self.objects)
         goals = tuple(self.goals)
         combined_state = agent_states + object_states + goals
-        return hash(combined_state)
-
+        return str(combined_state) + "_" + str(hash(combined_state))
 
 
     def get_action_space(self):
@@ -135,11 +143,12 @@ class MultiAgentPickAndPlace:
         '''
         Initialise the environment in a random state
         '''
+
         all_positions = [(x, y) for x in range(self.width) for y in range(self.length)]
         random.shuffle(all_positions)
 
         # Initialize objects with distinct positions
-        self.objects = [Object(all_positions.pop(), id=i) for i in range(self.n_agents)]
+        self.objects = [Object(all_positions.pop(), id=i) for i in range(self.n_objects)]
 
         # Create a list of picker flags based on the number of pickers
         picker_flags = [True] * self.n_pickers + [False] * (self.n_agents - self.n_pickers)
@@ -149,7 +158,8 @@ class MultiAgentPickAndPlace:
         self.agents = [Agent(position=all_positions.pop(), picker=picker) for picker in picker_flags]
 
         # Assign goals with distinct positions
-        self.goals = [all_positions.pop() for _ in range(self.n_agents)]
+        self.goals = random.sample(all_positions, self.n_objects)  # Sample distinct positions
+
 
 
     def initialize_from_state(self, initial_state):
