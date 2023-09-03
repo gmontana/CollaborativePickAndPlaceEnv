@@ -12,7 +12,7 @@ ex = Experiment(EXPERIMENT_NAME)
 def initialize_environment(config):
     """Initialize environment from a configuration dictionary."""
     return MultiAgentPickAndPlace(
-        cell_size=config['cell_size='],
+        cell_size=config['cell_size'],
         width=config['env_width'],
         length=config['env_length'],
         n_agents=config['env_n_agents'],
@@ -46,17 +46,17 @@ def cfg():
     learning_rate_decay = config['learning_rate_decay']
 
 @ex.main
-def run_experiment(episodes, max_steps_per_episode, learning_rate, discount_factor, exploration_rate, exploration_decay, min_exploration, env_width, env_length, cell_size, env_n_agents, env_n_pickers, env_n_objects, env_enable_rendering, q_table_filename):
+def run_experiment(episodes, max_steps_per_episode, learning_rate, discount_factor, exploration_rate, exploration_decay, min_exploration, cell_size, env_width, env_length, env_n_agents, env_n_pickers, env_n_objects, env_enable_rendering, q_table_filename):
 
     # initialise env
     env = initialize_environment({
-        'cell_size': cell_size,
         'env_width': env_width,
         'env_length': env_length,
         'env_n_agents': env_n_agents,
         'env_n_pickers': env_n_pickers,
         'env_n_objects': env_n_objects,
         'env_enable_rendering': env_enable_rendering,
+        'cell_size': cell_size,
     })
 
     # train algo
