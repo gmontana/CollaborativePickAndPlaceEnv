@@ -6,8 +6,8 @@ ANIMATION_DELAY = 150
 
 REWARD_STEP = -1
 REWARD_GOOD_PASS = 5
-REWARD_BAD = -5
-REWARD_GOAL = 10
+REWARD_BAD_PASS = -5
+REWARD_DROP = 10
 REWARD_COMPLETION = 20
 
 WHITE = (255, 255, 255)
@@ -51,6 +51,7 @@ class MultiAgentPickAndPlace:
         length,
         n_agents,
         n_pickers,
+        n_objects=None, # default to number of objects = number of agents
         initial_state=None,
         cell_size=100,
         debug_mode=False,
@@ -73,6 +74,12 @@ class MultiAgentPickAndPlace:
 
         self.action_space = ["move_up", "move_down", "move_left", "move_right", "pass"]
         self.done = False
+
+        # Check whether the grid size is sufficiently large 
+        total_cells = width * length
+        total_entities = n_agents + n_agents + 1 
+        if total_entities > total_cells: 
+            raise ValueError("Grid size not sufficiently large to contain all the entities.")
 
         if self.enable_rendering:
             pygame.init()
@@ -362,8 +369,6 @@ class MultiAgentPickAndPlace:
             if obj_id is not None:
                 self.agents[idx].carrying_object = obj_id
 
-
-
     def _check_termination(self):
         goal_positions = set(self.goals)
         object_positions = [obj.position for obj in self.objects]
@@ -374,8 +379,6 @@ class MultiAgentPickAndPlace:
             return REWARD_COMPLETION
         return 0
 
-
-
     def _handle_drops(self):
         for agent in self.agents:
             if agent.carrying_object is not None:
@@ -384,8 +387,12 @@ class MultiAgentPickAndPlace:
                         obj = next((o for o in self.objects if o.id == agent.carrying_object), None)
                         if obj:
                             obj.position = agent.position
+                        else:
+                            # Add the object back to the environment's list of objects
+                            new_obj = Object(position=agent.position, id=agent.carrying_object)
+                            self.objects.append(new_obj)
                         agent.carrying_object = None
-                        agent.reward += REWARD_GOAL
+                        agent.reward += REWARD_DROP
 
 
     def render(self):
