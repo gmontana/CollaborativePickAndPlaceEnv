@@ -1,7 +1,7 @@
 import unittest
 from macpp import MultiAgentPickAndPlace
 
-class TestPassingLogic(unittest.TestCase):
+class MACPPTests(unittest.TestCase):
 
     def test_invalid_moves(self):
         initial_state = {
@@ -65,8 +65,10 @@ class TestPassingLogic(unittest.TestCase):
              "goals": [],
          }
          env = MultiAgentPickAndPlace(10, 10, 2, 1, initial_state=initial_state)
+         print(env.print_state())
          actions = ["pass", "pass"]
          env.step(actions)
+         print(env.print_state())
          self.assertIsNone(env.agents[0].carrying_object, "Agent 1 did not pass the object")
          self.assertEqual(env.agents[1].carrying_object, 0, "Agent 2 did not receive the object")
 
@@ -80,8 +82,10 @@ class TestPassingLogic(unittest.TestCase):
              "goals": [],
          }
          env = MultiAgentPickAndPlace(10, 10, 2, 2, initial_state=initial_state)
+         print(env.print_state())
          actions = ["pass", "move_left"]
          env.step(actions)
+         print(env.print_state())
          self.assertTrue(
              env.agents[0].carrying_object is not None or env.agents[1].carrying_object is not None,
              "Multiple agents picked up the same object."
@@ -118,8 +122,10 @@ class TestPassingLogic(unittest.TestCase):
              "goals": [],
          }
          env = MultiAgentPickAndPlace(10, 10, 1, 1, initial_state=initial_state)
+         print(env.print_state())
          actions = ["pass"]
          env.step(actions)
+         print(env.print_state())
          self.assertEqual(env.agents[0].carrying_object, 0, "Agent passed the object when it shouldn't have.")
 
     def test_non_picker_cannot_pick(self):

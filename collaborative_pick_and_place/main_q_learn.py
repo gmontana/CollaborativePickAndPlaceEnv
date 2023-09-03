@@ -1,19 +1,35 @@
 import random
 from macpp import MultiAgentPickAndPlace
 
-# Initialize the environment
+# Q leraning params
+ALPHA = 0.1
+GAMMA = 0.9
+EPSILON = 0.1
+EPISODES = 1000
+MAX_STEPS = 100
+ROLLING_AVG = 10
+
 env = MultiAgentPickAndPlace(width=5, length=5, n_agents=3, n_pickers=2, enable_rendering=False)
 
-num_episodes = 100
-max_steps_per_episode = 300
-moving_avg_lenght = 10
+Q_table = []
+
+def epsilon_greedy_action_selection(state):
+    state_repr = env.get_hashed_state(state)
+    if random.uniform(0, 1) < EPSILON:
+        return [random.choice(env.get_action_space) for _ in range(env.n_agents)]
+    else:
+        return [max(env.action_space, key=lambda action: Q_table.get((state_repr, action), 0)) for _ in range(env.n_agents)]
+
+# Initialize the environment
+
 episode_returns = []
 
-for episode in range(num_episodes):
+for episode in range(EPISODES):
+
     state = env.reset()
     episode_return = 0
 
-    for step in range(max_steps_per_episode):
+    for step in range(MAX_STEPS):
 
         # print(env.print_state())
         actions = [random.choice(env.action_space) for _ in range(env.n_agents)]
@@ -27,7 +43,7 @@ for episode in range(num_episodes):
 
     episode_returns.append(episode_return)
 
-    if len(episode_returns) > moving_avg_lenght:
+    if len(episode_returns) > ROLLING_AVG:
         episode_returns.pop(0)  
     moving_avg = sum(episode_returns) / len(episode_returns)
 

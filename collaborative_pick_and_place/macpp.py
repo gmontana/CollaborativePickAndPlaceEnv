@@ -76,13 +76,9 @@ class MultiAgentPickAndPlace:
             self.screen = pygame.display.set_mode(
                 (self.width * self.cell_size, self.length * self.cell_size)
             )
-            pygame.display.set_caption("Multi-Agent Pick and Place")
-
-            # Load both icons
+            pygame.display.set_caption("Collaborative Multi-Agent Pick and Place")
             picker_icon = pygame.image.load("icons/agent_picker.png")
             non_picker_icon = pygame.image.load("icons/agent_non_picker.png")
-
-            # Assign icons based on the picker attribute of each agent
             self.agent_icons = [picker_icon if agent.picker else non_picker_icon for agent in self.agents]
 
 
@@ -93,6 +89,9 @@ class MultiAgentPickAndPlace:
 
 
     def reset(self):
+        '''
+        Reset the environment to either a random state or an predefined initial state
+        '''
         if hasattr(self, 'initial_state') and self.initial_state is not None:
             self.initialize_from_state(self.initial_state)
         else:
@@ -103,8 +102,27 @@ class MultiAgentPickAndPlace:
             agent.carrying_object = None
         self.done = False
 
+    def get_hashed_state(self):
+        '''
+        Return the hashed current state
+        '''
+        agent_states = tuple(agent.get_state() for agent in self.agents)
+        object_states = tuple(obj.get_state() for obj in self.objects)
+        goals = tuple(self.goals)
+        combined_state = agent_states + object_states + goals
+        return hash(combined_state)
+
+    def get_action_space(self):
+        '''
+        Return the action space of the environment
+        '''
+        return self.action_space
+
 
     def random_initialize(self):
+        '''
+        Initialise the environment in a random state
+        '''
         all_positions = [(x, y) for x in range(self.width) for y in range(self.length)]
         random.shuffle(all_positions)
 
@@ -146,8 +164,6 @@ class MultiAgentPickAndPlace:
             )
             self.agents.append(agent)
 
-
-
     def print_state(self):
         print("="*40)
         print("Agents' State:")
@@ -176,6 +192,8 @@ class MultiAgentPickAndPlace:
             
     def _random_position(self):
         return (random.randint(0, self.width - 1), random.randint(0, self.length - 1))
+
+
 
 
 
@@ -287,7 +305,7 @@ class MultiAgentPickAndPlace:
             x = min(self.width - 1, x + 1)
 
         new_position = (x, y)
-        # Only check for collisions with other agents
+        # Check for collisions with other agents
         if new_position not in [a.position for a in self.agents]:
             return new_position
         return agent.position
@@ -422,12 +440,9 @@ class MultiAgentPickAndPlace:
                 agent_icon_rect = agent_icon_resized.get_rect(center=cell_center)
                 self.screen.blit(agent_icon_resized, agent_icon_rect)
 
-                # Check if the agent is carrying an object
+                # Agent is carrying an object 
                 if agent.carrying_object is not None:
-                    # Define the green color
-                    # Define the thickness of the bounding box
                     thickness = 3
-                    # Draw a green rectangle around the agent's position
                     pygame.draw.rect(self.screen, GREEN, agent_icon_rect, thickness)
 
 
@@ -470,7 +485,5 @@ class MultiAgentPickAndPlace:
         #         )
 
         pygame.display.flip()
-
-        # We also add a delay to slow down the rendering speed
         pygame.time.wait(ANIMATION_DELAY)
 
