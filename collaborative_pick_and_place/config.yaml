@@ -2,6 +2,7 @@
 q_table_filename: q_table.npy
 
 # Environment parameters
+cell_size: 200
 env_width: 3
 env_length: 3
 env_n_agents: 2
@@ -10,7 +11,7 @@ env_n_objects: 1
 env_enable_rendering: False
 
 # Training parameters
-episodes: 5000
+episodes: 15000
 max_steps_per_episode: 50
 discount_factor: 0.99
 min_exploration: 0.01

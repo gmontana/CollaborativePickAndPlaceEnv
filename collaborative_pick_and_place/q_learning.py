@@ -6,7 +6,7 @@ class QTable:
         self.n_agents = n_agents
         self.action_space = action_space
 
-    def get_q_values(self, state):
+    def initialise(self, state):
         ''' 
         Initialising the Q table with small values may help exploration early on
         '''
@@ -15,18 +15,22 @@ class QTable:
         return self.q_table[state]
 
     def update(self, state, actions, value):
-        current_q_values = self.get_q_values(state)
+        current_q_values = self.initialise(state)
         action_indices = tuple(self.action_space.index(action) for action in actions)
         current_q_values[action_indices] = value
 
+    def count_elements(self):
+        return sum([np.prod(v.shape) for v in self.q_table.values()])
+
     def save_q_table(self, filename):
-        print(f"Saving: {filename}.")
+        print(f"Saving Q-value table: {filename}.")
         np.save(filename, self.q_table)
+        print(f"Number of elements in the Q table: {self.count_elements()}")
 
     def load_q_table(self, filename):
-        print(f"Loading: {filename}.")
+        print(f"Loading Q-value table: {filename}.")
         self.q_table = np.load(filename, allow_pickle=True).item()
-
+        print(f"Number of elements in the Q table: {self.count_elements()}")
 
 class QLearning:
     def __init__(self, env, learning_rate=0.1, discount_factor=0.99, exploration_rate=1.0, exploration_decay=0.995, min_exploration=0.01, learning_rate_decay=0.995, min_learning_rate=0.01):
@@ -45,7 +49,7 @@ class QLearning:
     def choose_actions(self, state_hash):
         if np.random.uniform(0, 1) < self.exploration_rate:
             return [np.random.choice(self.q_table.action_space) for _ in range(self.q_table.n_agents)]
-        q_values = self.q_table.get_q_values(state_hash)
+        q_values = self.q_table.initialise(state_hash)
         actions_indices = np.unravel_index(np.argmax(q_values), q_values.shape)
         return [self.q_table.action_space[index] for index in actions_indices]
 
@@ -96,8 +100,8 @@ class QLearning:
                 # the total reward is the sum of all agents' individual rewards
                 total_reward = sum(rewards)
 
-                current_q_values = self.q_table.get_q_values(state_hash)
-                next_q_values = self.q_table.get_q_values(next_state_hash)
+                current_q_values = self.q_table.initialise(state_hash)
+                next_q_values = self.q_table.initialise(next_state_hash)
                 action_indices = tuple(self.q_table.action_space.index(action) for action in actions)
                 max_next_q_value = np.max(next_q_values)
 
@@ -129,7 +133,7 @@ class QLearning:
             if episode % 100 == 0:
                 avg_reward = np.mean(rewards_all_episodes[-100:])
                 avg_steps = np.mean(steps_per_episode[-100:])
-                print(f"Episode {episode}, Average Reward: {avg_reward}, Average Steps: {avg_steps}")
+                print(f"Episode {episode} | Average Reward: {avg_reward} | Average Steps: {avg_steps}")
 
         print('----------------------------------------------------------------')
         print(f"Number of successful episodes: {successful_episodes}/{episodes}")
