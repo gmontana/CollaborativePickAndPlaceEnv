@@ -23,10 +23,12 @@ class QTable:
 
 
 class QLearning:
-    def __init__(self, env, learning_rate=0.1, discount_factor=0.99, exploration_rate=1.0, exploration_decay=0.995, min_exploration=0.01):
+    def __init__(self, env, learning_rate=0.1, discount_factor=0.99, exploration_rate=1.0, exploration_decay=0.995, min_exploration=0.01, learning_rate_decay=0.995, min_learning_rate=0.01):
         self.env = env
         self.q_table = QTable(n_agents=env.n_agents, action_space=env.get_action_space())
         self.learning_rate = learning_rate
+        self.learning_rate_decay = min_learning_rate
+        self.min_learning_rate = min_learning_rate
         self.discount_factor = discount_factor
         self.exploration_rate = exploration_rate
         self.exploration_decay = exploration_decay
@@ -59,6 +61,8 @@ class QLearning:
                 next_q_values = self.q_table.get_q_values(next_state_hash)
                 action_indices = tuple(self.q_table.action_space.index(action) for action in actions)
                 max_next_q_value = np.max(next_q_values)
+
+
                 
                 if done:
                     target = total_reward
@@ -75,6 +79,7 @@ class QLearning:
                     break
 
             self.exploration_rate = max(self.min_exploration, self.exploration_rate * self.exploration_decay)
+            self.learning_rate = max(self.min_learning_rate, self.learning_rate * self.learning_rate_decay)
             rewards_all_episodes.append(rewards_current_episode)
 
             if episode % 100 == 0:
@@ -92,16 +97,20 @@ def cfg():
     env_length = 4
     env_n_agents = 2
     env_n_pickers = 1
-    env_enable_rendering = False
+    env_enable_rendering = True
 
    # Q-learning parameters
     episodes = 2000
     max_steps_per_episode = 300
-    learning_rate = 0.3
-    discount_factor = 0.99
-    exploration_rate = 0.9
+    discount_factor = 0.95
+
+    min_exploration = 0.1
+    exploration_rate = 1.0
     exploration_decay = 0.995
-    min_exploration = 0.01
+
+    min_learning_rate = 0.1
+    learning_rate = 0.2
+    learning_rate_decay = 0.998
 
 @ex.main
 def run_experiment(episodes, max_steps_per_episode, learning_rate, discount_factor, exploration_rate, exploration_decay, min_exploration, env_width, env_length, env_n_agents, env_n_pickers, env_enable_rendering):
