@@ -53,9 +53,13 @@ class QLearning:
         # self.steps=0
         # self.final_return = 0
 
-    def choose_actions(self, state_hash):
+    def epsilon_greedy_actions(self, state_hash):
         if np.random.uniform(0, 1) < self.exploration_rate:
             return [np.random.choice(self.q_table.action_space) for _ in range(self.q_table.n_agents)]
+        else:
+            return self.greedy_actions(state_hash)
+
+    def greedy_actions(self, state_hash):
         q_values = self.q_table.initialise(state_hash)
         actions_indices = np.unravel_index(np.argmax(q_values), q_values.shape)
         return [self.q_table.action_space[index] for index in actions_indices]
@@ -70,12 +74,12 @@ class QLearning:
         total_steps = 0
         total_return = 0
 
-        while not done and total_steps < max_num_steps:  # Continue until done or max_num_steps
+        while not done and total_steps < max_num_steps:  
             total_steps += 1
 
-            print(self.env.print_state())
-            actions = self.choose_actions(state_hash)
-            print(actions)
+            # print(self.env.print_state())
+            actions = self.greedy_actions(state_hash)
+            # print(actions)
             _ , rewards, done = self.env.step(actions)
             next_state_hash = self.env.get_hashed_state()
 
@@ -102,7 +106,7 @@ class QLearning:
             done = False
 
             for step in range(max_steps_per_episode):
-                actions = self.choose_actions(state_hash)
+                actions = self.epsilon_greedy_actions(state_hash)
                 next_state, rewards, done = self.env.step(actions)
                 next_state_hash = self.env.get_hashed_state()
 
