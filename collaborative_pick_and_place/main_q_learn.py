@@ -56,14 +56,13 @@ class QLearning:
                 next_state, rewards, done = self.env.step(actions)
                 next_state_hash = self.env.get_hashed_state()
 
+                # the total reward is the sum of all agents' individual rewards
                 total_reward = sum(rewards)
                 current_q_values = self.q_table.get_q_values(state_hash)
                 next_q_values = self.q_table.get_q_values(next_state_hash)
                 action_indices = tuple(self.q_table.action_space.index(action) for action in actions)
                 max_next_q_value = np.max(next_q_values)
 
-
-                
                 if done:
                     target = total_reward
                 else:
@@ -93,20 +92,20 @@ class QLearning:
 def cfg():
 
     # Environment parameters
-    env_width = 4
-    env_length = 4
+    env_width = 3
+    env_length = 3
     env_n_agents = 2
     env_n_pickers = 1
     env_enable_rendering = True
 
    # Q-learning parameters
     episodes = 2000
-    max_steps_per_episode = 300
-    discount_factor = 0.95
+    max_steps_per_episode = 1000
+    discount_factor = 0.9
 
     min_exploration = 0.1
     exploration_rate = 1.0
-    exploration_decay = 0.995
+    exploration_decay = 0.999
 
     min_learning_rate = 0.1
     learning_rate = 0.2

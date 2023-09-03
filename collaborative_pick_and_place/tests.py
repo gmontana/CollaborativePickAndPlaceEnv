@@ -249,6 +249,31 @@ class MACPPTests(unittest.TestCase):
         self.assertEqual(env.agents[2].carrying_object, 0, "Non-picker Agent 1 did not receive the object.")
         self.assertEqual(env.agents[3].carrying_object, 1, "Non-picker Agent 2 did not receive the object.")
 
+    def test_non_picker_drop_on_goal(self):
+        initial_state = {
+            "agents": [{"position": (1, 1), "picker": False, "carrying_object": 0}],
+            "objects": [{"position": (1, 1), "id": 0}],
+            "goals": [(2, 1)],
+        }
+        env = MultiAgentPickAndPlace(10, 10, 1, 1, initial_state=initial_state)
+        actions = ["move_right"]
+        env.step(actions)
+        # Check that the object is still in the environment after being dropped on a goal
+        self.assertTrue(any(obj for obj in env.objects if obj.id == 0), "Object disappeared after being dropped on a goal by a non-picker agent.")
+
+    def test_picker_drop_on_goal(self):
+        initial_state = {
+            "agents": [{"position": (1, 1), "picker": True, "carrying_object": 0}],
+            "objects": [{"position": (1, 1), "id": 0}],
+            "goals": [(2, 1)],
+        }
+        env = MultiAgentPickAndPlace(10, 10, 1, 1, initial_state=initial_state)
+        actions = ["move_right"]
+        env.step(actions)
+        # Check that the object is still in the environment after being dropped on a goal by a picker agent
+        self.assertTrue(any(obj for obj in env.objects if obj.id == 0), "Object disappeared after being dropped on a goal by a picker agent.")
+
+
 if __name__ == "__main__":
 
     unittest.main()
