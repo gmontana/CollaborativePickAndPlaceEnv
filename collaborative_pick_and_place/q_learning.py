@@ -32,6 +32,13 @@ class QTable:
         self.q_table = np.load(filename, allow_pickle=True).item()
         print(f"Number of elements in the Q table: {self.count_elements()}")
 
+    def get_best_action(self, state, env):
+        hashed_state = self.hash_state(state)
+        if hashed_state not in self.q_table:
+            return random.choice(env.get_action_space())
+        return np.argmax(self.q_table[hashed_state])
+
+
 class QLearning:
     def __init__(self, env, learning_rate=0.1, discount_factor=0.99, exploration_rate=1.0, exploration_decay=0.995, min_exploration=0.01, learning_rate_decay=0.995, min_learning_rate=0.01):
         self.env = env
@@ -68,8 +75,8 @@ class QLearning:
 
             print(self.env.print_state())
             actions = self.choose_actions(state_hash)
+            print(actions)
             _ , rewards, done = self.env.step(actions)
-            print(self.env.print_state())
             next_state_hash = self.env.get_hashed_state()
 
             total_reward = sum(rewards)

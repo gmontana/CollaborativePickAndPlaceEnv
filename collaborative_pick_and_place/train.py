@@ -25,10 +25,20 @@ def run_experiment(cfg: DictConfig):
         cfg.exploration_decay, 
         cfg.min_exploration
     )
+
+    print("Action Space:", env.get_action_space())
+
     q_table, rewards_all_episodes, _ = q_learning.train(cfg.episodes, cfg.max_steps_per_episode)
 
     # save final policy 
     q_table.save_q_table(cfg.q_table_filename)
+
+    num_visualization_episodes = 3
+    print("\nExecuting learned policy for visualization:")
+    for e in range(num_visualization_episodes):
+        print(f"\n --- Episode {e+1} outputu --- \n")
+        success, total_return, total_steps = q_learning.execute(cfg.num_max_steps)
+        print(f"Episode Result: Success: {success}, Total Return: {total_return}, Total Steps: {total_steps}\n")
 
 if __name__ == "__main__":
     run_experiment()
