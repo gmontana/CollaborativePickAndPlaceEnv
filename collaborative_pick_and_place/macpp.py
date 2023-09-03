@@ -1,8 +1,10 @@
 import random
 import pygame
 import json 
+import imageio
 
 ANIMATION_DELAY = 500
+ANIMATION_FRAMES = 30
 
 REWARD_STEP = -1
 REWARD_GOOD_PASS = 5
@@ -56,6 +58,7 @@ class MultiAgentPickAndPlace:
         cell_size=100,
         debug_mode=False,
         enable_rendering=False,
+        video_save_path=None
     ):
         self.width = width
         self.length = length
@@ -99,6 +102,10 @@ class MultiAgentPickAndPlace:
             picker_icon = pygame.image.load("icons/agent_picker.png")
             non_picker_icon = pygame.image.load("icons/agent_non_picker.png")
             self.agent_icons = [picker_icon if agent.picker else non_picker_icon for agent in self.agents]
+
+        if video_save_path is not None:
+            self.video_save_path = video_save_path
+            self.frames = []
 
 
     def _validate_actions(self, actions):
@@ -469,6 +476,7 @@ class MultiAgentPickAndPlace:
                     pygame.draw.rect(self.screen, GREEN, agent_icon_rect, thickness)
 
 
+
         # # Draw agents
         # for agent in self.agents:
         #     x, y = agent.position
@@ -507,6 +515,21 @@ class MultiAgentPickAndPlace:
         #             ),
         #         )
 
+        if self.video_save_path:
+            frame = pygame.surfarray.array3d(pygame.display.get_surface())
+            self.frames.append(frame)
+
         pygame.display.flip()
         pygame.time.wait(ANIMATION_DELAY)
 
+    def save_video(self):
+        if self.enable_rendering:
+            images = []
+            for _ in range(ANIMATION_FRAMES):
+                # Capture the screen image
+                image = pygame.surfarray.array3d(self.screen)
+                images.append(image)
+                self.render()  # Advance the animation frames
+
+            # Save the images as a video
+            imageio.mimsave(video_path, images, fps=ANIMATION_FPS)
