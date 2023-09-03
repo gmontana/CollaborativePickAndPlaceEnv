@@ -2,9 +2,11 @@ import random
 import pygame
 import json 
 import imageio
+import os
+import numpy as np
 
 ANIMATION_DELAY = 500
-ANIMATION_FRAMES = 30
+ANIMATION_FPS = 5
 
 REWARD_STEP = -1
 REWARD_GOOD_PASS = 5
@@ -70,6 +72,7 @@ class MultiAgentPickAndPlace:
         self.objects = []
         self.goals = []
         self.initial_state = initial_state
+        self.video_save_path = video_save_path
 
         # Define actions and done flag
         self.action_space = ["move_up", "move_down", "move_left", "move_right", "pass"]
@@ -103,8 +106,7 @@ class MultiAgentPickAndPlace:
             non_picker_icon = pygame.image.load("icons/agent_non_picker.png")
             self.agent_icons = [picker_icon if agent.picker else non_picker_icon for agent in self.agents]
 
-        if video_save_path is not None:
-            self.video_save_path = video_save_path
+        if self.video_save_path is not None:
             self.frames = []
 
 
@@ -127,6 +129,9 @@ class MultiAgentPickAndPlace:
             agent.reward = 0
             agent.carrying_object = None
         self.done = False
+
+        if hasattr(self, 'video_save_path'):
+            self.frames = []
 
     def get_hashed_state(self):
         '''
@@ -208,7 +213,7 @@ class MultiAgentPickAndPlace:
 
         print("\nObjects' Positions:")
         for idx, obj in enumerate(self.objects, start=1):
-            print(f"- Object {idx}: Position: {obj.position}, ID: {obj.id}")  # <-- This line is changed
+            print(f"- Object {idx}: Position: {obj.position}, ID: {obj.id}")  
 
         print("Goal Positions:")
         if not self.goals:
@@ -516,20 +521,18 @@ class MultiAgentPickAndPlace:
         #         )
 
         if self.video_save_path:
+            # frame = pygame.surfarray.array3d(pygame.display.get_surface())
+            # frame = np.rot90(frame, -1)
+            # self.frames.append(frame)
+            pygame.display.flip()  # Ensure everything is drawn
             frame = pygame.surfarray.array3d(pygame.display.get_surface())
-            self.frames.append(frame)
+            self.frames.append(np.transpose(frame, (1, 0, 2)))  
+
 
         pygame.display.flip()
         pygame.time.wait(ANIMATION_DELAY)
 
-    def save_video(self):
-        if self.enable_rendering:
-            images = []
-            for _ in range(ANIMATION_FRAMES):
-                # Capture the screen image
-                image = pygame.surfarray.array3d(self.screen)
-                images.append(image)
-                self.render()  # Advance the animation frames
+    def save_video(self, video_filename):
+        if self.enable_rendering and self.video_save_path:
+            imageio.mimsave(self.video_save_path, self.frames, fps=ANIMATION_FPS)
 
-            # Save the images as a video
-            imageio.mimsave(video_path, images, fps=ANIMATION_FPS)

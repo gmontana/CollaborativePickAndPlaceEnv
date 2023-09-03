@@ -66,8 +66,10 @@ class QLearning:
         while not done and total_steps < max_num_steps:  # Continue until done or max_num_steps
             total_steps += 1
 
+            print(self.env.print_state())
             actions = self.choose_actions(state_hash)
             _ , rewards, done = self.env.step(actions)
+            print(self.env.print_state())
             next_state_hash = self.env.get_hashed_state()
 
             total_reward = sum(rewards)

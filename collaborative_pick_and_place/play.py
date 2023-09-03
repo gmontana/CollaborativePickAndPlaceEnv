@@ -33,12 +33,15 @@ def load_and_play_policy(cfg: DictConfig):
         success, total_return, total_steps = q_learning.execute(cfg.num_max_steps)
         print(f"Success: {success} | Total steps: {total_steps} | Total return: {total_return}.")
 
+        if cfg.video_save_path:
+            os.makedirs(cfg.video_save_path, exist_ok=True)
+            video_path = os.path.join(cfg.video_save_path, f"episode_{episode + 1}.mp4")
+            env.save_video(video_path)
+
         # Save video when required
         if cfg.video_save_path:
             video_path = os.path.join(cfg.video_save_path, f"episode_{episode + 1}.mp4")
-            env.save_video()
-            env.reset()  # Reset the environment for the next episode
-
+            env.save_video(video_path)
 
 if __name__ == "__main__":
     load_and_play_policy()
