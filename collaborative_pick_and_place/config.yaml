@@ -11,6 +11,7 @@ env_n_objects: 1
 env_enable_rendering: False
 num_play_episodes: 10
 num_max_steps: 50
+video_save_path: ${hydra:runtime.cwd}/videos/
 
 # Training parameters
 episodes: 15000
