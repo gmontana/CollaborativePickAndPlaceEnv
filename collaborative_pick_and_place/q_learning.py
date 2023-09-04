@@ -109,13 +109,14 @@ class QLearning:
         rewards_all_episodes = []
         successful_episodes = 0
         steps_per_episode = []
+        avg_rewards_all_episodes = []
 
         for episode in range(episodes):
             self.env.reset()
+            done = False
             state_hash = self.env.get_hashed_state()
 
             rewards_current_episode = 0
-            done = False
             steps=0
 
             for steps in range(max_steps_per_episode):
@@ -157,6 +158,7 @@ class QLearning:
 
             if episode % 100 == 0:
                 avg_reward = np.mean(rewards_all_episodes[-100:])
+                avg_rewards_all_episodes.append(avg_reward)
                 avg_steps = np.mean(steps_per_episode[-100:])
                 print(f"Episode {episode} | Average Reward: {avg_reward} | Average Steps: {avg_steps}")
 
@@ -164,5 +166,5 @@ class QLearning:
         print(f"Number of successful episodes: {successful_episodes}/{episodes}")
         print(f"Average steps per episode: {sum(steps_per_episode) / episodes}")
 
-        return self.q_table, rewards_all_episodes, steps_per_episode
+        return self.q_table, rewards_all_episodes, steps_per_episode, avg_rewards_all_episodes
 

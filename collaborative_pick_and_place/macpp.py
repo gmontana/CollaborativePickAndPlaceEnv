@@ -61,7 +61,7 @@ class MultiAgentPickAndPlace:
         cell_size=100,
         debug_mode=False,
         enable_rendering=False,
-        save_frames=None
+        create_video=False,
     ):
         self.width = width
         self.length = length
@@ -74,7 +74,7 @@ class MultiAgentPickAndPlace:
         self.objects = []
         self.goals = []
         self.initial_state = initial_state
-        self.save_frames = save_frames
+        self.save_frames = create_video
 
         # Define actions and done flag
         self.action_space = ["move_up", "move_down", "move_left", "move_right", "pass"]
@@ -392,23 +392,23 @@ class MultiAgentPickAndPlace:
     def render(self):
 
         # Fill background
-        self.screen.fill(WHITE)
+        self.offscreen_surface.fill(WHITE)
 
         # Draw grid
         for x in range(0, self.width * self.cell_size, self.cell_size):
             pygame.draw.line(
-                self.screen, BLACK, (x, 0), (x, self.length * self.cell_size)
+                self.offscreen_surface, BLACK, (x, 0), (x, self.length * self.cell_size)
             )
         for y in range(0, self.length * self.cell_size, self.cell_size):
             pygame.draw.line(
-                self.screen, BLACK, (0, y), (self.width * self.cell_size, y)
+                self.offscreen_surface, BLACK, (0, y), (self.width * self.cell_size, y)
             )
 
         # Draw objects
         for obj in self.objects:
             x, y = obj.position
             pygame.draw.circle(
-                self.screen,
+                self.offscreen_surface,
                 GREEN,
                 (
                     x * self.cell_size + self.cell_size // 2,
@@ -421,7 +421,7 @@ class MultiAgentPickAndPlace:
         for goal in self.goals:
             x, y = goal
             pygame.draw.rect(
-                self.screen,
+                self.offscreen_surface,
                 LIGHT_GRAY,
                 (
                     x * self.cell_size + self.cell_size // 3,
@@ -445,20 +445,20 @@ class MultiAgentPickAndPlace:
                 agent_icon = self.picker_icon if agent.picker else self.non_picker_icon
                 agent_icon_resized = pygame.transform.scale(agent_icon, (icon_size, icon_size))
                 agent_icon_rect = agent_icon_resized.get_rect(center=cell_center)
-                self.screen.blit(agent_icon_resized, agent_icon_rect)
+                self.offscreen_surface.blit(agent_icon_resized, agent_icon_rect)
 
                 # Agent is carrying an object 
                 if agent.carrying_object is not None:
                     thickness = 3
-                    pygame.draw.rect(self.screen, GREEN, agent_icon_rect, thickness)
+                    pygame.draw.rect(self.offscreen_surface, GREEN, agent_icon_rect, thickness)
 
             except Exception:
                 # Fallback to default rendering using shapes and colors
                 color = RED if agent.picker else BLUE
                 if agent.carrying_object is not None:
-                    pygame.draw.circle(self.screen, color, cell_center, self.cell_size // 3)
+                    pygame.draw.circle(self.offscreen_surface, color, cell_center, self.cell_size // 3)
                     pygame.draw.rect(
-                        self.screen,
+                        self.offscreen_surface,
                         YELLOW,
                         (
                             x * self.cell_size + self.cell_size // 3,
@@ -469,7 +469,7 @@ class MultiAgentPickAndPlace:
                     )
                 else:
                     pygame.draw.rect(
-                        self.screen,
+                        self.offscreen_surface,
                         color,
                         (
                             x * self.cell_size + self.cell_size // 4,
@@ -479,9 +479,11 @@ class MultiAgentPickAndPlace:
                         ),
                     )
 
-        # Collect frames for the video when required 
+
+        # Collect frames for the video when required and draw 
         if self.save_frames:
             self.frames.append(pygame.surfarray.array3d(self.offscreen_surface))
+
 
         # If rendering is enabled, blit the offscreen surface to the screen and update the display
         if self.enable_rendering:

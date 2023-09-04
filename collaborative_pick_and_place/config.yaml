@@ -3,11 +3,11 @@ q_table_filename: q_table.npy
 
 # Environment parameters
 cell_size: 300
-env_width: 3
-env_length: 3
+env_width: 4
+env_length: 4
 env_n_agents: 2
 env_n_pickers: 1
-env_n_objects: 1
+env_n_objects: 2
 env_enable_rendering: False
 
 # When playing the trained policy
@@ -16,7 +16,7 @@ num_max_steps: 50
 video_save_path: ${hydra:runtime.cwd}/videos/
 
 # Training parameters
-episodes: 200000
+episodes: 500000
 max_steps_per_episode: 50
 discount_factor: 0.90
 min_exploration: 0.02
