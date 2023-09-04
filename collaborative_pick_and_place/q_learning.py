@@ -74,21 +74,29 @@ class QLearning:
         total_steps = 0
         total_return = 0
 
+        print("-----------------------")
+        print("NEW EPISODE STARTS HERE")
+        print(f"Initial state: {state}")
+        print("-----------------------")
+
         while not done and total_steps < max_num_steps:  
             total_steps += 1
 
-            # print(self.env.print_state())
+            print("-----------------------")
             actions = self.greedy_actions(state_hash)
-            # print(actions)
-            _ , rewards, done = self.env.step(actions)
+            print(f"Agents' actions: {actions}")
+            next_state , rewards, done = self.env.step(actions)
             next_state_hash = self.env.get_hashed_state()
+            print(f"Next state: {next_state}")
+            print("-----------------------")
 
             total_reward = sum(rewards)
             state_hash = next_state_hash
             total_return += total_reward
 
-        if done: 
-            success = True
+            if done: 
+                print(f"EPISODE ENDED WITH SUCCESS")
+                success = True
 
         return success, total_return, total_steps
 
@@ -99,8 +107,9 @@ class QLearning:
         steps_per_episode = []
 
         for episode in range(episodes):
-            state = self.env.reset()
+            self.env.reset()
             state_hash = self.env.get_hashed_state()
+
             steps = 0  # Local variable for steps in this episode
             rewards_current_episode = 0
             done = False

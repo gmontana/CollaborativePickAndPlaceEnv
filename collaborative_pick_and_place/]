@@ -134,13 +134,6 @@ class MultiAgentPickAndPlace:
         if hasattr(self, 'video_save_path'):
             self.frames = []
 
-        agent_states = [agent.get_state() for agent in self.agents]
-        object_states = [obj.get_state() for obj in self.objects]
-        goal_states = self.goals
-
-        return agent_states, object_states, goal_states
-
-
     def get_hashed_state(self):
         '''
         Return the hashed current state
@@ -183,6 +176,7 @@ class MultiAgentPickAndPlace:
         # Assign goals with distinct positions
         self.goals = random.sample(all_positions, self.n_objects)  # Sample distinct positions
 
+        return [self.agents, self.objects, self.goals]
 
 
     def initialize_from_state(self, initial_state):
@@ -294,12 +288,6 @@ class MultiAgentPickAndPlace:
             agent = self.agents[idx]
             agent.position = self._move_agent(agent, agent_action)
 
-            # if an agent is carrying an object, the position of the object being carried needs to be updated
-            if agent.carrying_object is not None:
-                carried_object = next((o for o in self.objects if o.id == agent.carrying_object), None)
-                if carried_object:
-                    carried_object.position = agent.position
-
     def _handle_pickups(self):
         objects_to_remove = []
         for agent in self.agents:
@@ -367,7 +355,9 @@ class MultiAgentPickAndPlace:
                         agent.carrying_object = None
                         agent.reward += REWARD_DROP
 
+
     def render(self):
+
 
         # Fill background
         self.screen.fill(WHITE)

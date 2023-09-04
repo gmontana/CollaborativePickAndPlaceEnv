@@ -27,7 +27,7 @@ def run_experiment(cfg: DictConfig):
         cfg.min_exploration
     )
 
-    print("Action Space:", env.get_action_space())
+    # print("Action Space:", env.get_action_space())
 
     q_table, rewards_all_episodes, _ = q_learning.train(cfg.episodes, cfg.max_steps_per_episode)
 
@@ -35,7 +35,7 @@ def run_experiment(cfg: DictConfig):
     q_table.save_q_table(cfg.q_table_filename)
 
     # collect some summary stats after training
-    num_episodes = 100  
+    num_episodes = 10
     successes = []
     total_returns = []
     total_steps_list = []
