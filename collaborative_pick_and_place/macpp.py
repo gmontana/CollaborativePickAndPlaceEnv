@@ -301,16 +301,13 @@ class MultiAgentPickAndPlace:
                     carried_object.position = agent.position
 
     def _handle_pickups(self):
-        objects_to_remove = []
         for agent in self.agents:
             if agent.picker and agent.carrying_object is None:
                 for obj in self.objects:
                     if obj.position == agent.position:
-                        agent.carrying_object = obj.id  
-                        objects_to_remove.append(obj)
+                        agent.carrying_object = obj.id
                         break
-        for obj in objects_to_remove:
-            self.objects.remove(obj)
+
 
     def _handle_passes(self, actions):
 
@@ -346,11 +343,17 @@ class MultiAgentPickAndPlace:
         goal_positions = set(self.goals)
         object_positions = [obj.position for obj in self.objects]
 
+        # Check if any picker agent is at a goal position with an object
+        for agent in self.agents:
+            if agent.picker and agent.carrying_object is not None and agent.position in goal_positions:
+                return 0  # Termination condition not met
+
         # Check if all object positions are in goal positions
         if all(pos in goal_positions for pos in object_positions):
             self.done = True
             return REWARD_COMPLETION
         return 0
+
 
     def _handle_drops(self):
         for agent in self.agents:
