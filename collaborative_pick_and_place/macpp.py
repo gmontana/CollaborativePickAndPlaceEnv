@@ -104,13 +104,11 @@ class MultiAgentPickAndPlace:
                 (self.width * self.cell_size, self.length * self.cell_size)
             )
             pygame.display.set_caption("Collaborative Multi-Agent Pick and Place")
-            picker_icon = pygame.image.load("icons/agent_picker.png")
-            non_picker_icon = pygame.image.load("icons/agent_non_picker.png")
-            self.agent_icons = [picker_icon if agent.picker else non_picker_icon for agent in self.agents]
+            self.picker_icon = pygame.image.load("icons/agent_picker.png")
+            self.non_picker_icon = pygame.image.load("icons/agent_non_picker.png")
 
         if self.save_frames:
             self.frames = []
-
 
     def _validate_actions(self, actions):
         for action in actions:
@@ -166,25 +164,35 @@ class MultiAgentPickAndPlace:
         all_positions = [(x, y) for x in range(self.width) for y in range(self.length)]
         random.shuffle(all_positions)
 
-        # Step 1: Randomly assign Picker flags to agents
+        # Randomly assign Picker flags to agents
         picker_flags = [True] * self.n_pickers + [False] * (self.n_agents - self.n_pickers)
         random.shuffle(picker_flags)
 
-        # Step 2: Randomly allocate goal positions
-        self.goals = random.sample(all_positions, self.n_objects)
-        available_positions = [pos for pos in all_positions if pos not in self.goals]
+        # Randomly allocate object positions
+        object_positions = random.sample(all_positions, self.n_objects)
+        for obj_pos in object_positions:
+            all_positions.remove(obj_pos)
 
-        # Step 3: Randomly allocate object positions (not being goal positions)
-        self.objects = [Object(position=available_positions.pop(), id=i) for i in range(self.n_objects)]
+        # Randomly allocate agent positions
+        agent_positions = random.sample(all_positions, self.n_agents)
+        for agent_pos in agent_positions:
+            all_positions.remove(agent_pos)  
 
-        # Step 4: Randomly allocate agent positions (not being object positions)
+        # Randomly allocate goal positions. 
+        goal_positions = random.sample(all_positions, self.n_objects)
+
+        # Initialize agents
         self.agents = []
         for _ in range(self.n_agents):
-            agent_position = available_positions.pop()
-            agent_picker = picker_flags.pop()
-            self.agents.append(Agent(position=agent_position, picker=agent_picker))
+            agent_position = agent_positions.pop()
+            self.agents.append(Agent(position=agent_position, picker=picker_flags.pop(), carrying_object=None))
 
-        # print(f"Agents: {len(self.agents)}, Objects: {len(self.objects)}, Goals: {len(self.goals)}")
+        # Initialize objects
+        self.objects = [Object(position=obj_pos, id=i) for i, obj_pos in enumerate(object_positions)]
+
+        # Assign goals
+        self.goals = goal_positions
+
 
 
     def initialize_from_state(self, initial_state):
@@ -344,36 +352,6 @@ class MultiAgentPickAndPlace:
                 self.agents[idx].carrying_object = obj_id
 
 
-    # def _handle_passes(self, actions):
-    #
-    #     # Create a list to store agents that will receive objects
-    #     receiving_agents = [None] * len(self.agents)
-    #
-    #     for idx, agent in enumerate(self.agents):
-    #         if actions[idx] == "pass" and agent.carrying_object is not None:
-    #             x, y = agent.position
-    #             adjacent_positions = [(x + 1, y), (x - 1, y), (x, y + 1), (x, y - 1)]
-    #             for adj_pos in adjacent_positions:
-    #                 adj_agent = next((a for a in self.agents if a.position == adj_pos), None)
-    #                 if adj_agent and actions[self.agents.index(adj_agent)] == "pass" and adj_agent.carrying_object is None:
-    #                     receiving_agents[self.agents.index(adj_agent)] = agent.carrying_object
-    #                     agent.carrying_object = None
-    #
-    #                     # Assign rewards based on the type of pass
-    #                     if agent.picker and not adj_agent.picker:
-    #                         agent.reward += REWARD_GOOD_PASS
-    #                         adj_agent.reward += REWARD_GOOD_PASS
-    #                     elif not agent.picker and adj_agent.picker:
-    #                         agent.reward += REWARD_BAD_PASS
-    #                         adj_agent.reward += REWARD_BAD_PASS
-    #
-    #                     break
-    #
-    #     # Process the passing of objects
-    #     for idx, obj_id in enumerate(receiving_agents):
-    #         if obj_id is not None:
-    #             self.agents[idx].carrying_object = obj_id
-
     def check_termination(self):
         goal_positions = set(self.goals)
         object_positions = [obj.position for obj in self.objects]
@@ -444,17 +422,18 @@ class MultiAgentPickAndPlace:
                 ),
             )
 
-        # Draw agents with icon images
-        for idx, agent in enumerate(self.agents):
+        # Draw agents
+        for agent in self.agents:
             x, y = agent.position
-            agent_icon = self.agent_icons[idx] if idx < len(self.agent_icons) else None
-            if agent_icon:
-                cell_center = (
-                    x * self.cell_size + self.cell_size // 2,
-                    y * self.cell_size + self.cell_size // 2
-                )
-                scaling_factor = 0.8 
-                icon_size = int(self.cell_size * scaling_factor)
+            cell_center = (
+                x * self.cell_size + self.cell_size // 2,
+                y * self.cell_size + self.cell_size // 2
+            )
+            scaling_factor = 0.8 
+            icon_size = int(self.cell_size * scaling_factor)
+
+            try:
+                agent_icon = self.picker_icon if agent.picker else self.non_picker_icon
                 agent_icon_resized = pygame.transform.scale(agent_icon, (icon_size, icon_size))
                 agent_icon_rect = agent_icon_resized.get_rect(center=cell_center)
                 self.screen.blit(agent_icon_resized, agent_icon_rect)
@@ -464,51 +443,35 @@ class MultiAgentPickAndPlace:
                     thickness = 3
                     pygame.draw.rect(self.screen, GREEN, agent_icon_rect, thickness)
 
-
-
-        # # Draw agents
-        # for agent in self.agents:
-        #     x, y = agent.position
-        #     color = RED if agent.picker else BLUE
-        #     if agent.carrying_object is not None:
-        #         # Draw an additional shape or symbol to represent carrying agents
-        #         pygame.draw.circle(
-        #             self.screen,
-        #             color,
-        #             (
-        #                 x * self.cell_size + self.cell_size // 2,
-        #                 y * self.cell_size + self.cell_size // 2,
-        #             ),
-        #             self.cell_size // 3,
-        #         )
-        #         # Draw a smaller rectangle inside the agent's cell to represent the object they're carrying
-        #         pygame.draw.rect(
-        #             self.screen,
-        #             YELLOW,
-        #             (
-        #                 x * self.cell_size + self.cell_size // 3,
-        #                 y * self.cell_size + self.cell_size // 3,
-        #                 self.cell_size // 3,
-        #                 self.cell_size // 3,
-        #             ),
-        #         )
-        #     else:
-        #         pygame.draw.rect(
-        #             self.screen,
-        #             color,
-        #             (
-        #                 x * self.cell_size + self.cell_size // 4,
-        #                 y * self.cell_size + self.cell_size // 4,
-        #                 self.cell_size // 2,
-        #                 self.cell_size // 2,
-        #             ),
-        #         )
+            except Exception:
+                # Fallback to default rendering using shapes and colors
+                color = RED if agent.picker else BLUE
+                if agent.carrying_object is not None:
+                    pygame.draw.circle(self.screen, color, cell_center, self.cell_size // 3)
+                    pygame.draw.rect(
+                        self.screen,
+                        YELLOW,
+                        (
+                            x * self.cell_size + self.cell_size // 3,
+                            y * self.cell_size + self.cell_size // 3,
+                            self.cell_size // 3,
+                            self.cell_size // 3,
+                        ),
+                    )
+                else:
+                    pygame.draw.rect(
+                        self.screen,
+                        color,
+                        (
+                            x * self.cell_size + self.cell_size // 4,
+                            y * self.cell_size + self.cell_size // 4,
+                            self.cell_size // 2,
+                            self.cell_size // 2,
+                        ),
+                    )
 
         if self.save_frames:
-            # frame = pygame.surfarray.array3d(pygame.display.get_surface())
-            # frame = np.rot90(frame, -1)
-            # self.frames.append(frame)
-            pygame.display.flip()  # Ensure everything is drawn
+            pygame.display.flip()  
             frame = pygame.surfarray.array3d(pygame.display.get_surface())
             self.frames.append(np.transpose(frame, (1, 0, 2)))  
 
