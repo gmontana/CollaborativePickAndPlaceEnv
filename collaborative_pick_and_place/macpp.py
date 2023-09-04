@@ -98,15 +98,24 @@ class MultiAgentPickAndPlace:
         if total_entities > total_cells: 
             raise ValueError("Grid size not sufficiently large to contain all the entities.")
 
+        # Initialise pygame
+        pygame.init()
+
+        # Create the offscreen surface for rendering
+        self.offscreen_surface = pygame.Surface((self.width * self.cell_size, self.length * self.cell_size))
+
+        # Load agent icons
+        self.picker_icon = pygame.image.load("icons/agent_picker.png")
+        self.non_picker_icon = pygame.image.load("icons/agent_non_picker.png")
+
+        # When rendering is required, create the screen for display
         if self.enable_rendering:
-            pygame.init()
             self.screen = pygame.display.set_mode(
                 (self.width * self.cell_size, self.length * self.cell_size)
             )
             pygame.display.set_caption("Collaborative Multi-Agent Pick and Place")
-            self.picker_icon = pygame.image.load("icons/agent_picker.png")
-            self.non_picker_icon = pygame.image.load("icons/agent_non_picker.png")
 
+        # Collect frames for the video
         if self.save_frames:
             self.frames = []
 
@@ -470,14 +479,16 @@ class MultiAgentPickAndPlace:
                         ),
                     )
 
+        # Collect frames for the video when required 
         if self.save_frames:
-            pygame.display.flip()  
-            frame = pygame.surfarray.array3d(pygame.display.get_surface())
-            self.frames.append(np.transpose(frame, (1, 0, 2)))  
+            self.frames.append(pygame.surfarray.array3d(self.offscreen_surface))
 
+        # If rendering is enabled, blit the offscreen surface to the screen and update the display
+        if self.enable_rendering:
+            self.screen.blit(self.offscreen_surface, (0, 0))
+            pygame.display.flip()
+            pygame.time.wait(ANIMATION_DELAY)
 
-        pygame.display.flip()
-        pygame.time.wait(ANIMATION_DELAY)
 
     def save_video(self, video_path):
         print(f"Saving {len(self.frames)} frames in a video to: {video_path}")  
