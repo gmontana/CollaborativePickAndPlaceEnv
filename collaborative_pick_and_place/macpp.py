@@ -56,12 +56,12 @@ class MultiAgentPickAndPlace:
         length,
         n_agents,
         n_pickers,
-        n_objects=None, # default to number of objects = number of agents
+        n_objects=None, # default to number of agents
         initial_state=None,
         cell_size=100,
         debug_mode=False,
         enable_rendering=False,
-        video_save_path=None
+        save_frames=None
     ):
         self.width = width
         self.length = length
@@ -70,16 +70,17 @@ class MultiAgentPickAndPlace:
         self.debug_mode = debug_mode
         self.enable_rendering = enable_rendering
         self.n_pickers = n_pickers
+        self.agents = []
         self.objects = []
         self.goals = []
         self.initial_state = initial_state
-        self.video_save_path = video_save_path
+        self.save_frames = save_frames
 
         # Define actions and done flag
         self.action_space = ["move_up", "move_down", "move_left", "move_right", "pass"]
         self.done = False
 
-        # Set the number of objects (and goals)
+        # Set the number of objects and goals
         if n_objects is None:
             self.n_objects = self.n_agents
         else:
@@ -107,7 +108,7 @@ class MultiAgentPickAndPlace:
             non_picker_icon = pygame.image.load("icons/agent_non_picker.png")
             self.agent_icons = [picker_icon if agent.picker else non_picker_icon for agent in self.agents]
 
-        if self.video_save_path is not None:
+        if self.save_frames:
             self.frames = []
 
 
@@ -131,7 +132,7 @@ class MultiAgentPickAndPlace:
             agent.carrying_object = None
         self.done = False
 
-        if hasattr(self, 'video_save_path'):
+        if self.save_frames:
             self.frames = []
 
         agent_states = [agent.get_state() for agent in self.agents]
@@ -139,7 +140,6 @@ class MultiAgentPickAndPlace:
         goal_states = self.goals
 
         return agent_states, object_states, goal_states
-
 
     def get_hashed_state(self):
         '''
@@ -161,28 +161,30 @@ class MultiAgentPickAndPlace:
         '''
         return self.action_space
 
-
     def random_initialize(self):
-        '''
-        Initialise the environment in a random state
-        '''
 
         all_positions = [(x, y) for x in range(self.width) for y in range(self.length)]
         random.shuffle(all_positions)
 
-        # Initialize objects with distinct positions
-        self.objects = [Object(all_positions.pop(), id=i) for i in range(self.n_objects)]
-
-        # Create a list of picker flags based on the number of pickers
+        # Step 1: Randomly assign Picker flags to agents
         picker_flags = [True] * self.n_pickers + [False] * (self.n_agents - self.n_pickers)
-        random.shuffle(picker_flags)  # Shuffle to randomize which agents are pickers
+        random.shuffle(picker_flags)
 
-        # Initialize agents with distinct positions
-        self.agents = [Agent(position=all_positions.pop(), picker=picker) for picker in picker_flags]
+        # Step 2: Randomly allocate goal positions
+        self.goals = random.sample(all_positions, self.n_objects)
+        available_positions = [pos for pos in all_positions if pos not in self.goals]
 
-        # Assign goals with distinct positions
-        self.goals = random.sample(all_positions, self.n_objects)  # Sample distinct positions
+        # Step 3: Randomly allocate object positions (not being goal positions)
+        self.objects = [Object(position=available_positions.pop(), id=i) for i in range(self.n_objects)]
 
+        # Step 4: Randomly allocate agent positions (not being object positions)
+        self.agents = []
+        for _ in range(self.n_agents):
+            agent_position = available_positions.pop()
+            agent_picker = picker_flags.pop()
+            self.agents.append(Agent(position=agent_position, picker=agent_picker))
+
+        # print(f"Agents: {len(self.agents)}, Objects: {len(self.objects)}, Goals: {len(self.goals)}")
 
 
     def initialize_from_state(self, initial_state):
@@ -249,7 +251,7 @@ class MultiAgentPickAndPlace:
         self._handle_drops()
         self._handle_pickups()
         self._handle_passes(actions)
-        termination_reward = self._check_termination()
+        termination_reward = self.check_termination()
 
         done = False
         if termination_reward:
@@ -308,7 +310,6 @@ class MultiAgentPickAndPlace:
                         agent.carrying_object = obj.id
                         break
 
-
     def _handle_passes(self, actions):
 
         # Create a list to store agents that will receive objects
@@ -322,6 +323,9 @@ class MultiAgentPickAndPlace:
                     adj_agent = next((a for a in self.agents if a.position == adj_pos), None)
                     if adj_agent and actions[self.agents.index(adj_agent)] == "pass" and adj_agent.carrying_object is None:
                         receiving_agents[self.agents.index(adj_agent)] = agent.carrying_object
+                        obj = next((o for o in self.objects if o.id == agent.carrying_object), None)
+                        if obj:
+                            obj.position = adj_agent.position  # Update the object's position
                         agent.carrying_object = None
 
                         # Assign rewards based on the type of pass
@@ -339,20 +343,48 @@ class MultiAgentPickAndPlace:
             if obj_id is not None:
                 self.agents[idx].carrying_object = obj_id
 
-    def _check_termination(self):
+
+    # def _handle_passes(self, actions):
+    #
+    #     # Create a list to store agents that will receive objects
+    #     receiving_agents = [None] * len(self.agents)
+    #
+    #     for idx, agent in enumerate(self.agents):
+    #         if actions[idx] == "pass" and agent.carrying_object is not None:
+    #             x, y = agent.position
+    #             adjacent_positions = [(x + 1, y), (x - 1, y), (x, y + 1), (x, y - 1)]
+    #             for adj_pos in adjacent_positions:
+    #                 adj_agent = next((a for a in self.agents if a.position == adj_pos), None)
+    #                 if adj_agent and actions[self.agents.index(adj_agent)] == "pass" and adj_agent.carrying_object is None:
+    #                     receiving_agents[self.agents.index(adj_agent)] = agent.carrying_object
+    #                     agent.carrying_object = None
+    #
+    #                     # Assign rewards based on the type of pass
+    #                     if agent.picker and not adj_agent.picker:
+    #                         agent.reward += REWARD_GOOD_PASS
+    #                         adj_agent.reward += REWARD_GOOD_PASS
+    #                     elif not agent.picker and adj_agent.picker:
+    #                         agent.reward += REWARD_BAD_PASS
+    #                         adj_agent.reward += REWARD_BAD_PASS
+    #
+    #                     break
+    #
+    #     # Process the passing of objects
+    #     for idx, obj_id in enumerate(receiving_agents):
+    #         if obj_id is not None:
+    #             self.agents[idx].carrying_object = obj_id
+
+    def check_termination(self):
         goal_positions = set(self.goals)
         object_positions = [obj.position for obj in self.objects]
 
-        # Check if any picker agent is at a goal position with an object
-        for agent in self.agents:
-            if agent.picker and agent.carrying_object is not None and agent.position in goal_positions:
-                return 0  # Termination condition not met
+        for obj in self.objects:
+            if obj.position in goal_positions:
+                agent = next((a for a in self.agents if a.carrying_object == obj.id and not a.picker), None)
+                if agent:
+                    return REWARD_COMPLETION  
 
-        # Check if all object positions are in goal positions
-        if all(pos in goal_positions for pos in object_positions):
-            self.done = True
-            return REWARD_COMPLETION
-        return 0
+        return 0  
 
 
     def _handle_drops(self):
@@ -472,7 +504,7 @@ class MultiAgentPickAndPlace:
         #             ),
         #         )
 
-        if self.video_save_path:
+        if self.save_frames:
             # frame = pygame.surfarray.array3d(pygame.display.get_surface())
             # frame = np.rot90(frame, -1)
             # self.frames.append(frame)
@@ -485,7 +517,7 @@ class MultiAgentPickAndPlace:
         pygame.time.wait(ANIMATION_DELAY)
 
     def save_video(self, video_path):
-        if self.video_save_path is not None and len(self.frames) > 0:
-            imageio.mimsave(video_path, self.frames, fps=ANIMATION_FPS)  # Use video_path here
-            self.frames = []
+        print(f"Saving {len(self.frames)} frames in a video to: {video_path}")  
+        imageio.mimsave(video_path, self.frames, fps=ANIMATION_FPS)
+        self.frames = []
 
