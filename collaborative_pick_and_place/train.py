@@ -3,7 +3,7 @@ from omegaconf import DictConfig
 from macpp import MultiAgentPickAndPlace
 from q_learning import QLearning
 import numpy as np
-import os
+import matplotlib.pyplot as plt
 
 @hydra.main(config_name="config", version_base="1.1")
 def run_experiment(cfg: DictConfig):
@@ -30,12 +30,12 @@ def run_experiment(cfg: DictConfig):
 
     # print("Action Space:", env.get_action_space())
 
-    q_table, rewards_all_episodes, _ = q_learning.train(cfg.episodes, cfg.max_steps_per_episode)
+    q_table, rewards_all_episodes, _, avg_rewards_all_episodes = q_learning.train(cfg.episodes, cfg.max_steps_per_episode)
 
     # save final policy 
     q_table.save_q_table(cfg.q_table_filename)
 
-    # Initialise env again with save_frames=True
+    # Initialise env again to create a video 
     env_with_video = MultiAgentPickAndPlace(
         cell_size=cfg.cell_size,
         width=cfg.env_width,
@@ -43,15 +43,26 @@ def run_experiment(cfg: DictConfig):
         n_agents=cfg.env_n_agents,
         n_pickers=cfg.env_n_pickers,
         n_objects=cfg.env_n_objects,
-        enable_rendering=True,
-        save_frames=True
+        enable_rendering=False,
+        create_video=True
     )
 
     q_learning.env = env_with_video
     q_learning.q_table = q_table
 
-    # collect some summary stats after training
-    num_episodes = 10
+    # Create a training curve
+    plt.plot(avg_rewards_all_episodes)
+    plt.xlabel('Episode')
+    plt.ylabel('Average Reward')
+    config_details = f"Grid Size: {cfg.env_width}x{cfg.env_length}\nNumber of Agents: {cfg.env_n_agents}\nNumber of Pickers: {cfg.env_n_pickers}\nNumber of Objects: {cfg.env_n_objects}"
+    plt.title(f"Training Curve\n{config_details}")
+    plot_filename = "training_curve.png" 
+    plt.savefig(plot_filename)
+    print(f"Training curve saved to: {plot_filename}")
+    plt.savefig("training_curve.png")
+
+    # Create some summary stats and videos after training
+    num_episodes = 30
     successes = []
     total_returns = []
     total_steps_list = []
