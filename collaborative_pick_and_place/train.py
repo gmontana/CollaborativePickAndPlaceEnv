@@ -3,6 +3,7 @@ from omegaconf import DictConfig
 from macpp import MultiAgentPickAndPlace
 from q_learning import QLearning
 import numpy as np
+import os
 
 @hydra.main(config_name="config", version_base="1.1")
 def run_experiment(cfg: DictConfig):
@@ -34,6 +35,21 @@ def run_experiment(cfg: DictConfig):
     # save final policy 
     q_table.save_q_table(cfg.q_table_filename)
 
+    # Initialise env again with save_frames=True
+    env_with_video = MultiAgentPickAndPlace(
+        cell_size=cfg.cell_size,
+        width=cfg.env_width,
+        length=cfg.env_length,
+        n_agents=cfg.env_n_agents,
+        n_pickers=cfg.env_n_pickers,
+        n_objects=cfg.env_n_objects,
+        enable_rendering=True,
+        save_frames=True
+    )
+
+    q_learning.env = env_with_video
+    q_learning.q_table = q_table
+
     # collect some summary stats after training
     num_episodes = 10
     successes = []
@@ -41,8 +57,9 @@ def run_experiment(cfg: DictConfig):
     total_steps_list = []
 
     print(f"\nExecuting learned policy over {num_episodes} episodes for statistics:")
-    for e in range(num_episodes):
-        success, total_return, total_steps = q_learning.execute(cfg.num_max_steps)
+    for _ in range(num_episodes):
+
+        success, total_return, total_steps = q_learning.execute(cfg.num_max_steps, save_video=True)
         successes.append(success)
         total_returns.append(total_return)
         total_steps_list.append(total_steps)

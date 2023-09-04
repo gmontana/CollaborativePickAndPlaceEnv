@@ -16,10 +16,10 @@ num_max_steps: 50
 video_save_path: ${hydra:runtime.cwd}/videos/
 
 # Training parameters
-episodes: 150000
+episodes: 200000
 max_steps_per_episode: 50
 discount_factor: 0.90
-min_exploration: 0.01
+min_exploration: 0.02
 exploration_rate: 1.0
 exploration_decay: 0.99
 min_learning_rate: 0.01

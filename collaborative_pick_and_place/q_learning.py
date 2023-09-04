@@ -1,4 +1,7 @@
 import numpy as np
+from datetime import datetime
+import random
+import os
 
 class QTable:
     def __init__(self, n_agents, action_space):
@@ -32,12 +35,6 @@ class QTable:
         self.q_table = np.load(filename, allow_pickle=True).item()
         print(f"Number of elements in the Q table: {self.count_elements()}")
 
-    def get_best_action(self, state, env):
-        hashed_state = self.hash_state(state)
-        if hashed_state not in self.q_table:
-            return random.choice(env.get_action_space())
-        return np.argmax(self.q_table[hashed_state])
-
 
 class QLearning:
     def __init__(self, env, learning_rate=0.1, discount_factor=0.99, exploration_rate=1.0, exploration_decay=0.995, min_exploration=0.01, learning_rate_decay=0.995, min_learning_rate=0.01):
@@ -64,7 +61,7 @@ class QLearning:
         actions_indices = np.unravel_index(np.argmax(q_values), q_values.shape)
         return [self.q_table.action_space[index] for index in actions_indices]
 
-    def execute(self, max_num_steps):
+    def execute(self, max_num_steps, save_video=False):
 
         state = self.env.reset()
         state_hash = self.env.get_hashed_state()
@@ -98,6 +95,13 @@ class QLearning:
                 print(f"EPISODE ENDED WITH SUCCESS")
                 success = True
 
+        if save_video:
+            script_dir = os.path.dirname(os.path.abspath(__file__))
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            filename=script_dir+f"/videos/episode_{timestamp}.mp4"
+            print(f"Saving movie in {filename}.")
+            self.env.save_video(filename)
+
         return success, total_return, total_steps
 
 
@@ -110,13 +114,13 @@ class QLearning:
             self.env.reset()
             state_hash = self.env.get_hashed_state()
 
-            steps = 0  # Local variable for steps in this episode
             rewards_current_episode = 0
             done = False
+            steps=0
 
-            for step in range(max_steps_per_episode):
+            for steps in range(max_steps_per_episode):
                 actions = self.epsilon_greedy_actions(state_hash)
-                next_state, rewards, done = self.env.step(actions)
+                _, rewards, done = self.env.step(actions)
                 next_state_hash = self.env.get_hashed_state()
 
                 # the total reward is the sum of all agents' individual rewards
@@ -137,7 +141,6 @@ class QLearning:
 
                 rewards_current_episode += total_reward
                 state_hash = next_state_hash
-                steps += 1
 
                 if done:
                     break
