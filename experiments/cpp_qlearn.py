@@ -1,4 +1,3 @@
-# import os
 import sys
 import wandb
 import numpy as np
@@ -7,77 +6,58 @@ from algos.q_learning import QLearning
 
 sys.path.append('/home/gm13/Dropbox/mycode/envs/multi_agent_rl')
 
-# Parameters from config.yaml
-q_table_filename = "q_table.npy"
-cell_size = 300
-env_width = 4
-env_length = 4
-env_n_agents = 2
-env_n_pickers = 1
-env_n_objects = 2
-env_enable_rendering = False
-episodes = 500000
-max_steps_per_episode = 50
-discount_factor = 0.90
-min_exploration = 0.02
-exploration_rate = 1.0
-exploration_decay = 0.99
-min_learning_rate = 0.01
-learning_rate = 0.1
-learning_rate_decay = 0.995
+# Configuration parameters
+config = {
+    "q_table_filename": "q_table.npy",
+    "cell_size": 300,
+    "env_width": 4,
+    "env_length": 4,
+    "env_n_agents": 2,
+    "env_n_pickers": 1,
+    "env_n_objects": 2,
+    "env_enable_rendering": False,
+    "episodes": 500000,
+    "max_steps_per_episode": 50,
+    "discount_factor": 0.90,
+    "min_exploration": 0.02,
+    "exploration_rate": 1.0,
+    "exploration_decay": 0.99,
+    "min_learning_rate": 0.01,
+    "learning_rate": 0.1,
+    "learning_rate_decay": 0.995
+}
 
 # Initialize WandB
-wandb.init(project="cpp_qlearn", config={
-    "q_table_filename": q_table_filename,
-    "cell_size": cell_size,
-    "env_width": env_width,
-    "env_length": env_length,
-    "env_n_agents": env_n_agents,
-    "env_n_pickers": env_n_pickers,
-    "env_n_objects": env_n_objects,
-    "env_enable_rendering": env_enable_rendering,
-    "episodes": episodes,
-    "max_steps_per_episode": max_steps_per_episode,
-    "discount_factor": discount_factor,
-    "min_exploration": min_exploration,
-    "exploration_rate": exploration_rate,
-    "exploration_decay": exploration_decay,
-    "min_learning_rate": min_learning_rate,
-    "learning_rate": learning_rate,
-    "learning_rate_decay": learning_rate_decay
-})
+wandb.init(project="cpp_qlearn", config=config)
 
-def run_training(self, episodes, max_steps_per_episode):
+def run_training(q_learning, episodes, max_steps_per_episode):
     rewards_all_episodes = []
     successful_episodes = 0
     steps_per_episode = []
 
-    for episode in range(episodes):
-        state = self.env.reset()
-        state_hash = self.env.get_hashed_state()
+    for _ in range(episodes):  
+        state_hash = q_learning.env.reset()
         rewards_current_episode = 0
 
+        step = -1  
         for step in range(max_steps_per_episode):
-            total_reward, done, next_state_hash = self.train(state_hash)
+            total_reward, done, next_state_hash = q_learning.train(state_hash)
             rewards_current_episode += total_reward
             state_hash = next_state_hash
-
             if done:
                 break
 
         rewards_all_episodes.append(rewards_current_episode)
-        steps_per_episode.append(step)
+        steps_per_episode.append(step + 1) 
 
         # Check for a successful episode
-        if step <= max_steps_per_episode:
+        if step + 1 <= max_steps_per_episode:
             successful_episodes += 1
-
-        # Logging or any other operations you want to perform at the end of each episode
 
     return rewards_all_episodes, steps_per_episode
 
 def run_experiment():
-    # Access parameters using WandB's API
+
     cfg = wandb.config
 
     # Initialise env
@@ -101,7 +81,7 @@ def run_experiment():
         cfg.min_exploration
     )
 
-    _, rewards_all_episodes, _, _ = q_learning.train(cfg.episodes, cfg.max_steps_per_episode)
+    rewards_all_episodes, _ = run_training(q_learning, cfg.episodes, cfg.max_steps_per_episode)
     wandb.log({"Rewards for All Episodes": rewards_all_episodes})
 
     # Log rewards and other metrics
