@@ -3,8 +3,8 @@ import pygame
 import json 
 import imageio
 import os
-import numpy as np
-import hashlib
+# import numpy as np
+# import hashlib
 
 ANIMATION_DELAY = 500
 ANIMATION_FPS = 5
@@ -434,6 +434,12 @@ class MultiAgentPickAndPlace:
                 ),
             )
 
+        # Load icons for agents
+        base_path = os.path.dirname(__file__)
+        icon_path = os.path.join(base_path, "icons")
+        self.picker_icon = self._load_image(os.path.join(icon_path, "agent_picker.png"), (255, 0, 0))
+        self.non_picker_icon = self._load_image(os.path.join(icon_path, "agent_non_picker.png"), (0, 0, 255))
+
         # Draw agents
         for agent in self.agents:
             x, y = agent.position
@@ -444,22 +450,17 @@ class MultiAgentPickAndPlace:
             scaling_factor = 0.8 
             icon_size = int(self.cell_size * scaling_factor)
 
-            # Use icons
-            base_path = os.path.dirname(__file__)
-            icon_path = os.path.join(base_path, "icons")
+            try:
+                # Use icons
+                agent_icon = self.picker_icon if agent.picker else self.non_picker_icon
+                agent_icon_resized = pygame.transform.scale(agent_icon, (icon_size, icon_size))
+                agent_icon_rect = agent_icon_resized.get_rect(center=cell_center)
+                self.offscreen_surface.blit(agent_icon_resized, agent_icon_rect)
 
-            self.picker_icon = self._load_image(os.path.join(icon_path, "agent_picker.png"), (255, 0, 0))
-            self.non_picker_icon = self._load_image(os.path.join(icon_path, "agent_non_picker.png"), (0, 0, 255))
-
-            agent_icon = self.picker_icon if agent.picker else self.non_picker_icon
-            agent_icon_resized = pygame.transform.scale(agent_icon, (icon_size, icon_size))
-            agent_icon_rect = agent_icon_resized.get_rect(center=cell_center)
-            self.offscreen_surface.blit(agent_icon_resized, agent_icon_rect)
-
-            # Agent is carrying an object 
-            if agent.carrying_object is not None:
-                thickness = 3
-                pygame.draw.rect(self.offscreen_surface, GREEN, agent_icon_rect, thickness)
+                # Agent is carrying an object 
+                if agent.carrying_object is not None:
+                    thickness = 3
+                    pygame.draw.rect(self.offscreen_surface, GREEN, agent_icon_rect, thickness)
 
             except Exception:
                 # Fallback to default rendering using shapes and colors
@@ -487,6 +488,7 @@ class MultiAgentPickAndPlace:
                             self.cell_size // 2,
                         ),
                     )
+
 
         # Collect frames for the video when required and draw 
         if self.save_frames:
