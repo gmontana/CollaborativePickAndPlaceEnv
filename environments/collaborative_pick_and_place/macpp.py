@@ -23,6 +23,7 @@ BLACK = (0, 0, 0)
 GRAY = (200, 200, 200)
 LIGHT_GRAY = (200, 200, 200)
 YELLOW = (255, 255, 0)
+
  
 class Agent:
     def __init__(self, position, picker, carrying_object=None):
@@ -105,8 +106,8 @@ class MultiAgentPickAndPlace:
         self.offscreen_surface = pygame.Surface((self.width * self.cell_size, self.length * self.cell_size))
 
         # Load agent icons
-        self.picker_icon = pygame.image.load("icons/agent_picker.png")
-        self.non_picker_icon = pygame.image.load("icons/agent_non_picker.png")
+        image_path = os.path.join(os.path.dirname(__file__), "icons", "agent_picker.png")
+        self.picker_icon = pygame.image.load(image_path)
 
         # When rendering is required, create the screen for display
         if self.enable_rendering:
@@ -389,6 +390,8 @@ class MultiAgentPickAndPlace:
                         agent.carrying_object = None
                         agent.reward += REWARD_DROP
 
+
+
     def render(self):
 
         # Fill background
@@ -441,16 +444,22 @@ class MultiAgentPickAndPlace:
             scaling_factor = 0.8 
             icon_size = int(self.cell_size * scaling_factor)
 
-            try:
-                agent_icon = self.picker_icon if agent.picker else self.non_picker_icon
-                agent_icon_resized = pygame.transform.scale(agent_icon, (icon_size, icon_size))
-                agent_icon_rect = agent_icon_resized.get_rect(center=cell_center)
-                self.offscreen_surface.blit(agent_icon_resized, agent_icon_rect)
+            # Use icons
+            base_path = os.path.dirname(__file__)
+            icon_path = os.path.join(base_path, "icons")
 
-                # Agent is carrying an object 
-                if agent.carrying_object is not None:
-                    thickness = 3
-                    pygame.draw.rect(self.offscreen_surface, GREEN, agent_icon_rect, thickness)
+            self.picker_icon = self._load_image(os.path.join(icon_path, "agent_picker.png"), (255, 0, 0))
+            self.non_picker_icon = self._load_image(os.path.join(icon_path, "agent_non_picker.png"), (0, 0, 255))
+
+            agent_icon = self.picker_icon if agent.picker else self.non_picker_icon
+            agent_icon_resized = pygame.transform.scale(agent_icon, (icon_size, icon_size))
+            agent_icon_rect = agent_icon_resized.get_rect(center=cell_center)
+            self.offscreen_surface.blit(agent_icon_resized, agent_icon_rect)
+
+            # Agent is carrying an object 
+            if agent.carrying_object is not None:
+                thickness = 3
+                pygame.draw.rect(self.offscreen_surface, GREEN, agent_icon_rect, thickness)
 
             except Exception:
                 # Fallback to default rendering using shapes and colors
@@ -479,7 +488,6 @@ class MultiAgentPickAndPlace:
                         ),
                     )
 
-
         # Collect frames for the video when required and draw 
         if self.save_frames:
             self.frames.append(pygame.surfarray.array3d(self.offscreen_surface))
@@ -490,6 +498,15 @@ class MultiAgentPickAndPlace:
             self.screen.blit(self.offscreen_surface, (0, 0))
             pygame.display.flip()
             pygame.time.wait(ANIMATION_DELAY)
+
+    def _load_image(self, image_path, placeholder_color):
+        try:
+            return pygame.image.load(image_path)
+        except FileNotFoundError:
+            print(f"Warning: Image file {image_path} not found. Using a default placeholder.")
+            placeholder = pygame.Surface((50, 50))
+            pygame.draw.rect(placeholder, placeholder_color, (0, 0, 50, 50))
+            return placeholder
 
 
     def save_video(self, video_path):
