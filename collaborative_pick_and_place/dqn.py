@@ -55,7 +55,13 @@ class DQN(nn.Module):
         return self.fc(x)
 
     def epsilon_greedy_actions(self, state):
-        return 0
+        if random.random() < self.epsilon:
+            return self.env.action_space.sample()
+        else:
+            with torch.no_grad():
+                state_tensor = torch.FloatTensor(state).to(self.device)
+                q_values = self.policy_net(state_tensor)
+                return torch.argmax(q_values).item()
 
     def train(self, episodes):
 
