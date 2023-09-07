@@ -41,7 +41,7 @@ def run_training(q_learning, train_episodes, max_steps_per_episode):
     steps_per_episode = []
 
     for _ in range(train_episodes):  
-        state_hash = q_learning.env.reset()
+        state, state_hash = q_learning.env.reset()
         rewards_current_episode = 0
 
         step = -1  
