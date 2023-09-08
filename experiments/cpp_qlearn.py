@@ -41,7 +41,7 @@ def run_training(q_learning, train_episodes, max_steps_per_episode):
     steps_per_episode = []
 
     for _ in range(train_episodes):  
-        state, state_hash = q_learning.env.reset()
+        state_hash = q_learning.env.reset()
         rewards_current_episode = 0
 
         step = -1  
@@ -110,7 +110,8 @@ def run_experiment():
 
     print(f"\nExecuting learned policy over {num_episodes} episodes for statistics:")
     for _ in range(num_episodes):
-        success, total_return, total_steps = q_learning.execute(cfg.max_steps_per_episode, save_video=True)
+        # success, total_return, total_steps = q_learning.execute(cfg.max_steps_per_episode, save_video=True)
+        success, total_return, total_steps = q_learning.execute(cfg.max_steps_per_episode)
         successes.append(success)
         total_returns.append(total_return)
         total_steps_list.append(total_steps)
