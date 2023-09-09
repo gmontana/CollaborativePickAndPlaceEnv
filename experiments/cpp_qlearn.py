@@ -34,59 +34,15 @@ config = {
 # Initialize WandB
 wandb.init(project="cpp_qlearn", name="tabular_q", config=config)
 
-def run_execution():
-
-    cfg = wandb.config
-
-    # Re-initialise environment 
-    env = MultiAgentPickAndPlace(
-        cell_size=cfg.cell_size,
-        width=cfg.env_width,
-        length=cfg.env_length,
-        n_agents=cfg.env_n_agents,
-        n_pickers=cfg.env_n_pickers,
-        n_objects=cfg.env_n_objects,
-        enable_rendering=True,
-        create_video=True
-    )
-
-    # Set up Q learning algorithm 
-    q_learning = QLearning(
-        env, 
-        cfg.learning_rate, 
-        cfg.discount_factor, 
-        cfg.exploration_rate, 
-        cfg.exploration_decay, 
-        cfg.min_exploration
-    )
-
-    # Load the policy
-    q_learning.q_table.load_q_table(cfg.q_table_filename)
-
-    # Create some summary stats and videos after training
-    num_episodes = 10
-    successes = []
-    total_returns = []
-    total_steps_list = []
-
-    print(f"\nExecuting learned policy over {num_episodes} episodes for statistics:")
-    for i in range(num_episodes):
-        success, total_return, total_steps = q_learning.execute(cfg.max_steps_per_episode)
-        successes.append(success)
-        total_returns.append(total_return)
-        total_steps_list.append(total_steps)
-
-        # save the video
-        timestamp = datetime.datetime.now().strftime('%Y%m%d_%H%M%S')
-        video_filename = f"policy_video_{i}_{timestamp}.mp4"
-        env.save_video(video_filename)
-
-    print(f"Average return: {np.mean(total_returns)} | Average steps: {total_steps_list}")
-
-def run_training(q_learning, train_episodes, max_steps_per_episode):
+def run_episodes(q_learning, train_episodes, max_steps_per_episode, training):
     rewards_all_episodes = []
     successful_episodes = 0
     steps_all_episodes = []
+
+    if not training:
+        train_episodes=1
+
+    print(f"Running {train_episodes} episode(s)...")
 
     for episode in range(train_episodes):  
         state_hash = q_learning.env.reset()
@@ -94,7 +50,10 @@ def run_training(q_learning, train_episodes, max_steps_per_episode):
 
         step = -1  
         for step in range(max_steps_per_episode):
-            total_reward, done, next_state_hash = q_learning.train(state_hash)
+            if training:
+                total_reward, done, next_state_hash = q_learning.train(state_hash)
+            else:
+                total_reward, done, next_state_hash = q_learning.execute(state_hash)
             rewards_current_episode += total_reward
             state_hash = next_state_hash
             if done:
@@ -115,11 +74,21 @@ def run_training(q_learning, train_episodes, max_steps_per_episode):
                 "Average Steps": np.mean(steps_all_episodes[-100:])
             })
 
+        # Save the video when non trainng 
+        if not training:
+            print("Saving the video")
+            timestamp = datetime.datetime.now().strftime('%Y%m%d_%H%M%S')
+            video_filename = f"policy_video_{i}_{timestamp}.mp4"
+            env.save_video(video_filename)
+
     return rewards_all_episodes, steps_all_episodes
 
-def run_experiment():
+def run_experiment(training):
 
     cfg = wandb.config
+
+    enable_rendering=False if training else True
+    create_video=False if training else True
 
     # Initialise environment 
     env = MultiAgentPickAndPlace(
@@ -129,7 +98,8 @@ def run_experiment():
         n_agents=cfg.env_n_agents,
         n_pickers=cfg.env_n_pickers,
         n_objects=cfg.env_n_objects,
-        enable_rendering=cfg.env_enable_rendering,
+        enable_rendering=enable_rendering,
+        create_video=create_video
     )
 
     # Set up Q learning algorithm 
@@ -142,15 +112,19 @@ def run_experiment():
         cfg.min_exploration
     )
 
-    # Perform training
-    rewards_all_episodes, _ = run_training(q_learning, cfg.train_episodes, cfg.max_steps_per_episode)
+    # load the policy before execution
+    if not training:
+        q_learning.q_table.load_q_table(cfg.q_table_filename)
 
-    # Save final policy 
-    q_learning.q_table.save_q_table(cfg.q_table_filename)
+    # run episodes
+    rewards_all_episodes, _ = run_episodes(q_learning, cfg.train_episodes, cfg.max_steps_per_episode, training)
 
-    # wandb.save("model.h5")
+    # save the policy after training 
+    if training:
+        q_learning.q_table.save_q_table(cfg.q_table_filename)
+
     wandb.finish()
 
 if __name__ == "__main__":
-    # run_experiment()
-    run_execution()
+    training=False
+    run_experiment(training)
