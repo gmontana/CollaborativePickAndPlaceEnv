@@ -36,6 +36,8 @@ wandb.init(project="cpp_qlearn", name="tabular_q", config=config)
 
 def run_execution():
 
+    cfg = wandb.config
+
     # Re-initialise environment 
     env = MultiAgentPickAndPlace(
         cell_size=cfg.cell_size,
@@ -79,6 +81,7 @@ def run_execution():
         video_filename = f"policy_video_{i}_{timestamp}.mp4"
         env.save_video(video_filename)
 
+    print(f"Average return: {np.mean(total_returns)} | Average steps: {total_steps_list}")
 
 def run_training(q_learning, train_episodes, max_steps_per_episode):
     rewards_all_episodes = []
