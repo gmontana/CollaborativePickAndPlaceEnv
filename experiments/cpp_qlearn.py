@@ -4,11 +4,11 @@ import numpy as np
 import os 
 
 PATH = os.path.expanduser("~/Dropbox/mycode/envs/multi_agent_rl")
+print(PATH)
 sys.path.append(PATH)
 
-
 from environments.collaborative_pick_and_place.macpp import MultiAgentPickAndPlace
-from algos.qlearn import QLearning
+from algorithms.qlearn import QLearning
 
 
 # Configuration parameters
@@ -21,7 +21,7 @@ config = {
     "env_n_pickers": 1,
     "env_n_objects": 1,
     "env_enable_rendering": False,
-    "train_episodes": 150000,
+    "train_episodes": 200000,
     "max_steps_per_episode": 50,
     "discount_factor": 0.90,
     "min_exploration": 0.02,
@@ -33,14 +33,14 @@ config = {
 }
 
 # Initialize WandB
-wandb.init(project="cpp_qlearn", config=config)
+wandb.init(project="cpp_qlearn", name="tabular_q", config=config)
 
 def run_training(q_learning, train_episodes, max_steps_per_episode):
     rewards_all_episodes = []
     successful_episodes = 0
-    steps_per_episode = []
+    steps_all_episodes = []
 
-    for _ in range(train_episodes):  
+    for episode in range(train_episodes):  
         state_hash = q_learning.env.reset()
         rewards_current_episode = 0
 
@@ -53,13 +53,21 @@ def run_training(q_learning, train_episodes, max_steps_per_episode):
                 break
 
         rewards_all_episodes.append(rewards_current_episode)
-        steps_per_episode.append(step + 1) 
+        steps_all_episodes.append(step + 1) 
+        print(f"Episode: {episode} | Steps: {step+1} | Rewards: {rewards_current_episode}")
 
         # Check for a successful episode
         if step + 1 <= max_steps_per_episode:
             successful_episodes += 1
 
-    return rewards_all_episodes, steps_per_episode
+        # Log rewards and average rewards every N episodes (e.g., every 100 episodes)
+        if (episode + 1) % 100 == 0:
+            wandb.log({
+                "Average Reward": np.mean(rewards_all_episodes[-100:]),
+                "Average Steps": np.mean(steps_all_episodes[-100:])
+            })
+
+    return rewards_all_episodes, steps_all_episodes
 
 def run_experiment():
 
@@ -90,7 +98,7 @@ def run_experiment():
     rewards_all_episodes, _ = run_training(q_learning, cfg.train_episodes, cfg.max_steps_per_episode)
 
     # Log rewards and other metrics
-    wandb.log({"Rewards for All Episodes": rewards_all_episodes, "Average Reward": np.mean(rewards_all_episodes)})
+    print(f"Average Reward: {np.mean(rewards_all_episodes)}")
 
     # Save and log the final policy as an artifact (if needed)
     # artifact = wandb.Artifact('model', type='model')
@@ -100,6 +108,7 @@ def run_experiment():
     # Save final policy 
     # q_table.save_q_table(cfg.q_table_filename)
 
+    wandb.save("model.h5")
     wandb.finish()
 
     # Create some summary stats and videos after training
@@ -110,7 +119,6 @@ def run_experiment():
 
     print(f"\nExecuting learned policy over {num_episodes} episodes for statistics:")
     for _ in range(num_episodes):
-        # success, total_return, total_steps = q_learning.execute(cfg.max_steps_per_episode, save_video=True)
         success, total_return, total_steps = q_learning.execute(cfg.max_steps_per_episode)
         successes.append(success)
         total_returns.append(total_return)
