@@ -3,8 +3,7 @@ import pygame
 import json
 import imageio
 import os
-
-# import numpy as np
+import numpy as np
 # import hashlib
 
 ANIMATION_DELAY = 500
@@ -76,7 +75,7 @@ class MultiAgentPickAndPlace:
         self.objects = []
         self.goals = []
         self.initial_state = initial_state
-        self.save_frames = create_video
+        self.create_video = create_video
 
         # Define actions and done flag
         self.action_space = ["move_up", "move_down", "move_left", "move_right", "pass"]
@@ -123,9 +122,10 @@ class MultiAgentPickAndPlace:
             )
             pygame.display.set_caption("Collaborative Multi-Agent Pick and Place")
 
-        # Collect frames for the video
-        if self.save_frames:
+        # If a video is required, create frames 
+        if self.create_video:
             self.frames = []
+
 
     def _validate_actions(self, actions):
         for action in actions:
@@ -146,8 +146,6 @@ class MultiAgentPickAndPlace:
             agent.carrying_object = None
         self.done = False
 
-        if self.save_frames:
-            self.frames = []
 
         # agent_states = [agent.get_state() for agent in self.agents]
         # object_states = [obj.get_state() for obj in self.objects]
@@ -301,6 +299,12 @@ class MultiAgentPickAndPlace:
 
         if self.enable_rendering:
             self.render()
+
+        # if self.create_video:
+        #     self.frames = []
+        # Collect frames for the video when required and draw
+        if self.create_video:
+            self.frames.append(pygame.surfarray.array3d(self.offscreen_surface))
 
         next_state_hash = self.get_hashed_state()
         return next_state_hash, rewards, done
@@ -536,9 +540,6 @@ class MultiAgentPickAndPlace:
                         ),
                     )
 
-        # Collect frames for the video when required and draw
-        if self.save_frames:
-            self.frames.append(pygame.surfarray.array3d(self.offscreen_surface))
 
         # If rendering is enabled, blit the offscreen surface to the screen and update the display
         if self.enable_rendering:
@@ -559,7 +560,7 @@ class MultiAgentPickAndPlace:
 
     def save_video(self, video_path):
         print(f"Saving {len(self.frames)} frames in a video to: {video_path}")
-        imageio.mimsave(video_path, self.frames, fps=ANIMATION_FPS)
+        rotated_frames = [np.rot90(frame) for frame in self.frames]
+        imageio.mimsave(video_path, rotated_frames, fps=ANIMATION_FPS, codec='h264')
         self.frames = []
-
 
