@@ -93,11 +93,11 @@ class QLearning:
     def execute(self, state):
 
         # Get actions, next state and rewards
-        actions = self.epsilon_greedy_actions(state)
-        next_state, rewards, done = self.env.step(actions)
-
-        return rewards, done, next_state
-
+        actions = self.greedy_actions(state)
+        next_state_hash, rewards, done = self.env.step(actions)
+        total_reward = sum(rewards)
+        return total_reward, done, next_state_hash
+  
     def train(self, state_hash):
 
         # Get actions, next state and rewards
