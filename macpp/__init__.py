@@ -1,7 +1,4 @@
-from gym.envs.registration import register
+from gym.envs.registration import registry, register, make, spec
+from itertools import product
 
-register(
-    id='CollaborativePickAndPlace-v0',
-    entry_point='pick_and_place.environment:MultiAgentPickAndPlace',
-)
 

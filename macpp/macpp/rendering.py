@@ -1,5 +1,5 @@
 """
-    2D rendering of collaborative pick and place environment using PyGame
+2D rendering of collaborative pick and place environment using PyGame
 """
 import pygame
 import os
