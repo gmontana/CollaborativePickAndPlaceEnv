@@ -1,4 +1,5 @@
 import gym
+
 # from enum import Enum
 from gym import spaces
 import random
@@ -9,6 +10,7 @@ import os
 import numpy as np
 import time
 import sys
+
 sys.path.append("/home/gm13/Dropbox/mycode/envs/collaborative_pick_and_place/macpp/")
 
 
@@ -26,7 +28,8 @@ REWARD_COMPLETION = 20
 #     MOVE_LEFT = 3
 #     MOVE_RIGHT = 4
 #     PASS = 5
-    
+
+
 class Agent:
     def __init__(self, position, picker, carrying_object=None):
         self.position = position
@@ -53,7 +56,7 @@ class Object:
 
 
 class MultiAgentPickAndPlace(gym.Env):
-    """ 
+    """
     Class containing the logic for the collaborating pick and place environment
     """
 
@@ -71,9 +74,12 @@ class MultiAgentPickAndPlace(gym.Env):
         debug_mode=False,
         create_video=False,
     ):
+
+        # Dimesions of the grid and cell size
         self.width = width
         self.length = length
         self.cell_size = cell_size
+
         self.n_agents = n_agents
         self.debug_mode = debug_mode
         self.n_pickers = n_pickers
@@ -100,7 +106,6 @@ class MultiAgentPickAndPlace(gym.Env):
             self.random_initialize()
         else:
             self.initialize_from_state(initial_state)
-
 
         # Check whether the grid size is sufficiently large
         total_cells = self.width * self.length
@@ -131,12 +136,11 @@ class MultiAgentPickAndPlace(gym.Env):
 
         # Rendering
         self._rendering_initialised = False
-        self.viewer = None
+        self.renderer = None
 
-        # If a video is required, create frames 
+        # If a video is required, create frames
         if self.create_video:
             self.frames = []
-
 
     def _validate_actions(self, actions):
         for action in actions:
@@ -157,19 +161,20 @@ class MultiAgentPickAndPlace(gym.Env):
             agent.carrying_object = None
         self.done = False
 
-
         # agent_states = [agent.get_state() for agent in self.agents]
         # object_states = [obj.get_state() for obj in self.objects]
         # goal_states = self.goals
 
         return self.get_hashed_state()
 
-
     def get_hashed_state(self):
         """
         Return the hashed current state
         """
-        agent_states = tuple((agent.position, agent.picker, agent.carrying_object) for agent in self.agents)
+        agent_states = tuple(
+            (agent.position, agent.picker, agent.carrying_object)
+            for agent in self.agents
+        )
         object_states = tuple(obj.position for obj in self.objects)
         goals = tuple(self.goals)
         combined_state = agent_states + object_states + goals
@@ -290,7 +295,7 @@ class MultiAgentPickAndPlace(gym.Env):
 
     def step(self, actions):
         """
-        Step through the environment 
+        Step through the environment
         """
 
         self._validate_actions(actions)
@@ -455,21 +460,21 @@ class MultiAgentPickAndPlace(gym.Env):
                         agent.carrying_object = None
                         agent.reward += REWARD_DROP
 
-    def render(self):
-        if not self._rendering_initialised:
-            self._init_render()
-        return self.viewer.render(self.agents, self.objects, self.goals)
-
     def _init_render(self):
         from core.rendering import Viewer
 
-        self.viewer = Viewer(self.width, self.length, self.cell_size)
+        self.renderer = Viewer(self)
         self._rendering_initialised = True
-        
+
+    def render(self):
+        if not self._rendering_initialised:
+            self._init_render()
+        return self.renderer.render(self)
 
     def close(self):
-        if self.viewer:
-            self.viewer.close()
+        if self.renderer:
+            self.renderer.close()
+
 
 def _game_loop(env, render):
     """
@@ -480,7 +485,6 @@ def _game_loop(env, render):
 
     if render:
         env.render()
-        time.sleep(0.5)
 
     while not done:
         # Sample random actions for each agent
@@ -498,15 +502,13 @@ def _game_loop(env, render):
 
         done = np.all(ndone)
 
+    print("Episode finished.")
+
 if __name__ == "__main__":
     env = MultiAgentPickAndPlace(
-        width=3,
-        length=3,
-        n_agents=2,
-        n_pickers=1,
-        cell_size=3)
+        width=3, length=3, n_agents=2, n_pickers=1, cell_size=3
+    )
     for episode in range(3):
         print(f"Episode {episode}:")
-        _game_loop(env,  render = True)
+        _game_loop(env, render=True)
     print("Done")
-
