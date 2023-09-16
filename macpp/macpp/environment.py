@@ -142,7 +142,7 @@ class MultiAgentPickAndPlace(gym.Env):
 
     def reset(self):
         """
-            Reset the environment to either a random state or an predefined initial state
+        Reset the environment to either a random state or an predefined initial state
         """
         if hasattr(self, "initial_state") and self.initial_state is not None:
             self.initialize_from_state(self.initial_state)
@@ -164,7 +164,7 @@ class MultiAgentPickAndPlace(gym.Env):
 
     def get_hashed_state(self):
         """
-            Return the hashed current state
+        Return the hashed current state
         """
         agent_states = tuple((agent.position, agent.picker, agent.carrying_object) for agent in self.agents)
         object_states = tuple(obj.position for obj in self.objects)
@@ -174,13 +174,13 @@ class MultiAgentPickAndPlace(gym.Env):
 
     def get_action_space(self):
         """
-            Return the action space of the environment
+        Return the action space of the environment
         """
         return self.action_space
 
     def random_initialize(self):
         """
-            Initialise the environment with random allocations of agents and objects
+        Initialise the environment with random allocations of agents and objects
         """
         all_positions = [(x, y) for x in range(self.width) for y in range(self.length)]
         random.shuffle(all_positions)
@@ -226,7 +226,7 @@ class MultiAgentPickAndPlace(gym.Env):
 
     def initialize_from_state(self, initial_state):
         """
-            Initiate from a predefined state
+        Initiate environment at a predefined state
         """
 
         # Initialise objects
@@ -286,6 +286,9 @@ class MultiAgentPickAndPlace(gym.Env):
         return (random.randint(0, self.width - 1), random.randint(0, self.length - 1))
 
     def step(self, actions):
+        """
+        Step through the environment 
+        """
 
         self._validate_actions(actions)
 
@@ -326,6 +329,9 @@ class MultiAgentPickAndPlace(gym.Env):
         return next_state_hash, rewards, done, {}
 
     def _move_agent(self, agent, action):
+        """
+        Move the envirnment in the grid. Collisions between agents are not allowed.
+        """
 
         x, y = agent.position
         if action == "move_up":
@@ -474,8 +480,9 @@ def _game_loop(env, render):
         print(actions)
 
         nobs, nreward, ndone, _ = env.step(actions)
-        if sum(nreward) > 0:
-            print(nreward)
+        print(nreward)
+        # if sum(nreward) > 0:
+        #     print(nreward)
 
         if render:
             env.render()
