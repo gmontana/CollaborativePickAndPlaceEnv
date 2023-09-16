@@ -1,6 +1,0 @@
-Traceback (most recent call last):
-  File "/Users/giovannimontana/Dropbox/mycode/envs/multi_agent_rl/experiments/cpp_qlearn.py", line 153, in <module>
-    run_execution()
-  File "/Users/giovannimontana/Dropbox/mycode/envs/multi_agent_rl/experiments/cpp_qlearn.py", line 41, in run_execution
-    cell_size=cfg.cell_size,
-NameError: name 'cfg' is not defined

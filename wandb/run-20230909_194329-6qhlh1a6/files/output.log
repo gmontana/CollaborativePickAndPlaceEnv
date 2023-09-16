@@ -1,6 +1,0 @@
-Traceback (most recent call last):
-  File "/Users/giovannimontana/Dropbox/mycode/envs/multi_agent_rl/experiments/cpp_qlearn.py", line 156, in <module>
-    run_execution()
-  File "/Users/giovannimontana/Dropbox/mycode/envs/multi_agent_rl/experiments/cpp_qlearn.py", line 42, in run_execution
-    env = MultiAgentPickAndPlace(
-TypeError: MultiAgentPickAndPlace.__init__() got an unexpected keyword argument 'save_frames'

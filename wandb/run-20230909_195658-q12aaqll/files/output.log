@@ -1,6 +1,0 @@
-Loading Q-value table: q_table.npy.
-Number of elements in the Q table: 318825
-Executing learned policy over 1 episodes for statistics:
-Adding a new frame
-Saving 1 frames in a video to: policy_video_0_20230909_195701.mp4
-Average return: 0.0 | Average steps: [3260178326157392212]
