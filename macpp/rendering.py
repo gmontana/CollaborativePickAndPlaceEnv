@@ -1,10 +1,10 @@
-""
-2D rendering of collaborative pick and place environment using PyGame
-""
+"""
+    2D rendering of collaborative pick and place environment using PyGame
+"""
 import pygame
 import os
 
-_ANIMATION_DELAY = 500
+# _ANIMATION_DELAY = 500
 _ANIMATION_FPS = 5
 
 _WHITE = (255, 255, 255)
@@ -147,7 +147,7 @@ class Viewer:
         self._draw_goals(goals)
         self.screen.blit(self.offscreen_surface, (0, 0))
         pygame.display.flip()
-        pygame.time.wait(_ANIMATION_DELAY)
+        # pygame.time.wait(_ANIMATION_DELAY)
 
     def close(self):
         pygame.quit()

@@ -1,5 +1,5 @@
-
 import gym
+# from enum import Enum
 from gym import spaces
 import random
 import pygame
@@ -7,6 +7,7 @@ import json
 import imageio
 import os
 import numpy as np
+import time
 from rendering import Viewer
 # import hashlib
 
@@ -16,6 +17,13 @@ REWARD_BAD_PASS = -5
 REWARD_DROP = 10
 REWARD_COMPLETION = 20
 
+# class Action(Enum):
+#     MOVE_UP = 1
+#     MOVE_DOWN = 2
+#     MOVE_LEFT = 3
+#     MOVE_RIGHT = 4
+#     PASS = 5
+    
 class Agent:
     def __init__(self, position, picker, carrying_object=None):
         self.position = position
@@ -42,6 +50,12 @@ class Object:
 
 
 class MultiAgentPickAndPlace(gym.Env):
+    """ 
+    Class containing the logic for the collaborating pick and place environment
+    """
+
+    metadata = {"render.modes": ["human"]}
+
     def __init__(
         self,
         width,
@@ -128,7 +142,7 @@ class MultiAgentPickAndPlace(gym.Env):
 
     def reset(self):
         """
-        Reset the environment to either a random state or an predefined initial state
+            Reset the environment to either a random state or an predefined initial state
         """
         if hasattr(self, "initial_state") and self.initial_state is not None:
             self.initialize_from_state(self.initial_state)
@@ -149,7 +163,9 @@ class MultiAgentPickAndPlace(gym.Env):
 
 
     def get_hashed_state(self):
-        '''Return the hashed current state'''
+        """
+            Return the hashed current state
+        """
         agent_states = tuple((agent.position, agent.picker, agent.carrying_object) for agent in self.agents)
         object_states = tuple(obj.position for obj in self.objects)
         goals = tuple(self.goals)
@@ -158,12 +174,14 @@ class MultiAgentPickAndPlace(gym.Env):
 
     def get_action_space(self):
         """
-        Return the action space of the environment
+            Return the action space of the environment
         """
         return self.action_space
 
     def random_initialize(self):
-
+        """
+            Initialise the environment with random allocations of agents and objects
+        """
         all_positions = [(x, y) for x in range(self.width) for y in range(self.length)]
         random.shuffle(all_positions)
 
@@ -207,6 +225,10 @@ class MultiAgentPickAndPlace(gym.Env):
         self.goals = goal_positions
 
     def initialize_from_state(self, initial_state):
+        """
+            Initiate from a predefined state
+        """
+
         # Initialise objects
         self.objects = [
             Object(position=obj["position"], id=obj.get("id", None))
@@ -232,7 +254,7 @@ class MultiAgentPickAndPlace(gym.Env):
             )
             self.agents.append(agent)
 
-    def print_state(self):
+    def _print_state(self):
         print("=" * 40)
         print("Agents' State:")
         for idx, agent in enumerate(self.agents, start=1):
@@ -289,7 +311,7 @@ class MultiAgentPickAndPlace(gym.Env):
         }
 
         if self.debug_mode:
-            self.print_state()
+            self._print_state()
 
         if self.enable_rendering:
             self.render()
@@ -434,3 +456,43 @@ class MultiAgentPickAndPlace(gym.Env):
     def close(self):
         if self.viewer:
             self.viewer.close()
+
+def _game_loop(env, render):
+    """
+    Game loop for the MultiAgentPickAndPlace environment.
+    """
+    obs = env.reset()
+    done = False
+
+    if render:
+        env.render()
+        time.sleep(0.5)
+
+    while not done:
+        # Sample random actions for each agent
+        actions = [env.action_space.sample() for _ in range(env.n_agents)]
+        print(actions)
+
+        nobs, nreward, ndone, _ = env.step(actions)
+        if sum(nreward) > 0:
+            print(nreward)
+
+        if render:
+            env.render()
+            time.sleep(0.5)
+
+        done = np.all(ndone)
+
+if __name__ == "__main__":
+    env = MultiAgentPickAndPlace(
+        width=5,
+        length=5,
+        n_agents=2,
+        n_pickers=1,
+        cell_size=3,
+        enable_rendering=True)
+    for episode in range(10):
+        print(f"Episode {episode}:")
+        _game_loop(env,  render = True)
+    print("Done")
+
