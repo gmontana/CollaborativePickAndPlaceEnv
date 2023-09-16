@@ -45,11 +45,11 @@ class QTable:
         print(f"Number of elements in the Q table: {self.count_elements()}")
 
     def load_q_table(self, filename):
-        print(f"Loading Q-value table: {filename}.")
         self.q_table = np.load(filename, allow_pickle=True).item()
         print(f"Number of elements in the Q table: {self.count_elements()}")
 
 
+        print(f"Loading Q-value table: {filename}.")
 class QLearning:
     def __init__(
         self,
@@ -90,10 +90,10 @@ class QLearning:
         else:
             return self.greedy_actions(state_hash)
 
-    def execute(self, state):
+    def execute(self, state_hash):
 
         # Get actions, next state and rewards
-        actions = self.greedy_actions(state)
+        actions = self.greedy_actions(state_hash)
         next_state_hash, rewards, done = self.env.step(actions)
         total_reward = sum(rewards)
         return total_reward, done, next_state_hash
@@ -103,9 +103,9 @@ class QLearning:
         # Get actions, next state and rewards
         actions = self.epsilon_greedy_actions(state_hash)
         next_state_hash, rewards, done = self.env.step(actions)
+        total_reward = sum(rewards)
 
         # Update Q-values
-        total_reward = sum(rewards)
         current_q_values = self.q_table.initialise(state_hash)
         max_next_q_value = self.q_table.get_max_q_value(next_state_hash)
         action_indices = tuple(self.q_table.action_space.index(action) for action in actions)
