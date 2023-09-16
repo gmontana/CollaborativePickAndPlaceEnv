@@ -4,24 +4,17 @@
 import pygame
 import os
 
-# _ANIMATION_DELAY = 500
 _ANIMATION_FPS = 5
 
+# Colors
 _WHITE = (255, 255, 255)
 _GRAY = (200, 200, 200)
 _BLUE = (0, 0, 255)
 _RED = (255, 0, 0)
-# GREEN = (0, 255, 0)
-# BLACK = (0, 0, 0)
-# LIGHT_GRAY = (200, 200, 200)
-# YELLOW = (255, 255, 0)
 
 
 class Viewer:
-    def __init__(self, width, length, cell_size):
-        self.width = width
-        self.length = length
-        self.cell_size = cell_size
+    def __init__(self):
 
         # Initialize pygame
         pygame.init()
@@ -74,8 +67,8 @@ class Viewer:
                 (self.width * self.cell_size, y),
             )
 
-    def _draw_agents(self, agents):
-        for agent in agents:
+    def _draw_agents(self):
+        for agent in self.agents:
             x, y = agent.position
             cell_center = (
                 x * self.cell_size + self.cell_size // 2,
@@ -112,8 +105,8 @@ class Viewer:
                     ),
                 )
 
-    def _draw_objects(self, objects):
-        for obj in objects:
+    def _draw_objects(self):
+        for obj in self.objects:
             x, y = obj.position
             pygame.draw.circle(
                 self.offscreen_surface,
@@ -125,8 +118,8 @@ class Viewer:
                 self.cell_size // 4,
             )
 
-    def _draw_goals(self, goals):
-        for goal in goals:
+    def _draw_goals(self):
+        for goal in self.goals:
             x, y = goal
             pygame.draw.rect(
                 self.offscreen_surface,
@@ -139,12 +132,12 @@ class Viewer:
                 ),
             )
 
-    def render(self, agents, objects, goals):
+    def render(self):
         self.offscreen_surface.fill(_WHITE)
         self._draw_grid()
-        self._draw_agents(agents)
-        self._draw_objects(objects)
-        self._draw_goals(goals)
+        self._draw_agents(self.agents)
+        self._draw_objects(self.objects)
+        self._draw_goals(self.goals)
         self.screen.blit(self.offscreen_surface, (0, 0))
         pygame.display.flip()
         # pygame.time.wait(_ANIMATION_DELAY)
