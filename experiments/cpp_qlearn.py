@@ -126,5 +126,5 @@ def run_experiment(training):
     wandb.finish()
 
 if __name__ == "__main__":
-    training=False
+    training=True
     run_experiment(training)
