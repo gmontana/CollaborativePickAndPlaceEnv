@@ -506,7 +506,7 @@ def _game_loop(env, render):
 
 if __name__ == "__main__":
     env = MultiAgentPickAndPlace(
-        width=3, length=3, n_agents=2, n_pickers=1, cell_size=3
+        width=3, length=3, n_agents=2, n_pickers=1, cell_size=300
     )
     for episode in range(3):
         print(f"Episode {episode}:")

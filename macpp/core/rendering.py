@@ -99,15 +99,15 @@ class Viewer:
                     self.offscreen_surface,
                     color,
                     (
-                        x * env.cell_size + env.cell_size // 4,
-                        y * env.cell_size + env.cell_size // 4,
-                        env.cell_size // 2,
-                        env.cell_size // 2,
+                        x * self.env.cell_size + self.env.cell_size // 4,
+                        y * self.env.cell_size + self.env.cell_size // 4,
+                        self.env.cell_size // 2,
+                        self.env.cell_size // 2,
                     ),
                 )
 
     def _draw_objects(self):
-        for obj in selfenv.objects:
+        for obj in self.env.objects:
             x, y = obj.position
             pygame.draw.circle(
                 self.offscreen_surface,
@@ -135,10 +135,10 @@ class Viewer:
 
     def render(self):
         self.offscreen_surface.fill(_WHITE)
-        self._draw_grid(self)
-        self._draw_agents(self)
-        self._draw_objects(self)
-        self._draw_goals(self)
+        self._draw_grid()
+        self._draw_agents()
+        self._draw_objects()
+        self._draw_goals()
         self.screen.blit(self.offscreen_surface, (0, 0))
         pygame.display.flip()
 
