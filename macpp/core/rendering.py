@@ -53,31 +53,30 @@ class Viewer:
             pygame.draw.rect(placeholder, placeholder_color, (0, 0, 50, 50))
             return placeholder
 
-    def _draw_grid(self, env):
-        for x in range(0, env.width * env.cell_size, env.cell_size):
+    def _draw_grid(self):
+        for x in range(0, self.env.width * self.env.cell_size, self.env.cell_size):
             pygame.draw.line(
                 self.offscreen_surface,
                 (0, 0, 0),
                 (x, 0),
                 (x, self.env.length * self.env.cell_size),
             )
-        for y in range(0, env.length * env.cell_size, env.cell_size):
+        for y in range(0, self.env.length * self.env.cell_size, self.env.cell_size):
             pygame.draw.line(
                 self.offscreen_surface,
                 (0, 0, 0),
                 (0, y),
-                (env.width * env.cell_size, y),
+                (self.env.width * self.env.cell_size, y),
             )
 
-    def _draw_agents(self, env):
-        for agent in env.agents:
+    def _draw_agents(self):
+        for agent in self.env.agents:
             x, y = agent.position
             cell_center = (
-                x * env.cell_size + env.cell_size // 2,
-                y * env.cell_size + env.cell_size // 2,
+                x * self.env.cell_size + self.env.cell_size // 2,
+                y * self.env.cell_size + self.env.cell_size // 2,
             )
-            scaling_factor = 0.8
-            icon_size = int(env.cell_size * scaling_factor)
+            icon_size = int(self.env.cell_size * 0.8)
 
             try:
                 agent_icon = self.picker_icon if agent.picker else self.non_picker_icon
@@ -107,42 +106,41 @@ class Viewer:
                     ),
                 )
 
-    def _draw_objects(self, env):
-        for obj in env.objects:
+    def _draw_objects(self):
+        for obj in selfenv.objects:
             x, y = obj.position
             pygame.draw.circle(
                 self.offscreen_surface,
                 (0, 255, 0),
                 (
-                    x * env.cell_size + env.cell_size // 2,
-                    y * env.cell_size + env.cell_size // 2,
+                    x * self.env.cell_size + self.env.cell_size // 2,
+                    y * self.env.cell_size + self.env.cell_size // 2,
                 ),
-                env.cell_size // 4,
+                self.env.cell_size // 4,
             )
 
-    def _draw_goals(self, env):
+    def _draw_goals(self):
         for goal in self.env.goals:
             x, y = goal
             pygame.draw.rect(
                 self.offscreen_surface,
                 _GRAY,
                 (
-                    x * env.cell_size + env.cell_size // 3,
-                    y * env.cell_size + env.cell_size // 3,
-                    self.cell_size // 3,
-                    self.cell_size // 3,
+                    x * self.env.cell_size + self.env.cell_size // 3,
+                    y * self.env.cell_size + self.env.cell_size // 3,
+                    self.env.cell_size // 3,
+                    self.env.cell_size // 3,
                 ),
             )
 
-    def render(self, env):
+    def render(self):
         self.offscreen_surface.fill(_WHITE)
-        self._draw_grid(self, env)
-        self._draw_agents(self, env)
-        self._draw_objects(self, env)
-        self._draw_goals(self, env)
+        self._draw_grid(self)
+        self._draw_agents(self)
+        self._draw_objects(self)
+        self._draw_goals(self)
         self.screen.blit(self.offscreen_surface, (0, 0))
         pygame.display.flip()
-        # pygame.time.wait(_ANIMATION_DELAY)
 
     def close(self):
         pygame.quit()
