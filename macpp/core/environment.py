@@ -469,7 +469,7 @@ class MultiAgentPickAndPlace(gym.Env):
     def render(self):
         if not self._rendering_initialised:
             self._init_render()
-        return self.renderer.render(self)
+        return self.renderer.render()
 
     def close(self):
         if self.renderer:
