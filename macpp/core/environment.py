@@ -1,6 +1,5 @@
 import gym
-
-# from enum import Enum
+from enum import Enum
 from gym import spaces
 import random
 import pygame
@@ -14,20 +13,19 @@ import sys
 sys.path.append("/home/gm13/Dropbox/mycode/envs/collaborative_pick_and_place/macpp/")
 
 
-# import hashlib
-
 REWARD_STEP = -1
 REWARD_GOOD_PASS = 5
 REWARD_BAD_PASS = -5
 REWARD_DROP = 10
 REWARD_COMPLETION = 20
 
-# class Action(Enum):
-#     MOVE_UP = 1
-#     MOVE_DOWN = 2
-#     MOVE_LEFT = 3
-#     MOVE_RIGHT = 4
-#     PASS = 5
+
+class Action(Enum):
+    UP = 1
+    DOWN = 2
+    LEFT = 3
+    RIGHT = 4
+    PASS = 5
 
 
 class Agent:
@@ -37,7 +35,7 @@ class Agent:
         self.carrying_object = carrying_object
         self.reward = 0
 
-    def get_state(self):
+    def get_agent_state(self):
         return {
             "position": self.position,
             "picker": self.picker,
@@ -51,13 +49,13 @@ class Object:
         self.position = position
         self.id = id
 
-    def get_state(self):
+    def get_object_state(self):
         return {"id": self.id, "position": self.position}
 
 
 class MultiAgentPickAndPlace(gym.Env):
     """
-    Class containing the logic for the collaborating pick and place environment
+    Class implementing the logic for the collaborative pick and place environment
     """
 
     metadata = {"render.modes": ["human"]}
@@ -70,7 +68,7 @@ class MultiAgentPickAndPlace(gym.Env):
         n_pickers,
         n_objects=None,  # default to number of agents
         initial_state=None,
-        cell_size=100,
+        cell_size=300,
         debug_mode=False,
         create_video=False,
     ):
@@ -79,19 +77,22 @@ class MultiAgentPickAndPlace(gym.Env):
         self.width = width
         self.length = length
         self.cell_size = cell_size
-
         self.n_agents = n_agents
         self.debug_mode = debug_mode
         self.n_pickers = n_pickers
-        self.agents = []
-        self.objects = []
-        self.goals = []
         self.initial_state = initial_state
         self.create_video = create_video
 
         # Define actions and done flag
-        self.action_space = ["move_up", "move_down", "move_left", "move_right", "pass"]
-        self.action_space = spaces.Discrete(len(self.action_space))
+        # self.action_space = ["move_up", "move_down", "move_left", "move_right", "pass"]
+        self.action_set = [
+            Action.UP,
+            Action.DOWN,
+            Action.LEFT,
+            Action.RIGHT,
+            Action.PASS,
+        ]
+        self.action_space = spaces.Tuple([spaces.Discrete(5)] * len(self.n_agents))
         self.observation_space = spaces.Discrete(1e6)
         self.done = False
 
@@ -120,19 +121,11 @@ class MultiAgentPickAndPlace(gym.Env):
             (self.width * self.cell_size, self.length * self.cell_size)
         )
 
-        # Load agent icons
-        image_path = os.path.join(
-            os.path.dirname(__file__), "icons", "agent_picker.png"
-        )
-        self.picker_icon = pygame.image.load(image_path)
-
-        # # When rendering is required, create the screen for display
-        # if self.enable_rendering:
-        #     self.viewer = Viewer(width, length, cell_size)
-        #     # self.screen = pygame.display.set_mode(
-        #     #     (self.width * self.cell_size, self.length * self.cell_size)
-        #     # )
-        #     # pygame.display.set_caption("Collaborative Multi-Agent Pick and Place")
+        # # Load agent icons
+        # image_path = os.path.join(
+        #     os.path.dirname(__file__), "icons", "agent_picker.png"
+        # )
+        # self.picker_icon = pygame.image.load(image_path)
 
         # Rendering
         self._rendering_initialised = False
@@ -142,9 +135,14 @@ class MultiAgentPickAndPlace(gym.Env):
         if self.create_video:
             self.frames = []
 
+        # Initialise entities
+        self.agents = []
+        self.objects = []
+        self.goals = []
+
     def _validate_actions(self, actions):
         for action in actions:
-            if action not in self.get_action_space():
+            if action not in self.action_set:
                 raise ValueError(f"Unrecognized action: {action}.")
 
     def reset(self):
@@ -316,17 +314,15 @@ class MultiAgentPickAndPlace(gym.Env):
             done = True
 
         next_state = {
-            "agents": [agent.get_state() for agent in self.agents],
-            "objects": [obj.get_state() for obj in self.objects],
+            "agents": [agent.get_agent_state() for agent in self.agents],
+            "objects": [obj.get_object_state() for obj in self.objects],
             "goals": self.goals,
         }
 
         if self.debug_mode:
             self._print_state()
 
-        # if self.create_video:
-        #     self.frames = []
-        # Collect frames for the video when required and draw
+        # Collect frames for the video when required
         if self.create_video:
             self.frames.append(pygame.surfarray.array3d(self.offscreen_surface))
 
@@ -423,7 +419,7 @@ class MultiAgentPickAndPlace(gym.Env):
 
     def check_termination(self):
         goal_positions = set(self.goals)
-        object_positions = [obj.position for obj in self.objects]
+        # object_positions = [obj.position for obj in self.objects]
 
         for obj in self.objects:
             if obj.position in goal_positions:
@@ -476,7 +472,7 @@ class MultiAgentPickAndPlace(gym.Env):
             self.renderer.close()
 
 
-def _game_loop(env, render):
+def game_loop(env, render):
     """
     Game loop for the MultiAgentPickAndPlace environment.
     """
@@ -504,11 +500,12 @@ def _game_loop(env, render):
 
     print("Episode finished.")
 
+
 if __name__ == "__main__":
     env = MultiAgentPickAndPlace(
         width=3, length=3, n_agents=2, n_pickers=1, cell_size=300
     )
     for episode in range(3):
         print(f"Episode {episode}:")
-        _game_loop(env, render=True)
+        game_loop(env, render=True)
     print("Done")
