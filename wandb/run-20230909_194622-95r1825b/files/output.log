@@ -1,0 +1,14 @@
+Loading Q-value table: q_table.npy.
+Number of elements in the Q table: 318825
+Executing learned policy over 10 episodes for statistics:
+Saving 1 frames in a video to: policy_video_0_20230909_194625.mp4
+Saving 1 frames in a video to: policy_video_1_20230909_194626.mp4
+Saving 1 frames in a video to: policy_video_2_20230909_194626.mp4
+Saving 1 frames in a video to: policy_video_3_20230909_194627.mp4
+Saving 1 frames in a video to: policy_video_4_20230909_194627.mp4
+Saving 1 frames in a video to: policy_video_5_20230909_194628.mp4
+Saving 1 frames in a video to: policy_video_6_20230909_194628.mp4
+Saving 1 frames in a video to: policy_video_7_20230909_194629.mp4
+Saving 1 frames in a video to: policy_video_8_20230909_194630.mp4
+Saving 1 frames in a video to: policy_video_9_20230909_194630.mp4
+Average return: 0.0 | Average steps: [-2681344610639019823, -2681344610639019823, -2979191318350221808, -2979191318350221808, -2979191318350221808, 7890397257878875084, 7890397257878875084, -2979191318350221808, -2979191318350221808, 7890397257878875084]
