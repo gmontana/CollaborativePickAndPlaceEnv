@@ -8,7 +8,6 @@ import imageio
 import os
 import numpy as np
 import time
-from rendering import Viewer
 # import hashlib
 
 REWARD_STEP = -1
@@ -66,7 +65,6 @@ class MultiAgentPickAndPlace(gym.Env):
         initial_state=None,
         cell_size=100,
         debug_mode=False,
-        enable_rendering=False,
         create_video=False,
     ):
         self.width = width
@@ -100,6 +98,7 @@ class MultiAgentPickAndPlace(gym.Env):
         else:
             self.initialize_from_state(initial_state)
 
+
         # Check whether the grid size is sufficiently large
         total_cells = self.width * self.length
         total_entities = self.n_agents + self.n_objects
@@ -107,9 +106,6 @@ class MultiAgentPickAndPlace(gym.Env):
             raise ValueError(
                 "Grid size not sufficiently large to contain all the entities."
             )
-
-        # Initialise pygame
-        pygame.init()
 
         # Create the offscreen surface for rendering
         self.offscreen_surface = pygame.Surface(
@@ -122,13 +118,17 @@ class MultiAgentPickAndPlace(gym.Env):
         )
         self.picker_icon = pygame.image.load(image_path)
 
-        # When rendering is required, create the screen for display
-        if self.enable_rendering:
-            self.viewer = Viewer(width, length, cell_size)
-            # self.screen = pygame.display.set_mode(
-            #     (self.width * self.cell_size, self.length * self.cell_size)
-            # )
-            # pygame.display.set_caption("Collaborative Multi-Agent Pick and Place")
+        # # When rendering is required, create the screen for display
+        # if self.enable_rendering:
+        #     self.viewer = Viewer(width, length, cell_size)
+        #     # self.screen = pygame.display.set_mode(
+        #     #     (self.width * self.cell_size, self.length * self.cell_size)
+        #     # )
+        #     # pygame.display.set_caption("Collaborative Multi-Agent Pick and Place")
+
+        # Rendering
+        self._rendering_initialised = False
+        self.viewer = None
 
         # If a video is required, create frames 
         if self.create_video:
@@ -456,8 +456,16 @@ class MultiAgentPickAndPlace(gym.Env):
                         agent.reward += REWARD_DROP
 
     def render(self):
-        if self.viewer:
-            self.viewer.render(self.agents, self.objects, self.goals)
+        if not self._rendering_initialised:
+            self._init_render()
+        return self.viewer.render(self.agents, self.objects, self.goals)
+
+    def _init_render(self):
+        from macpp.macpp.rendering import Viewer
+
+        self.viewer = Viewer(self.width, self.length, self.cell_size)
+        self._rendering_initialised = True
+        
 
     def close(self):
         if self.viewer:
@@ -497,7 +505,6 @@ if __name__ == "__main__":
         n_agents=2,
         n_pickers=1,
         cell_size=3,
-        enable_rendering=True)
     for episode in range(10):
         print(f"Episode {episode}:")
         _game_loop(env,  render = True)
