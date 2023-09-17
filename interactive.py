@@ -65,7 +65,7 @@ def game_loop(env):
 
 if __name__ == "__main__":
     env = MultiAgentPickAndPlace(
-        width=4, length=4, n_agents=2, n_pickers=1, n_objects=2, debug_mode=True
+        width=4, length=4, n_agents=2, n_pickers=1, n_objects=3, debug_mode=True
     )
     game_loop(env)
 
