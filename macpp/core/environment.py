@@ -3,9 +3,9 @@ from enum import Enum
 from gym import spaces
 import random
 import pygame
-import json
-import imageio
-import os
+# import json
+# import imageio
+# import os
 import numpy as np
 import time
 import sys
@@ -511,6 +511,8 @@ class MultiAgentPickAndPlace(gym.Env):
         from core.rendering import Viewer
 
         self.renderer = Viewer(self)
+        if self.debug_mode:
+            print("Rendering initialised.")
         self._rendering_initialised = True
 
     def render(self):
