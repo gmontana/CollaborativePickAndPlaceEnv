@@ -299,14 +299,13 @@ class MultiAgentPickAndPlace(gym.Env):
             self.agents.append(agent)
 
         if self.debug_mode:
-            self.print_state()
-            print(f"There are {len(self.agents)} agents.")
-            print(f"There are {len(self.objects)} objects.")
-            print(f"There are {len(self.goals)} goals.")
+            self._print_state()
+            # print(f"There are {len(self.agents)} agents.")
+            # print(f"There are {len(self.objects)} objects.")
+            # print(f"There are {len(self.goals)} goals.")
 
-    def print_state(self):
-        print("----- Start of the current state ---")
-        print("Agents' State:")
+    def _print_state(self):
+        print("-" * 30)
         for idx, agent in enumerate(self.agents, start=1):
             carrying_status = (
                 "Carrying" if agent.carrying_object is not None else "Not Carrying"
@@ -321,17 +320,15 @@ class MultiAgentPickAndPlace(gym.Env):
                 f"Picker: {str(agent.picker):<5}, Status: {carrying_status:<12}, {carrying_object}"
             )
 
-        print("\nObjects' Positions:")
         for idx, obj in enumerate(self.objects, start=1):
             print(f"- Object {idx}: Position: {obj.position}, ID: {obj.id}")
 
-        print("Goal Positions:")
         if not self.goals:
             print("- No goal positions set.")
         else:
             for idx, goal in enumerate(self.goals):
                 print(f"- Goal {idx + 1}: Position {goal}")
-        print("----- End of the current state ---")
+        print("-" * 30)
 
     def _random_position(self):
         return (random.randint(0, self.width - 1), random.randint(0, self.length - 1))
@@ -347,36 +344,33 @@ class MultiAgentPickAndPlace(gym.Env):
             print(f"\nExecuting actions: {actions}\n")
 
         # Negative reward given at every step
-        rewards = [REWARD_STEP] * self.n_agents
-
+        for agent in self.agents:
+            agent.rewards = REWARD_STEP
 
         # Execute the actions
         self._handle_moves(actions)
         self._handle_drops()
         self._handle_pickups()
         self._handle_passes(actions)
-        termination_reward = self.check_termination()
 
         # Check for termination
-        done = False
-        if termination_reward:
-            for idx in range(self.n_agents):
-                rewards[idx] += termination_reward
-            done = True
+        if self.check_termination():
+            for agent in self.agents:
+                agent.reward += REWARD_COMPLETION
+            self.done = True
 
         # Collect frames for the video when required
         if self.create_video:
             self.frames.append(pygame.surfarray.array3d(self.offscreen_surface))
 
-        # Get the next state
-        next_state = self.get_state()
-
         # Debug info
         if self.debug_mode:
-            self.print_state()
+            self._print_state()
 
-        # next_state_hash = self.get_hashed_state()
-        return next_state, rewards, done, {}
+        return self.get_state(), self._get_rewards(), self.done, {}
+
+    def _get_rewards(self):
+        return [agent.rewards for agent in self.agents]
 
     def _move_agent(self, agent, action):
         """
@@ -470,16 +464,15 @@ class MultiAgentPickAndPlace(gym.Env):
     def check_termination(self):
         goal_positions = set(self.goals)
         object_positions = {obj.position for obj in self.objects}
-    
         if object_positions.issubset(goal_positions):
-            return REWARD_COMPLETION
-        return 0
-
+            if self.debug_mode:
+                print("Termination checked!")
+            return True
+        return False
    
     # def check_termination(self):
     #     goal_positions = set(self.goals)
     #     # object_positions = [obj.position for obj in self.objects]
-
     #     for obj in self.objects:
     #         if obj.position in goal_positions:
     #             agent = next(
@@ -492,7 +485,6 @@ class MultiAgentPickAndPlace(gym.Env):
     #             )
     #             if agent:
     #                 return REWARD_COMPLETION
-
     #     return 0
 
     def _handle_drops(self):

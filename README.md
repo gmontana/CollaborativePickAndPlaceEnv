@@ -1,53 +1,32 @@
-#Agent Actions:
 
-    "move_up": Move one cell upwards.
-    "move_down": Move one cell downwards.
-    "move_left": Move one cell to the left.
-    "move_right": Move one cell to the right.
-    "pass": Pass an object to a neighboring agent.
+# **Collaborative Pick and Place**
 
-#Allowed Actions:
+In "Collaborative Pick and Place," agents work together in a grid environment to pick up and place objects in designated goal positions. The game emphasizes teamwork, with agents having distinct roles and responsibilities. The game concludes when all objects are correctly placed, rewarding agents based on their collaborative efforts.
 
-Agents can move to adjacent cells on the grid if the cell is unoccupied by another agent.
+# **Environment Description**
 
-#Agents can only pass an object to a neighboring agent if:
-    The neighboring agent is in an adjacent cell.
-    The neighboring agent is not already carrying an object.
-    The current agent is carrying an object.
+The environment consists of a grid where agents can move, interact with objects, and achieve specific goals. Agents are either:
+- **Pickers**: Can pick up objects
+- **Non-pickers**: Can drop off objects
 
-#Picker Status:
+## **Rules**
 
-    Agents can be classified as "pickers" or "non-pickers."
-    Picker agents can pick up objects from the grid.
-    Non-picker agents cannot pick up objects, but they can receive objects from picker agents through passing.
+### Movement:**
+- Agents can move one cell in directions: `up`, `down`, `left`, or `right`.
+- They cannot move into cells occupied by other agents.
+- They can, however, occupy cells containing objects.
 
-#Object Interaction:
+### Object Interaction:**
+- **Pickers** automatically pick up objects when they move over a cell containing one, provided they aren't already carrying an object.
+- **Non-pickers** automatically drop off objects when they move over a goal position, earning a positive reward for doing so.
 
-    Agents can pick up objects from the grid if they are designated as "pickers" and they are not currently carrying an object.
-    When an agent picks up an object, the object is removed from the grid.
+## Passing Objects:**
+- Agents can pass objects to adjacent agents.
+- Both agents must use the "pass" action at the same time.
+  - **Picker to Non-picker**: Both receive a positive reward.
+  - **Non-picker to Picker**: Both receive a negative reward.
 
-#Passing Objects:
+### Termination:**
+- The game ends when all objects are placed on goal positions.
+- Upon conclusion, all agents receive a completion reward.
 
-    Picker agents can pass objects to neighboring agents through the "pass" action.
-    Passing an object requires both the current agent and the adjacent agent to take the "pass" action simultaneously.
-    If the adjacent agent is a picker and not carrying an object, it will receive the object.
-
-#Goals:
-
-    The environment contains goal positions where objects need to be delivered.
-    The goal is considered fulfilled when all objects are placed in their corresponding goal positions.
-
-#Rewards and Termination:
-
-    Agents receive rewards based on their actions and achievements:
-    Moving incurs a negative reward (REWARD_STEP).
-    Successfully passing an object to a non-picker incurs a positive reward (REWARD_GOOD_PASS).
-    Passing an object to a picker incurs a negative reward (REWARD_BAD_PASS).
-    Dropping an object on a goal incurs a positive reward (REWARD_DROP).
-    Fulfilling all goals results in a termination reward (REWARD_COMPLETION).
-    The environment terminates when all goals are fulfilled.
-
-#Grid Constraints:
-
-    Agents cannot move out of the grid boundaries.
-    The grid size must be large enough to accommodate all agents and objects.
