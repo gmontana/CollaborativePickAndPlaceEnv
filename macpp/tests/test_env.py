@@ -2,7 +2,7 @@ import unittest
 from ..core.environment import MultiAgentPickAndPlace
 from ..core.environment import Action
 
-DEBUG=False
+DEBUG=True
 
 class MACPPTests(unittest.TestCase):
 

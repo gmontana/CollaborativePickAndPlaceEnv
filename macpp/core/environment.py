@@ -84,19 +84,24 @@ class MultiAgentPickAndPlace(gym.Env):
         self.create_video = create_video
         self.debug_mode = debug_mode
 
+        # Check if there are enough pickers
+        # if n_agents-n_pickers <= 0:
+       #     raise ValueError("There should be an at least one picker.")
+
         # Set the number of objects and goals
         if n_objects is None:
             self.n_objects = self.n_agents
         else:
             self.n_objects = n_objects
 
-        # Check whether the grid size is sufficiently large
+        # Check if the grid size is sufficiently large
         total_cells = self.width * self.length
         total_entities = self.n_agents + self.n_objects
         if total_entities > total_cells:
             raise ValueError(
                 "Grid size not sufficiently large to contain all the entities."
             )
+
 
         # Define actions and actions space
         self.action_set = [
@@ -147,16 +152,11 @@ class MultiAgentPickAndPlace(gym.Env):
 
         self.done = False
 
-        # Initialise the environment 
+        # Initialise the environment either randomly or from a state
         if initial_state is None:
             self.random_initialize()
         else:
             self.initialize_from_state(initial_state)
-
-        # Create the offscreen surface for rendering
-        self.offscreen_surface = pygame.Surface(
-            (self.width * self.cell_size, self.length * self.cell_size)
-        )
 
         # Rendering
         self._rendering_initialised = False
@@ -164,6 +164,9 @@ class MultiAgentPickAndPlace(gym.Env):
 
         # If a video is required, create frames
         if self.create_video:
+            self.offscreen_surface = pygame.Surface(
+                (self.width * self.cell_size, self.length * self.cell_size)
+            )
             self.frames = []
 
 
@@ -464,11 +467,13 @@ class MultiAgentPickAndPlace(gym.Env):
     def check_termination(self):
         goal_positions = set(self.goals)
         object_positions = {obj.position for obj in self.objects}
-        if object_positions.issubset(goal_positions):
+        # Check if every object is on a goal and every goal has an object
+        if object_positions.issubset(goal_positions) and len(object_positions) == len(goal_positions):
             if self.debug_mode:
                 print("Termination checked!")
             return True
         return False
+
    
     # def check_termination(self):
     #     goal_positions = set(self.goals)
@@ -484,32 +489,26 @@ class MultiAgentPickAndPlace(gym.Env):
     #                 None,
     #             )
     #             if agent:
-    #                 return REWARD_COMPLETION
-    #     return 0
+    #                 return True
+    #     return False
 
     def _handle_drops(self):
         for agent in self.agents:
             if agent.carrying_object is not None:
                 if not agent.picker:
                     if agent.position in self.goals:
-                        obj = next(
-                            (o for o in self.objects if o.id == agent.carrying_object),
-                            None,
-                        )
-                        if obj:
-                            obj.position = agent.position
-                        else:
-                            # Add the object back to the environment's list of objects
-                            new_obj = Object(
-                                position=agent.position, id=agent.carrying_object
-                            )
-                            self.objects.append(new_obj)
-                        agent.carrying_object = None
-                        agent.reward += REWARD_DROP
+                        # Exclude the object being carried by the agent when checking
+                        if not any(obj.position == agent.position and obj.id != agent.carrying_object for obj in self.objects):
+                            obj = next((o for o in self.objects if o.id == agent.carrying_object), None)
+                            if obj:
+                                obj.position = agent.position
+                                agent.carrying_object = None
+                                agent.reward += REWARD_DROP
+
+
 
     def _init_render(self):
         from core.rendering import Viewer
-
         self.renderer = Viewer(self)
         if self.debug_mode:
             print("Rendering initialised.")
@@ -521,8 +520,12 @@ class MultiAgentPickAndPlace(gym.Env):
         return self.renderer.render()
 
     def close(self):
+        # Close the renderer
         if self.renderer:
             self.renderer.close()
+        # Save the video frames
+        if self.create_video:
+            pass
 
 
 def game_loop(env, render):
@@ -551,8 +554,8 @@ def game_loop(env, render):
 
         done = np.all(ndone)
 
+    env.close()
     print("Episode finished.")
-
 
 if __name__ == "__main__":
     env = MultiAgentPickAndPlace(
