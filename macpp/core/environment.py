@@ -27,7 +27,7 @@ class Action(Enum):
     LEFT = 3
     RIGHT = 4
     PASS = 5
-
+    WAIT = 6
 
 class Agent:
     def __init__(self, position, picker, carrying_object=None):
@@ -110,8 +110,9 @@ class MultiAgentPickAndPlace(gym.Env):
             Action.LEFT,
             Action.RIGHT,
             Action.PASS,
+            Action.WAIT,
         ]
-        self.action_space = spaces.Tuple([spaces.Discrete(5)] * self.n_agents)
+        self.action_space = spaces.Tuple([spaces.Discrete(6)] * self.n_agents)
 
         # Define agent observation space
         self.agent_space = spaces.Dict(
@@ -474,23 +475,6 @@ class MultiAgentPickAndPlace(gym.Env):
             return True
         return False
 
-   
-    # def check_termination(self):
-    #     goal_positions = set(self.goals)
-    #     # object_positions = [obj.position for obj in self.objects]
-    #     for obj in self.objects:
-    #         if obj.position in goal_positions:
-    #             agent = next(
-    #                 (
-    #                     a
-    #                     for a in self.agents
-    #                     if a.carrying_object == obj.id and not a.picker
-    #                 ),
-    #                 None,
-    #             )
-    #             if agent:
-    #                 return True
-    #     return False
 
     def _handle_drops(self):
         for agent in self.agents:
