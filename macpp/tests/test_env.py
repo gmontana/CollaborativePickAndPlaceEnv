@@ -1,5 +1,6 @@
 import unittest
-from core.environment import MultiAgentPickAndPlace
+from ..core.environment import MultiAgentPickAndPlace
+from ..core.environment import Action
 
 class MACPPTests(unittest.TestCase):
 
@@ -13,7 +14,7 @@ class MACPPTests(unittest.TestCase):
             "goals": [(0, 0), (1, 0)],
         }
         env = MultiAgentPickAndPlace(10, 10, 2, 0, initial_state=initial_state)
-        actions = ["move_right", "move_left"]
+        actions = [Action.RIGHT, Action.LEFT]
         env.step(actions)
         self.assertEqual(env.agents[0].position, (0, 0), "Agent moved out of bounds or overlapped with another agent.")
 
@@ -25,7 +26,7 @@ class MACPPTests(unittest.TestCase):
         }
         env = MultiAgentPickAndPlace(10, 10, 1, 1, initial_state=initial_state)
         print(env.print_state())
-        actions = ["move_left"]
+        actions = [Action.LEFT]
         env.step(actions)
         print(env.print_state())
         self.assertIsNone(env.agents[0].carrying_object, "Agent failed to drop off the object.")
@@ -38,7 +39,7 @@ class MACPPTests(unittest.TestCase):
             "goals": [],
         }
         env = MultiAgentPickAndPlace(10, 10, 1, 1, initial_state=initial_state)
-        actions = ["pass"]
+        actions = [Action.PASS]
         env.step(actions)
         self.assertEqual(env.agents[0].carrying_object, 0, "Picker agent failed to pick up the object.")
 
@@ -49,7 +50,7 @@ class MACPPTests(unittest.TestCase):
             "goals": [],
         }
         env = MultiAgentPickAndPlace(10, 10, 1, 1, initial_state=initial_state)
-        actions = ["pass"]
+        actions = [Action.PASS]
         env.step(actions)
         self.assertIsNone(env.agents[0].carrying_object, "Non-picker agent managed to pick up the object.")
 
@@ -60,7 +61,7 @@ class MACPPTests(unittest.TestCase):
             "goals": [],
         }
         env = MultiAgentPickAndPlace(10, 10, 1, 1, initial_state=initial_state)
-        actions = ["pass"]
+        actions = [Action.PASS]
         env.step(actions)
         self.assertNotIn({"position": (0, 0), "id": 0}, env.objects, "Object did not disappear after being picked up.")
 
@@ -75,7 +76,7 @@ class MACPPTests(unittest.TestCase):
             "goals": [],
         }
         env = MultiAgentPickAndPlace(10, 10, 3, 2, initial_state=initial_state)
-        actions = ["pass", "pass", "pass"]
+        actions = [Action.PASS, Action.PASS, Action.PASS]
         env.step(actions)
         self.assertTrue(env.agents[2].carrying_object in [0, 1], "Agent did not receive an object.")
         self.assertTrue(
@@ -90,7 +91,7 @@ class MACPPTests(unittest.TestCase):
             "goals": [(1, 0)],
         }
         env = MultiAgentPickAndPlace(10, 10, 1, 0, initial_state=initial_state)
-        actions = ["move_right"]
+        actions = [Action.RIGHT]
         env.step(actions)
         self.assertIsNone(env.agents[0].carrying_object, "Agent status changed even without carrying an object.")
 
@@ -114,7 +115,7 @@ class MACPPTests(unittest.TestCase):
          }
          env = MultiAgentPickAndPlace(10, 10, 4, 4, initial_state=initial_state)
          print(env.print_state())
-         actions = ["move_down", "move_right", "move_right", "move_right"]
+         actions = [Action.DOWN, Action.RIGHT, Action.RIGHT, Action.RIGHT]
          env.step(actions)
          print(env.print_state())
          self.assertTrue(env.done, "Termination condition not recognized.")
@@ -130,7 +131,7 @@ class MACPPTests(unittest.TestCase):
          }
          env = MultiAgentPickAndPlace(10, 10, 2, 1, initial_state=initial_state)
          print(env.print_state())
-         actions = ["pass", "pass"]
+         actions = [Action.PASS, Action.PASS]
          env.step(actions)
          print(env.print_state())
          self.assertIsNone(env.agents[0].carrying_object, "Agent 1 did not pass the object")
@@ -147,7 +148,7 @@ class MACPPTests(unittest.TestCase):
          }
          env = MultiAgentPickAndPlace(10, 10, 2, 2, initial_state=initial_state)
          print(env.print_state())
-         actions = ["pass", "move_left"]
+         actions = [Action.PASS, Action.LEFT]
          env.step(actions)
          print(env.print_state())
          self.assertTrue(
@@ -170,7 +171,7 @@ class MACPPTests(unittest.TestCase):
              "goals": [],
          }
          env = MultiAgentPickAndPlace(10, 10, 2, 2, initial_state=initial_state)
-         actions = ["pass", "pass"]
+         actions = [Action.PASS, Action.PASS]
          print(env.print_state())
          env.step(actions)
          print(env.print_state())
@@ -187,7 +188,7 @@ class MACPPTests(unittest.TestCase):
          }
          env = MultiAgentPickAndPlace(10, 10, 1, 1, initial_state=initial_state)
          print(env.print_state())
-         actions = ["pass"]
+         actions = [Action.PASS]
          env.step(actions)
          print(env.print_state())
          self.assertEqual(env.agents[0].carrying_object, 0, "Agent passed the object when it shouldn't have.")
@@ -200,7 +201,7 @@ class MACPPTests(unittest.TestCase):
          }
          env = MultiAgentPickAndPlace(10, 10, 1, 1, initial_state=initial_state)
          print(env.print_state())
-         actions = ["pass"]
+         actions = [Action.PASS]
          env.step(actions)
          print(env.print_state())
          self.assertIsNone(env.agents[0].carrying_object, "Agent that's not a picker managed to pick an object.")
@@ -218,7 +219,7 @@ class MACPPTests(unittest.TestCase):
             "goals": [],
         }
         env = MultiAgentPickAndPlace(10, 10, 2, 2, initial_state=initial_state)
-        actions = ["pass", "pass"]
+        actions = [Action.PASS, Action.PASS]
         env.step(actions)
         # Check that both agents still have their objects after trying to pass to each other
         self.assertEqual(env.agents[0].carrying_object, 0, "Agent 1 lost its object.")
@@ -240,7 +241,7 @@ class MACPPTests(unittest.TestCase):
         }
         env = MultiAgentPickAndPlace(10, 10, 4, 2, initial_state=initial_state)
         print(env.print_state())
-        actions = ["pass", "pass", "pass", "pass"]
+        actions = [Action.PASS, Action.PASS, Action.PASS, Action.PASS]
         env.step(actions)
         print(env.print_state())
         # Check that the picker agents passed their objects to the non-picker agents
@@ -256,7 +257,7 @@ class MACPPTests(unittest.TestCase):
             "goals": [(2, 1)],
         }
         env = MultiAgentPickAndPlace(10, 10, 1, 1, initial_state=initial_state)
-        actions = ["move_right"]
+        actions = [Action.RIGHT]
         env.step(actions)
         # Check that the object is still in the environment after being dropped on a goal
         self.assertTrue(any(obj for obj in env.objects if obj.id == 0), "Object disappeared after being dropped on a goal by a non-picker agent.")
@@ -268,7 +269,7 @@ class MACPPTests(unittest.TestCase):
             "goals": [(2, 1)],
         }
         env = MultiAgentPickAndPlace(10, 10, 1, 1, initial_state=initial_state)
-        actions = ["move_right"]
+        actions = [Action.RIGHT]
         env.step(actions)
         # Check that the object is still in the environment after being dropped on a goal by a picker agent
         self.assertTrue(any(obj for obj in env.objects if obj.id == 0), "Object disappeared after being dropped on a goal by a picker agent.")

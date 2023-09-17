@@ -106,7 +106,7 @@ class MultiAgentPickAndPlace(gym.Env):
             Action.RIGHT,
             Action.PASS,
         ]
-        self.action_space = spaces.Tuple([spaces.Discrete(5)] * len(self.n_agents))
+        self.action_space = spaces.Tuple([spaces.Discrete(5)] * self.n_agents)
 
         # Define agent observation space
         self.agent_space = spaces.Dict(
@@ -299,7 +299,7 @@ class MultiAgentPickAndPlace(gym.Env):
             )
             self.agents.append(agent)
 
-    def _print_state(self):
+    def print_state(self):
         print("=" * 40)
         print("Agents' State:")
         for idx, agent in enumerate(self.agents, start=1):
@@ -336,7 +336,7 @@ class MultiAgentPickAndPlace(gym.Env):
         """
 
         # Check that no invalid actions are taken 
-        is self.debug_mode:
+        if self.debug_mode:
             self._validate_actions(actions)
 
         # Negative reward given at every step
