@@ -475,20 +475,18 @@ class MultiAgentPickAndPlace(gym.Env):
             return True
         return False
 
-
     def _handle_drops(self):
         for agent in self.agents:
-            if agent.carrying_object is not None:
-                if not agent.picker:
-                    if agent.position in self.goals:
-                        # Exclude the object being carried by the agent when checking
-                        if not any(obj.position == agent.position and obj.id != agent.carrying_object for obj in self.objects):
-                            obj = next((o for o in self.objects if o.id == agent.carrying_object), None)
-                            if obj:
-                                obj.position = agent.position
-                                agent.carrying_object = None
-                                agent.reward += REWARD_DROP
-
+            # Check if the agent is carrying an object and is NOT a picker
+            if agent.carrying_object is not None and not agent.picker:
+                # Check if the agent's position matches any of the goal positions
+                if agent.position in self.goals:
+                    # Check if the goal position already has an object
+                    if not any(obj.position == agent.position for obj in self.objects):
+                        # Drop the object at the goal position
+                        obj = next(obj for obj in self.objects if obj.id == agent.carrying_object)
+                        obj.position = agent.position
+                        agent.carrying_object = None
 
 
     def _init_render(self):
