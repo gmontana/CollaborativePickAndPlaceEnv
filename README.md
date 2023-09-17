@@ -3,8 +3,8 @@
 ## Overview
 In the Collaborative Pick and Place environment, multiple agents work together in a grid-based world to accomplish a common task. The goal is to successfully pick up and place objects (green circles) into designated goal positions (gray rectangles). The agents populating this environment can be of two types:
 
-- Pickers can automatically pick up objects when moving over them.
-- Non-pickers can automatically drop off objects when moving over goal positions.
+- **Pickers**: can automatically pick up objects when moving over them.
+- **Non-pickers**: can automatically drop off objects when moving over goal positions.
 
 In order to successfully drop objects on on goal positions, the agents need to learn a collaborative strategy.
 
