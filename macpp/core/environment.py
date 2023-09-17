@@ -79,10 +79,10 @@ class MultiAgentPickAndPlace(gym.Env):
         self.length = length
         self.cell_size = cell_size
         self.n_agents = n_agents
-        self.debug_mode = debug_mode
         self.n_pickers = n_pickers
         self.initial_state = initial_state
         self.create_video = create_video
+        self.debug_mode = debug_mode
 
         # Set the number of objects and goals
         if n_objects is None:
@@ -147,7 +147,7 @@ class MultiAgentPickAndPlace(gym.Env):
 
         self.done = False
 
-        # Use a random state unless a predefined state is provided
+        # Initialise the environment 
         if initial_state is None:
             self.random_initialize()
         else:
@@ -274,6 +274,9 @@ class MultiAgentPickAndPlace(gym.Env):
         Initiate environment at a predefined state
         """
 
+        if self.debug_mode:
+            print(f"\n--- Initialisation from state --- \n {initial_state} \n")
+
         # Initialise objects
         self.objects = [
             Object(position=obj["position"], id=obj.get("id", None))
@@ -299,8 +302,11 @@ class MultiAgentPickAndPlace(gym.Env):
             )
             self.agents.append(agent)
 
+        if self.debug_mode:
+            self.print_state()
+
     def print_state(self):
-        print("=" * 40)
+        print("----- Start of the current state ---")
         print("Agents' State:")
         for idx, agent in enumerate(self.agents, start=1):
             carrying_status = (
@@ -326,6 +332,7 @@ class MultiAgentPickAndPlace(gym.Env):
         else:
             for idx, goal in enumerate(self.goals):
                 print(f"- Goal {idx + 1}: Position {goal}")
+        print("----- End of the current state ---")
 
     def _random_position(self):
         return (random.randint(0, self.width - 1), random.randint(0, self.length - 1))
@@ -338,6 +345,7 @@ class MultiAgentPickAndPlace(gym.Env):
         # Check that no invalid actions are taken 
         if self.debug_mode:
             self._validate_actions(actions)
+            print(f"Executing actions: {actions}")
 
         # Negative reward given at every step
         rewards = [REWARD_STEP] * self.n_agents
