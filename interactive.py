@@ -3,6 +3,9 @@ from macpp.core.environment import MultiAgentPickAndPlace
 from macpp.core.environment import Action
 
 class InteractivePolicy:
+    '''
+    Class to manually control a two-player game using the keyboard 
+    '''
     def __init__(self):
         self.move_a = {Action.UP: False, Action.DOWN: False, Action.LEFT: False, Action.RIGHT: False, Action.PASS: False}
         self.move_b = {Action.UP: False, Action.DOWN: False, Action.LEFT: False, Action.RIGHT: False, Action.PASS: False}
@@ -37,7 +40,7 @@ class InteractivePolicy:
             self.move_b[key_mappings_b[key]] = pressed
 
 def game_loop(env):
-    obs = env.reset()
+    env.reset()
     done = False
     policy = InteractivePolicy()
     env.render()
