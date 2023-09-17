@@ -60,43 +60,6 @@ class MultiAgentPickAndPlace(gym.Env):
 
     metadata = {"render.modes": ["human"]}
 
-    # Define agent observation space
-    agent_space = spaces.Dict(
-        {
-            "position": spaces.Tuple(
-                (spaces.Discrete(self.width), spaces.Discrete(self.length))
-            ),
-            "picker": spaces.Discrete(2),  # 0 or 1
-            "carrying_object": spaces.Discrete(
-                self.n_objects + 1
-            ),  # Including a value for "not carrying"
-        }
-    )
-
-    # Define object observation space
-    object_space = spaces.Dict(
-        {
-            "position": spaces.Tuple(
-                (spaces.Discrete(self.width), spaces.Discrete(self.length))
-            ),
-            "id": spaces.Discrete(self.n_objects),
-        }
-    )
-
-    # Define goals space
-    goal_space = spaces.Tuple(
-        (spaces.Discrete(self.width), spaces.Discrete(self.length))
-    )
-
-    # Combine all spaces into the overall observation space
-    self.observation_space = spaces.Dict(
-        {
-            "agents": spaces.Tuple([agent_space] * self.n_agents),
-            "objects": spaces.Tuple([object_space] * self.n_objects),
-            "goals": spaces.Tuple([goal_space] * self.n_objects),
-        }
-    )
-
     def __init__(
         self,
         width,
@@ -120,30 +83,11 @@ class MultiAgentPickAndPlace(gym.Env):
         self.initial_state = initial_state
         self.create_video = create_video
 
-        # Define actions and done flag
-        # self.action_space = ["move_up", "move_down", "move_left", "move_right", "pass"]
-        self.action_set = [
-            Action.UP,
-            Action.DOWN,
-            Action.LEFT,
-            Action.RIGHT,
-            Action.PASS,
-        ]
-        self.action_space = spaces.Tuple([spaces.Discrete(5)] * len(self.n_agents))
-        self.observation_space = spaces.Discrete(1e6)
-        self.done = False
-
         # Set the number of objects and goals
         if n_objects is None:
             self.n_objects = self.n_agents
         else:
             self.n_objects = n_objects
-
-        # Use a random state unless a predefined state is provided
-        if initial_state is None:
-            self.random_initialize()
-        else:
-            self.initialize_from_state(initial_state)
 
         # Check whether the grid size is sufficiently large
         total_cells = self.width * self.length
@@ -153,16 +97,65 @@ class MultiAgentPickAndPlace(gym.Env):
                 "Grid size not sufficiently large to contain all the entities."
             )
 
+        # Define actions and actions space
+        self.action_set = [
+            Action.UP,
+            Action.DOWN,
+            Action.LEFT,
+            Action.RIGHT,
+            Action.PASS,
+        ]
+        self.action_space = spaces.Tuple([spaces.Discrete(5)] * len(self.n_agents))
+
+        # Define agent observation space
+        self.agent_space = spaces.Dict(
+            {
+                "position": spaces.Tuple(
+                    (spaces.Discrete(self.width), spaces.Discrete(self.length))
+                ),
+                "picker": spaces.Discrete(2),  # 0 or 1
+                "carrying_object": spaces.Discrete(
+                    self.n_objects + 1
+                ),  # Including a value for "not carrying"
+            }
+        )
+
+        # Define object observation space
+        self.object_space = spaces.Dict(
+            {
+                "position": spaces.Tuple(
+                    (spaces.Discrete(self.width), spaces.Discrete(self.length))
+                ),
+                "id": spaces.Discrete(self.n_objects),
+            }
+        )
+
+        # Define goals space
+        self.goal_space = spaces.Tuple(
+            (spaces.Discrete(self.width), spaces.Discrete(self.length))
+        )
+
+        # Combine all spaces into the overall observation space
+        self.observation_space = spaces.Dict(
+            {
+                "agents": spaces.Tuple([agent_space] * self.n_agents),
+                "objects": spaces.Tuple([object_space] * self.n_objects),
+                "goals": spaces.Tuple([goal_space] * self.n_objects),
+            }
+        )
+
+        self.done = False
+
+        # Use a random state unless a predefined state is provided
+        if initial_state is None:
+            self.random_initialize()
+        else:
+            self.initialize_from_state(initial_state)
+
         # Create the offscreen surface for rendering
         self.offscreen_surface = pygame.Surface(
             (self.width * self.cell_size, self.length * self.cell_size)
         )
-
-        # # Load agent icons
-        # image_path = os.path.join(
-        #     os.path.dirname(__file__), "icons", "agent_picker.png"
-        # )
-        # self.picker_icon = pygame.image.load(image_path)
 
         # Rendering
         self._rendering_initialised = False
