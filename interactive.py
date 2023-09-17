@@ -7,8 +7,8 @@ class InteractivePolicy:
     Class to manually control a two-player game using the keyboard 
     '''
     def __init__(self):
-        self.move_a = {Action.UP: False, Action.DOWN: False, Action.LEFT: False, Action.RIGHT: False, Action.PASS: False}
-        self.move_b = {Action.UP: False, Action.DOWN: False, Action.LEFT: False, Action.RIGHT: False, Action.PASS: False}
+        self.move_a = {Action.UP: False, Action.DOWN: False, Action.LEFT: False, Action.RIGHT: False, Action.PASS: False, Action.WAIT: False}
+        self.move_b = {Action.UP: False, Action.DOWN: False, Action.LEFT: False, Action.RIGHT: False, Action.PASS: False, Action.WAIT: False}
 
     def action(self):
         actions = [
@@ -23,7 +23,8 @@ class InteractivePolicy:
             pygame.K_DOWN: Action.DOWN,
             pygame.K_LEFT: Action.LEFT,
             pygame.K_RIGHT: Action.RIGHT,
-            pygame.K_SPACE: Action.PASS
+            pygame.K_SPACE: Action.PASS,
+            pygame.K_p: Action.WAIT
         }
 
         key_mappings_b = {
@@ -31,7 +32,8 @@ class InteractivePolicy:
             pygame.K_b: Action.DOWN,
             pygame.K_g: Action.LEFT,
             pygame.K_h: Action.RIGHT,
-            pygame.K_x: Action.PASS
+            pygame.K_x: Action.PASS,
+            pygame.K_q: Action.WAIT
         }
 
         if key in key_mappings_a:
