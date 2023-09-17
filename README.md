@@ -1,20 +1,36 @@
-# **Collaborative Pick and Place**
+# Collaborative Pick and Place Environment
 
-In this environment, agents work together in a grid to pick up and place objects in designated goal positions. The game emphasizes teamwork, with agents having distinct roles and responsibilities. The game concludes when all objects are correctly placed, rewarding agents based on their collaborative efforts.
+## Overview
+In the Collaborative Pick and Place environment, multiple agents collaborate within a grid-based world to perform a task involving the pickup and placement of objects into designated goal positions. This cooperative game emphasizes teamwork and specialization among agents, each with distinct roles and responsibilities. The primary objective is to successfully place all objects at their respective goal locations, with agents receiving rewards based on their collaborative efforts.
 
-The environment consists of a grid where agents can move, interact with objects, and achieve specific goals. Agents are either:
-- **Pickers**: Can only pick up objects
-- **Non-pickers**: Can only drop off objects
+## Agents
+There are two types of agents in this environment:
 
-Agents can move one cell in directions: `up`, `down`, `left`, or `right`. They cannot move into cells occupied by other agents but can occupy cells containing objects. They can also stay where they are without moving using the `wait` action.
+### 1. Pickers
+- Role: Pickers are specialized in picking up objects.
+- Actions: They can move in four cardinal directions—up, down, left, and right—and can also wait in their current position.
+- Object Interaction: Pickers automatically pick up objects when they move over a cell containing an object, provided they are not already carrying an object.
 
-Objects are automatically picked up and dropped off:
+### 2. Non-pickers
+- Role: Non-pickers are specialized in dropping off objects at goal positions.
+- Actions: Similar to Pickers, they can move in four directions and wait.
+- Object Interaction: Non-pickers automatically drop off objects when they move over a goal position, earning a positive reward for doing so.
+
+## Object Handling
 - **Pickers** automatically pick up objects when they move over a cell containing one, provided they aren't already carrying an object.
 - **Non-pickers** automatically drop off objects when they move over a goal position, earning a positive reward for doing so.
 
-When an agent is carrying an object, it can pass the object to an adjacent agent using the `pass` action. This transfer is successful only if the receiving agent is also taking the same action at the same time.
-  - **Picker to Non-picker**: Both receive a positive reward.
-  - **Non-picker to Picker**: Both receive a negative reward.
+## Object Transfer
+Agents can transfer objects to one another under certain conditions:
+- To pass an object from one agent to another, both agents must perform the `pass` action simultaneously.
+- When a Picker passes an object to a Non-picker, both agents receive a positive reward.
+- When a Non-picker passes an object to a Picker, both agents receive a negative reward.
 
-The task is successfully completed when all objects are placed on goal positions. Upon conclusion, all agents receive a final reward.
+## Object Representation
+- Objects are represented as green circles on the grid.
+- Goal positions are indicated by gray rectangles.
+- When an agent is carrying an object, a green bounding box appears around the agent, indicating the carried object.
+
+## Task Completion
+The task is considered successfully completed when all objects have been placed on their respective goal positions. Upon successful completion, all agents receive a final reward based on their contributions.
 
