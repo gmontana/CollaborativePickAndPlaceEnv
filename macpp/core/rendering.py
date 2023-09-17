@@ -7,10 +7,11 @@ import os
 _ANIMATION_FPS = 5
 
 # Colors
-_WHITE = (255, 255, 255)
-_GRAY = (200, 200, 200)
-_BLUE = (0, 0, 255)
-_RED = (255, 0, 0)
+WHITE = (255, 255, 255)
+GRAY = (200, 200, 200)
+BLUE = (0, 0, 255)
+RED = (255, 0, 0)
+GREEN = (0, 255, 0)
 
 
 class Viewer:
@@ -30,10 +31,10 @@ class Viewer:
         base_path = os.path.dirname(__file__)
         icon_path = os.path.join(base_path, "icons")
         self.picker_icon = self._load_image(
-            os.path.join(icon_path, "agent_picker.png"), _RED
+            os.path.join(icon_path, "agent_picker.png"), RED
         )
         self.non_picker_icon = self._load_image(
-            os.path.join(icon_path, "agent_non_picker.png"), _BLUE
+            os.path.join(icon_path, "agent_non_picker.png"), BLUE
         )
 
         # Create the screen for display
@@ -86,15 +87,15 @@ class Viewer:
                 agent_icon_rect = agent_icon_resized.get_rect(center=cell_center)
                 self.offscreen_surface.blit(agent_icon_resized, agent_icon_rect)
 
+                # Draw rectangle around the agent carrying an object
                 if agent.carrying_object is not None:
-                    thickness = 3
                     pygame.draw.rect(
-                        self.offscreen_surface, (0, 255, 0), agent_icon_rect, thickness
+                        self.offscreen_surface, GREEN, agent_icon_rect, 5
                     )
 
             except Exception:
                 # Fallback rendering
-                color = (255, 0, 0) if agent.picker else (0, 0, 255)
+                color = RED if agent.picker else BLUE
                 pygame.draw.rect(
                     self.offscreen_surface,
                     color,
@@ -124,7 +125,7 @@ class Viewer:
             x, y = goal
             pygame.draw.rect(
                 self.offscreen_surface,
-                _GRAY,
+                GRAY,
                 (
                     x * self.env.cell_size + self.env.cell_size // 3,
                     y * self.env.cell_size + self.env.cell_size // 3,
@@ -134,11 +135,11 @@ class Viewer:
             )
 
     def render(self):
-        self.offscreen_surface.fill(_WHITE)
+        self.offscreen_surface.fill(WHITE)
         self._draw_grid()
-        self._draw_agents()
         self._draw_objects()
         self._draw_goals()
+        self._draw_agents()
         self.screen.blit(self.offscreen_surface, (0, 0))
         pygame.display.flip()
 
