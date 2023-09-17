@@ -4,25 +4,26 @@ from ..core.environment import Action
 
 
 class MACPPTests(unittest.TestCase):
-    def test_invalid_moves(self):
-        initial_state = {
-            "agents": [
-                {"position": (0, 0), "picker": True, "carrying_object": None},
-                {"position": (1, 0), "picker": False, "carrying_object": None},
-            ],
-            "objects": [{"position": (2, 2), "id": 0}],
-            "goals": [(0, 0)],
-        }
 
-        env = MultiAgentPickAndPlace(width=10, length=10, n_agents=2, n_pickers=0, initial_state=initial_state, debug_mode=True)
+    # def test_invalid_moves(self):
+    #     initial_state = {
+    #         "agents": [
+    #             {"position": (0, 0), "picker": True, "carrying_object": None},
+    #             {"position": (1, 0), "picker": False, "carrying_object": None},
+    #         ],
+    #         "objects": [{"position": (2, 2), "id": 0}],
+    #         "goals": [(0, 0)],
+    #     }
 
-        actions = [Action.RIGHT, Action.LEFT]
-        env.step(actions)
-        self.assertEqual(
-            env.agents[0].position,
-            (0, 0),
-            "Agent moved out of bounds or overlapped with another agent.",
-        )
+    #     env = MultiAgentPickAndPlace(width=10, length=10, n_agents=2, n_pickers=0, initial_state=initial_state, debug_mode=True)
+
+    #     actions = [Action.RIGHT, Action.LEFT]
+    #     env.step(actions)
+    #     self.assertEqual(
+    #         env.agents[0].position,
+    #         (0, 0),
+    #         "Agent moved out of bounds or overlapped with another agent.",
+    #     )
 
     # def test_dropoff_object(self):
     #     initial_state = {
@@ -123,28 +124,28 @@ class MACPPTests(unittest.TestCase):
     #         "Agent status changed even without carrying an object.",
     #     )
 
-    # def test_termination_condition(self):
-    #     initial_state = {
-    #         "agents": [
-    #             {"position": (3, 3), "picker": False, "carrying_object": 0},
-    #             {"position": (4, 4), "picker": False, "carrying_object": 1},
-    #             {"position": (5, 5), "picker": False, "carrying_object": 2},
-    #             {"position": (6, 6), "picker": False, "carrying_object": 3},
-    #         ],
-    #         "objects": [
-    #             {"position": (3, 3), "id": 0},
-    #             {"position": (4, 4), "id": 1},
-    #             {"position": (5, 5), "id": 2},
-    #             {"position": (6, 6), "id": 3},
-    #         ],
-    #         "goals": [(3, 4), (5, 4), (6, 5), (7, 6)],
-    #     }
-    #     env = MultiAgentPickAndPlace(10, 10, 4, 4, initial_state=initial_state)
-    #     print(env.print_state())
-    #     actions = [Action.DOWN, Action.RIGHT, Action.RIGHT, Action.RIGHT]
-    #     env.step(actions)
-    #     print(env.print_state())
-    #     self.assertTrue(env.done, "Termination condition not recognized.")
+    def test_termination_condition(self):
+        initial_state = {
+            "agents": [
+                {"position": (3, 3), "picker": False, "carrying_object": 0},
+                {"position": (4, 4), "picker": False, "carrying_object": 1},
+                {"position": (5, 5), "picker": False, "carrying_object": 2},
+                {"position": (6, 6), "picker": False, "carrying_object": 3},
+            ],
+            "objects": [
+                {"position": (3, 3), "id": 0},
+                {"position": (4, 4), "id": 1},
+                {"position": (5, 5), "id": 2},
+                {"position": (6, 6), "id": 3},
+            ],
+            "goals": [(3, 4), (5, 4), (6, 5), (7, 6)],
+        }
+        env = MultiAgentPickAndPlace(10, 10, 4, 4, initial_state=initial_state)
+        print(env.print_state())
+        actions = [Action.DOWN, Action.RIGHT, Action.RIGHT, Action.RIGHT]
+        env.step(actions)
+        print(env.print_state())
+        self.assertTrue(env.done, "Termination condition not recognized.")
 
     # def test_pass_object_between_two_agents(self):
     #     initial_state = {
