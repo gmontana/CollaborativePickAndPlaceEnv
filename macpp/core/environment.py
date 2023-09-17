@@ -85,8 +85,8 @@ class MultiAgentPickAndPlace(gym.Env):
         self.debug_mode = debug_mode
 
         # Check if there are enough pickers
-        # if n_agents-n_pickers <= 0:
-       #     raise ValueError("There should be an at least one picker.")
+        if n_agents-n_pickers <= 0:
+           raise ValueError("There should be an at least one picker.")
 
         # Set the number of objects and goals
         if n_objects is None:
@@ -468,7 +468,6 @@ class MultiAgentPickAndPlace(gym.Env):
         goal_positions = set(self.goals)
         object_positions = {obj.position for obj in self.objects}
         carrying_agents = {agent.position for agent in self.agents if agent.carrying_object is not None}
-
         # Check if every goal has an object on it, no goal has more than one object,
         # and no non-picker agent is carrying an object
         if (object_positions == goal_positions and
