@@ -60,6 +60,43 @@ class MultiAgentPickAndPlace(gym.Env):
 
     metadata = {"render.modes": ["human"]}
 
+    # Define agent observation space
+    agent_space = spaces.Dict(
+        {
+            "position": spaces.Tuple(
+                (spaces.Discrete(self.width), spaces.Discrete(self.length))
+            ),
+            "picker": spaces.Discrete(2),  # 0 or 1
+            "carrying_object": spaces.Discrete(
+                self.n_objects + 1
+            ),  # Including a value for "not carrying"
+        }
+    )
+
+    # Define object observation space
+    object_space = spaces.Dict(
+        {
+            "position": spaces.Tuple(
+                (spaces.Discrete(self.width), spaces.Discrete(self.length))
+            ),
+            "id": spaces.Discrete(self.n_objects),
+        }
+    )
+
+    # Define goals space
+    goal_space = spaces.Tuple(
+        (spaces.Discrete(self.width), spaces.Discrete(self.length))
+    )
+
+    # Combine all spaces into the overall observation space
+    self.observation_space = spaces.Dict(
+        {
+            "agents": spaces.Tuple([agent_space] * self.n_agents),
+            "objects": spaces.Tuple([object_space] * self.n_objects),
+            "goals": spaces.Tuple([goal_space] * self.n_objects),
+        }
+    )
+
     def __init__(
         self,
         width,
@@ -164,6 +201,14 @@ class MultiAgentPickAndPlace(gym.Env):
         # goal_states = self.goals
 
         return self.get_hashed_state()
+
+    def get_state(self):
+
+        agent_states = [agent.get_agent_state() for agent in self.agents]
+        object_states = [obj.get_object_state() for obj in self.objects]
+        goal_states = self.goals
+
+        return {"agents": agent_states, "objects": object_states, "goals": goal_states}
 
     def get_hashed_state(self):
         """
@@ -296,38 +341,40 @@ class MultiAgentPickAndPlace(gym.Env):
         Step through the environment
         """
 
-        self._validate_actions(actions)
+        # Check that no invalid actions are taken 
+        is self.debug_mode:
+            self._validate_actions(actions)
 
         # Negative reward given at every step
         rewards = [REWARD_STEP] * self.n_agents
 
+        # Execute the actions
         self._handle_moves(actions)
         self._handle_drops()
         self._handle_pickups()
         self._handle_passes(actions)
         termination_reward = self.check_termination()
 
+        # Check for termination
         done = False
         if termination_reward:
             for idx in range(self.n_agents):
                 rewards[idx] += termination_reward
             done = True
 
-        next_state = {
-            "agents": [agent.get_agent_state() for agent in self.agents],
-            "objects": [obj.get_object_state() for obj in self.objects],
-            "goals": self.goals,
-        }
-
-        if self.debug_mode:
-            self._print_state()
-
         # Collect frames for the video when required
         if self.create_video:
             self.frames.append(pygame.surfarray.array3d(self.offscreen_surface))
 
-        next_state_hash = self.get_hashed_state()
-        return next_state_hash, rewards, done, {}
+        # Get the next state
+        next_state = self.get_state()
+
+        # Debug info
+        if self.debug_mode:
+            self._print_state()
+
+        # next_state_hash = self.get_hashed_state()
+        return next_state, rewards, done, {}
 
     def _move_agent(self, agent, action):
         """
@@ -335,13 +382,13 @@ class MultiAgentPickAndPlace(gym.Env):
         """
 
         x, y = agent.position
-        if action == "move_up":
+        if action == Action.UP:
             y = max(0, y - 1)
-        elif action == "move_down":
+        elif action == Action.DOWN:
             y = min(self.length - 1, y + 1)
-        elif action == "move_left":
+        elif action == Action.LEFT:
             x = max(0, x - 1)
-        elif action == "move_right":
+        elif action == Action.RIGHT:
             x = min(self.width - 1, x + 1)
 
         new_position = (x, y)
@@ -377,7 +424,7 @@ class MultiAgentPickAndPlace(gym.Env):
         receiving_agents = [None] * len(self.agents)
 
         for idx, agent in enumerate(self.agents):
-            if actions[idx] == "pass" and agent.carrying_object is not None:
+            if actions[idx] == Action.PASS and agent.carrying_object is not None:
                 x, y = agent.position
                 adjacent_positions = [(x + 1, y), (x - 1, y), (x, y + 1), (x, y - 1)]
                 for adj_pos in adjacent_positions:
@@ -386,7 +433,7 @@ class MultiAgentPickAndPlace(gym.Env):
                     )
                     if (
                         adj_agent
-                        and actions[self.agents.index(adj_agent)] == "pass"
+                        and actions[self.agents.index(adj_agent)] == Action.PASS
                         and adj_agent.carrying_object is None
                     ):
                         receiving_agents[
