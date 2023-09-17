@@ -8,7 +8,7 @@ The environment consists of a grid where agents can move, interact with objects,
 
 Agents can move one cell in directions: `up`, `down`, `left`, or `right`. They cannot move into cells occupied by other agents but can occupy cells containing objects. 
 
-When an agent is carrying an object, it can pass the object to an adjacent agent using the `pass` action. This transfer is successful only if the receiving agent is also pressing the 'pass' action.
+When an agent is carrying an object, it can pass the object to an adjacent agent using the `pass` action. This transfer is successful only if the receiving agent is also taking the same action at the same time.
   - **Picker to Non-picker**: Both receive a positive reward.
   - **Non-picker to Picker**: Both receive a negative reward.
 
