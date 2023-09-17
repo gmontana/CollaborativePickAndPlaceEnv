@@ -138,9 +138,9 @@ class MultiAgentPickAndPlace(gym.Env):
         # Combine all spaces into the overall observation space
         self.observation_space = spaces.Dict(
             {
-                "agents": spaces.Tuple([agent_space] * self.n_agents),
-                "objects": spaces.Tuple([object_space] * self.n_objects),
-                "goals": spaces.Tuple([goal_space] * self.n_objects),
+                "agents": spaces.Tuple([self.agent_space] * self.n_agents),
+                "objects": spaces.Tuple([self.object_space] * self.n_objects),
+                "goals": spaces.Tuple([self.goal_space] * self.n_objects),
             }
         )
 
