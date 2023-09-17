@@ -166,10 +166,6 @@ class MultiAgentPickAndPlace(gym.Env):
         if self.create_video:
             self.frames = []
 
-        # Initialise entities
-        self.agents = []
-        self.objects = []
-        self.goals = []
 
     def _validate_actions(self, actions):
         for action in actions:
@@ -304,6 +300,9 @@ class MultiAgentPickAndPlace(gym.Env):
 
         if self.debug_mode:
             self.print_state()
+            print(f"There are {len(self.agents)} agents.")
+            print(f"There are {len(self.objects)} objects.")
+            print(f"There are {len(self.goals)} goals.")
 
     def print_state(self):
         print("----- Start of the current state ---")
@@ -345,10 +344,11 @@ class MultiAgentPickAndPlace(gym.Env):
         # Check that no invalid actions are taken 
         if self.debug_mode:
             self._validate_actions(actions)
-            print(f"Executing actions: {actions}")
+            print(f"\nExecuting actions: {actions}\n")
 
         # Negative reward given at every step
         rewards = [REWARD_STEP] * self.n_agents
+
 
         # Execute the actions
         self._handle_moves(actions)
@@ -373,7 +373,7 @@ class MultiAgentPickAndPlace(gym.Env):
 
         # Debug info
         if self.debug_mode:
-            self._print_state()
+            self.print_state()
 
         # next_state_hash = self.get_hashed_state()
         return next_state, rewards, done, {}
@@ -466,24 +466,34 @@ class MultiAgentPickAndPlace(gym.Env):
             if obj_id is not None:
                 self.agents[idx].carrying_object = obj_id
 
+
     def check_termination(self):
         goal_positions = set(self.goals)
-        # object_positions = [obj.position for obj in self.objects]
-
-        for obj in self.objects:
-            if obj.position in goal_positions:
-                agent = next(
-                    (
-                        a
-                        for a in self.agents
-                        if a.carrying_object == obj.id and not a.picker
-                    ),
-                    None,
-                )
-                if agent:
-                    return REWARD_COMPLETION
-
+        object_positions = {obj.position for obj in self.objects}
+    
+        if object_positions.issubset(goal_positions):
+            return REWARD_COMPLETION
         return 0
+
+   
+    # def check_termination(self):
+    #     goal_positions = set(self.goals)
+    #     # object_positions = [obj.position for obj in self.objects]
+
+    #     for obj in self.objects:
+    #         if obj.position in goal_positions:
+    #             agent = next(
+    #                 (
+    #                     a
+    #                     for a in self.agents
+    #                     if a.carrying_object == obj.id and not a.picker
+    #                 ),
+    #                 None,
+    #             )
+    #             if agent:
+    #                 return REWARD_COMPLETION
+
+    #     return 0
 
     def _handle_drops(self):
         for agent in self.agents:
