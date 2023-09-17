@@ -6,7 +6,7 @@ The environment consists of a grid where agents can move, interact with objects,
 - **Pickers**: Can only pick up objects
 - **Non-pickers**: Can only drop off objects
 
-Agents can move one cell in directions: `up`, `down`, `left`, or `right`. They cannot move into cells occupied by other agents but can occupy cells containing objects. 
+Agents can move one cell in directions: `up`, `down`, `left`, or `right`. They cannot move into cells occupied by other agents but can occupy cells containing objects. They can also stay where they are without moving using the `wait` action.
 
 Objects are automatically picked up and dropped off:
 - **Pickers** automatically pick up objects when they move over a cell containing one, provided they aren't already carrying an object.
