@@ -1,9 +1,10 @@
 import numpy as np
 from datetime import datetime
-# import random
 import os
+import random
 
-class QTable:
+
+class QLearningTable:
     def __init__(self, n_agents, action_space):
         self.q_table = {}
         self.n_agents = n_agents
@@ -43,7 +44,7 @@ class QTable:
 class QLearning:
     def __init__(self, env, learning_rate=0.1, discount_factor=0.99, exploration_rate=1.0, exploration_decay=0.995, min_exploration=0.01, learning_rate_decay=0.995, min_learning_rate=0.01, max_steps_per_episode=50):
         self.env = env
-        self.q_table = QTable(n_agents=env.n_agents, action_space=env.get_action_space())
+        self.q_table = QLearningTable(n_agents=env.n_agents, action_space=env.get_action_space())
         self.learning_rate = learning_rate
         self.learning_rate_decay = learning_rate_decay
         self.min_learning_rate = min_learning_rate
