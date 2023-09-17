@@ -1,6 +1,7 @@
-import pygame
-from macpp.core.environment import MultiAgentPickAndPlace
+# sys.path.append("/path/to/code/envs/collaborative_pick_and_place/macpp/")
 
+import pygame
+from ..macpp.core.environment import MultiAgentPickAndPlace
 
 class InteractivePolicy:
     def __init__(self, env):
