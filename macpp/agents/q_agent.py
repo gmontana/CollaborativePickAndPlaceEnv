@@ -3,6 +3,7 @@ from datetime import datetime
 import os
 import random
 import json
+import time
 
 
 class QLearningTable:
@@ -66,14 +67,14 @@ class QLearning:
 
     def epsilon_greedy_actions(self, state):
         if np.random.uniform(0, 1) < self.exploration_rate:
-            return [np.random.choice(self.q_table.action_space) for _ in range(self.q_table.n_agents)]
+            return [space.sample() for space in self.env.action_space]
         else:
             return self.greedy_actions(state)
 
     def greedy_actions(self, state):
         q_values = self.q_table.initialise(state)
         actions_indices = np.unravel_index(np.argmax(q_values), q_values.shape)
-        return [self.q_table.action_space[index] for index in actions_indices]
+        return list(actions_indices)
 
     def act(self, state, explore=False):
         if explore:
@@ -101,7 +102,7 @@ class QLearning:
         return total_reward, done, next_state
 
 
-def game_loop(env, agent, training=False, num_episodes=1, max_steps=50, create_video=False, qtable_file=None):
+def game_loop(env, agent, training=False, num_episodes=1, steps_per_episode=50, render=False, create_video=False, qtable_file=None):
 
     print("Game loop started...")
     total_steps = []
@@ -121,12 +122,16 @@ def game_loop(env, agent, training=False, num_episodes=1, max_steps=50, create_v
             next_state, rewards, done, _ = env.step(actions)
             episode_returns += sum(rewards)
             episode_steps += 1
-            if episode_steps > 50:
+            if episode_steps > steps_per_episode:
                 break
             # learn when needed
             if training:
                 agent.learn(state, actions, next_state, rewards, done)
             state = next_state
+            print(actions)
+            if render:
+                env.render()
+                time.sleep(0.5)
         total_steps.append(episode_steps)
         total_returns.append(episode_returns)
 
@@ -157,5 +162,5 @@ if __name__ == "__main__":
     )
     agent = QLearning(env)
 
-    total_steps, total_returns = game_loop(env, agent, True, 10000, 50, qtable_file='qtable')
+    total_steps, total_returns = game_loop(env, agent, True, 1, 300, render=True, qtable_file='qtable')
     # total_steps, total_returns = game_loop(env, agent, False, 10, create_video=True, qtable_file='qtable')
