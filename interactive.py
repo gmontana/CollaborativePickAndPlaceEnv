@@ -12,8 +12,8 @@ class InteractivePolicy:
 
     def action(self):
         actions = [
-            next((action for action, pressed in self.move_a.items() if pressed), None),
-            next((action for action, pressed in self.move_b.items() if pressed), None)
+            next((action.value for action, pressed in self.move_a.items() if pressed), None),
+            next((action.value for action, pressed in self.move_b.items() if pressed), None)
         ]
         return actions
 
@@ -56,9 +56,10 @@ def game_loop(env):
                 policy.handle_key(event.key, pressed)
 
         actions = policy.action()
-        if actions and all(action is not None for action in actions):
+        if actions and all(Action.is_valid(action) for action in actions):
             _, _, done, _ = env.step(actions)
             env.render()
+            print(env._print_state())
         pygame.time.wait(100)
 
     env.close()

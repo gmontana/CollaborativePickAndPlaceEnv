@@ -112,11 +112,14 @@ def game_loop(env, agent, training=False, num_episodes=1, steps_per_episode=50, 
     total_steps = []
     total_returns = []
     for episode in range(num_episodes):
+        print(f"Episode #{episode+1}\n")
         state = env.reset()
+        print(env._print_state())
         done = False
         episode_steps = 0
         episode_returns = 0
         while not done:
+            print(f"Current state: {env._print_state()}")
             # take action
             if training:
                 actions = agent.act(state, explore=True)
@@ -131,8 +134,9 @@ def game_loop(env, agent, training=False, num_episodes=1, steps_per_episode=50, 
             # learn when needed
             if training:
                 agent.learn(state, actions, next_state, rewards, done)
+            print(f"Actions: {actions}")
+            print(f"Next state: {env._print_state()}")
             state = next_state
-            print(actions)
             if render:
                 env.render()
                 time.sleep(0.5)
@@ -162,7 +166,7 @@ if __name__ == "__main__":
     from macpp.core.environment import MultiAgentPickAndPlace
 
     env = MultiAgentPickAndPlace(
-        width=3, length=3, n_agents=2, n_pickers=1, cell_size=300
+        width=3, length=3, n_agents=2, n_pickers=1, cell_size=300, debug_mode=True
     )
     agent = QLearning(env)
 

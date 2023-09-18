@@ -29,6 +29,12 @@ class Action(Enum):
     PASS = 5
     WAIT = 6
 
+    @staticmethod
+    def is_valid(value):
+        if value is None:
+            return False
+        return 1 <= value <= len(Action)
+    
 class Agent:
     def __init__(self, position, picker, carrying_object=None):
         self.position = position
@@ -104,14 +110,7 @@ class MultiAgentPickAndPlace(gym.Env):
 
 
         # Define actions and actions space
-        self.action_set = [
-            Action.UP,
-            Action.DOWN,
-            Action.LEFT,
-            Action.RIGHT,
-            Action.PASS,
-            Action.WAIT,
-        ]
+        self.action_set = set(action.value for action in Action)
         self.action_space = spaces.Tuple([spaces.Discrete(6)] * self.n_agents)
 
         # Define agent observation space
@@ -170,11 +169,11 @@ class MultiAgentPickAndPlace(gym.Env):
             )
             self.frames = []
 
-
     def _validate_actions(self, actions):
         for action in actions:
-            if action not in self.action_set:
+            if not Action.is_valid(action):
                 raise ValueError(f"Unrecognized action: {action}.")
+
 
     def reset(self):
         """
@@ -383,13 +382,13 @@ class MultiAgentPickAndPlace(gym.Env):
         """
 
         x, y = agent.position
-        if action == Action.UP:
+        if action == Action.UP.value:
             y = max(0, y - 1)
-        elif action == Action.DOWN:
+        elif action == Action.DOWN.value:
             y = min(self.length - 1, y + 1)
-        elif action == Action.LEFT:
+        elif action == Action.LEFT.value:
             x = max(0, x - 1)
-        elif action == Action.RIGHT:
+        elif action == Action.RIGHT.value:
             x = min(self.width - 1, x + 1)
 
         new_position = (x, y)
@@ -425,7 +424,7 @@ class MultiAgentPickAndPlace(gym.Env):
         receiving_agents = [None] * len(self.agents)
 
         for idx, agent in enumerate(self.agents):
-            if actions[idx] == Action.PASS and agent.carrying_object is not None:
+            if actions[idx] == Action.PASS.value and agent.carrying_object is not None:
                 x, y = agent.position
                 adjacent_positions = [(x + 1, y), (x - 1, y), (x, y + 1), (x, y - 1)]
                 for adj_pos in adjacent_positions:
@@ -434,7 +433,7 @@ class MultiAgentPickAndPlace(gym.Env):
                     )
                     if (
                         adj_agent
-                        and actions[self.agents.index(adj_agent)] == Action.PASS
+                        and actions[self.agents.index(adj_agent)] == Action.PASS.value
                         and adj_agent.carrying_object is None
                     ):
                         receiving_agents[
