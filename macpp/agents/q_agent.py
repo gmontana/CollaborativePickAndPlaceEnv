@@ -101,15 +101,16 @@ class QLearning:
         return total_reward, done, next_state
 
 
-def game_loop(env, agent, training=False, num_episodes=1, create_video=False, qtable_file=None):
+def game_loop(env, agent, training=False, num_episodes=1, max_steps=50, create_video=False, qtable_file=None):
 
+    print("Game loop started...")
     total_steps = []
     total_returns = []
-    for _ in range(num_episodes):
+    for episode in range(num_episodes):
         state = env.reset()
         done = False
         episode_steps = 0
-        episode_return = 0
+        episode_returns = 0
         while not done:
             # take action
             if training:
@@ -118,23 +119,31 @@ def game_loop(env, agent, training=False, num_episodes=1, create_video=False, qt
                 actions = agent.act(state, explore=False)
             # execute action
             next_state, rewards, done, _ = env.step(actions)
-            episode_return += sum(rewards)
+            episode_returns += sum(rewards)
             episode_steps += 1
+            if episode_steps > 50:
+                break
             # learn when needed
             if training:
                 agent.learn(state, actions, next_state, rewards, done)
             state = next_state
         total_steps.append(episode_steps)
-        total_returns.append(total_returns)
-        # create a video when needed 
-        if create_video:
-            script_dir = os.path.dirname(os.path.abspath(__file__))
-            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-            filename=script_dir+f"/videos/episode_{timestamp}.mp4"
-            print(f"Saving movie in {filename}.")
-            env.save_video(filename)
-        if training and qtable_file is not None:
-            agent.q_table.save_table(qtable_file)
+        total_returns.append(episode_returns)
+
+        # print some stats
+        avg_steps = np.mean(total_steps)
+        avg_return = np.mean(total_returns)
+        print(f"Episode {episode+1}/{num_episodes}: Average Steps: {avg_steps:.2f}, Average Return: {avg_return:.2f}")
+
+    # create a video when needed 
+    if create_video:
+        script_dir = os.path.dirname(os.path.abspath(__file__))
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        filename=script_dir+f"/videos/episode_{timestamp}.mp4"
+        print(f"Saving movie in {filename}.")
+        env.save_video(filename)
+    if training and qtable_file is not None:
+        agent.q_table.save_table(qtable_file)
 
 
     return total_steps, total_returns
@@ -142,10 +151,11 @@ def game_loop(env, agent, training=False, num_episodes=1, create_video=False, qt
 if __name__ == "__main__":
 
     from macpp.core.environment import MultiAgentPickAndPlace
+
     env = MultiAgentPickAndPlace(
         width=3, length=3, n_agents=2, n_pickers=1, cell_size=300
     )
     agent = QLearning(env)
-    total_steps, total_returns = game_loop(env, agent, True, 200, qtable_file='qtable')
-    total_steps, total_returns = game_loop(env, agent, False, 10, create_video=True, qtable_file='qtable')
 
+    total_steps, total_returns = game_loop(env, agent, True, 10000, 50, qtable_file='qtable')
+    # total_steps, total_returns = game_loop(env, agent, False, 10, create_video=True, qtable_file='qtable')
