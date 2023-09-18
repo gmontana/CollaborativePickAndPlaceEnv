@@ -142,7 +142,7 @@ class MultiAgentPickAndPlace(gym.Env):
         )
 
         # Combine all spaces into the overall observation space
-        self.observation_space = spaces.Dict(
+        self.state_space = spaces.Dict(
             {
                 "agents": spaces.Tuple([self.agent_space] * self.n_agents),
                 "objects": spaces.Tuple([self.object_space] * self.n_objects),
@@ -171,7 +171,7 @@ class MultiAgentPickAndPlace(gym.Env):
 
     def _validate_actions(self, actions):
         for action in actions:
-            if not Action.is_valid(action):
+            if action is None or not (1 <= action <= len(Action)):
                 raise ValueError(f"Unrecognized action: {action}.")
 
 
@@ -513,6 +513,17 @@ class MultiAgentPickAndPlace(gym.Env):
         if self.create_video:
             pass
 
+    def _get_state_space_size(self):
+        agent_space_size = self.width * self.length * 2 * (self.n_objects + 1)
+        object_space_size = self.width * self.length * self.n_objects
+        goal_space_size = self.width * self.length
+        state_space_size = (agent_space_size ** self.n_agents) * (object_space_size ** self.n_objects) * (goal_space_size ** self.n_objects)
+        return state_space_size
+
+    def _get_action_space_size(self):
+        single_agent_action_space = len(Action)
+        action_space_size = single_agent_action_space ** self.n_agents
+        return action_space_size
 
 def game_loop(env, render):
     """
