@@ -5,6 +5,9 @@ import random
 
 
 class QLearningTable:
+    '''
+    Class implementing the Q value table 
+    '''
     def __init__(self, n_agents, action_space):
         self.q_table = {}
         self.n_agents = n_agents
@@ -30,18 +33,21 @@ class QLearningTable:
         current_q_values = self.initialise(state)
         return np.max(current_q_values)
 
-    def save_q_table(self, filename):
+    def save_table(self, filename):
         print(f"Saving Q-value table: {filename}.")
         np.save(filename, self.q_table)
         print(f"Number of elements in the Q table: {self.count_elements()}")
 
-    def load_q_table(self, filename):
+    def load_table(self, filename):
         print(f"Loading Q-value table: {filename}.")
         self.q_table = np.load(filename, allow_pickle=True).item()
         print(f"Number of elements in the Q table: {self.count_elements()}")
 
 
 class QLearning:
+    '''
+    Class implementing the tabular Q learning algorihtm
+    '''
     def __init__(self, env, learning_rate=0.1, discount_factor=0.99, exploration_rate=1.0, exploration_decay=0.995, min_exploration=0.01, learning_rate_decay=0.995, min_learning_rate=0.01, max_steps_per_episode=50):
         self.env = env
         self.q_table = QLearningTable(n_agents=env.n_agents, action_space=env.get_action_space())
@@ -65,6 +71,11 @@ class QLearning:
         actions_indices = np.unravel_index(np.argmax(q_values), q_values.shape)
         return [self.q_table.action_space[index] for index in actions_indices]
 
+    def act(self, state, explore=False):
+        if explore:
+            return self.epsilon_greedy_actions(state)
+        else:
+            return self.greedy_actions(state)
 
     def learn(self, state):
 
@@ -91,63 +102,54 @@ class QLearning:
 
         return total_reward, done, next_state
 
-def training_loop(env, agent, num_episodes):
 
+def game_loop(env, agents, training=False, num_episodes=1, create_video=False, qtable_file=None):
+
+    total_steps = []
+    total_returns = []
+    done = False
+    env.reset()
     for episode in range(num_episodes):
         state = env.reset()
         done = False
+        episode_steps = 0
+        episode_return = 0
         while not done:
-            actions = agent.act(state)
+            # take action
+            if training:
+                actions = agent.act(state, explore=True)
+            else:
+                actions = agent.act(state, explore=False)
+            # execute action
             next_state, reward, done, _ = env.step(actions)
-            agent.learn()
+            # learn when needed
+            if training:
+                agent.learn(state)
             state = next_state
+            episode_return += reward
+            episode_steps += 1
+        total_steps.push(episode_steps)
+        total_returns.push(total_returns)
+        # create a video when needed 
+        if create_video:
+            script_dir = os.path.dirname(os.path.abspath(__file__))
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            filename=script_dir+f"/videos/episode_{timestamp}.mp4"
+            print(f"Saving movie in {filename}.")
+            env.save_video(filename)
+        if training and qtable_file is not None:
+            agent.q_table.save_table(qtable_file)
 
-def execution_loop(env, agents, num_episodes):
 
-        # Get initial state
-        state = self.env.reset()
-        # state = self.env.get_hashed_state()
-
-        done = False
-        success = False
-        total_steps = 0
-        total_return = 0
-
-        for episode in range(num_episodes):
-
-            done = False
-            state = env.reset()
-            while not done and total_steps < max_num_steps:  
-                total_steps += 1
-
-                actions = agent.greedy_actions(state)
-                next_state , rewards, done = self.env.step(actions)
-                # next_state_hash = self.env.get_hashed_state()
-
-                total_reward = sum(rewards)
-                state = next_state
-                total_return += total_reward
-
-                if done: 
-                    print(f"EPISODE ENDED WITH SUCCESS")
-                    success = True
-
-            if save_video:
-                script_dir = os.path.dirname(os.path.abspath(__file__))
-                timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-                filename=script_dir+f"/videos/episode_{timestamp}.mp4"
-                print(f"Saving movie in {filename}.")
-                self.env.save_video(filename)
-
-        return success, total_return, total_steps
-
+    return total_steps, total_returns
 
 if __name__ == "__main__":
 
+    from macpp.core.environment import MultiAgentPickAndPlace
     env = MultiAgentPickAndPlace(
         width=3, length=3, n_agents=2, n_pickers=1, cell_size=300
     )
-    agent = QLearning()
-
-    training_loop(env, agent, 200)
+    agent = QLearning(env)
+    total_steps, total_returns = game_loop(env, agent, True, 200, qtable_file='qtable')
+    total_stepe, total_returns = game_loop(env, agent, False, 10, create_video=True, qtable_file='qtable')
 
