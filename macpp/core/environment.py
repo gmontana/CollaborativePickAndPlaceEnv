@@ -194,7 +194,8 @@ class MultiAgentPickAndPlace(gym.Env):
         # object_states = [obj.get_state() for obj in self.objects]
         # goal_states = self.goals
 
-        return self.get_hashed_state()
+        # return self.get_hashed_state()
+        return self.get_state()
 
     def get_state(self):
 
@@ -547,7 +548,7 @@ if __name__ == "__main__":
     env = MultiAgentPickAndPlace(
         width=3, length=3, n_agents=2, n_pickers=1, cell_size=300
     )
-    for episode in range(3):
+    for episode in range(20):
         print(f"Episode {episode}:")
         game_loop(env, render=True)
     print("Done")
