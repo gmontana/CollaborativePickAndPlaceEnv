@@ -77,39 +77,31 @@ class QLearning:
         else:
             return self.greedy_actions(state)
 
-    def learn(self, state):
+    def learn(self, state, actions, next_state, rewards, done):
 
-        # Get actions, next state and rewards
-        actions = self.epsilon_greedy_actions(state)
-        next_state, rewards, done = self.env.step(actions)
-
-        # Update Q-values
         total_reward = sum(rewards)
-        # current_q_values = self.q_table.initialise(state)
-        # next_q_values = self.q_table.initialise(next_state)
-        action_indices = tuple(self.q_table.action_space.index(action) for action in actions)
-        max_next_q_value = self.get_max_q_value(next_state)
+        action_indices = tuple(list(self.q_table.action_space).index(action) for action in actions)
+        max_next_q_value = self.q_table.get_max_q_value(next_state)
         if done:
             target = total_reward
         else:
             target = total_reward + self.discount_factor * max_next_q_value
-        updated_value = current_q_values[action_indices] + self.learning_rate * (target - current_q_values[action_indices])
-        self.q_table.update(state, actions, updated_value)
 
-        # Decay exploration and learning rates
+        current_q_values = self.q_table.initialise(state)
+        updated_value = current_q_values[action_indices] + self.learning_rate * (target - current_q_values[action_indices])
+
+        self.q_table.update(state, actions, updated_value)
         self.exploration_rate = max(self.min_exploration, self.exploration_rate * self.exploration_decay)
         self.learning_rate = max(self.min_learning_rate, self.learning_rate * self.learning_rate_decay)
 
         return total_reward, done, next_state
 
 
-def game_loop(env, agents, training=False, num_episodes=1, create_video=False, qtable_file=None):
+def game_loop(env, agent, training=False, num_episodes=1, create_video=False, qtable_file=None):
 
     total_steps = []
     total_returns = []
-    done = False
-    env.reset()
-    for episode in range(num_episodes):
+    for _ in range(num_episodes):
         state = env.reset()
         done = False
         episode_steps = 0
@@ -121,15 +113,15 @@ def game_loop(env, agents, training=False, num_episodes=1, create_video=False, q
             else:
                 actions = agent.act(state, explore=False)
             # execute action
-            next_state, reward, done, _ = env.step(actions)
+            next_state, rewards, done, _ = env.step(actions)
+            episode_return += sum(rewards)
+            episode_steps += 1
             # learn when needed
             if training:
-                agent.learn(state)
+                agent.learn(state, actions, next_state, rewards, done)
             state = next_state
-            episode_return += reward
-            episode_steps += 1
-        total_steps.push(episode_steps)
-        total_returns.push(total_returns)
+        total_steps.append(episode_steps)
+        total_returns.append(total_returns)
         # create a video when needed 
         if create_video:
             script_dir = os.path.dirname(os.path.abspath(__file__))
@@ -151,5 +143,5 @@ if __name__ == "__main__":
     )
     agent = QLearning(env)
     total_steps, total_returns = game_loop(env, agent, True, 200, qtable_file='qtable')
-    total_stepe, total_returns = game_loop(env, agent, False, 10, create_video=True, qtable_file='qtable')
+    total_steps, total_returns = game_loop(env, agent, False, 10, create_video=True, qtable_file='qtable')
 
