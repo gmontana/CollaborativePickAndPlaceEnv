@@ -10,10 +10,10 @@ class QLearningTable:
     '''
     Class implementing the Q value table 
     '''
-    def __init__(self, n_agents, action_space):
+    def __init__(self, n_agents, n_actions):
         self.q_table = {}
         self.n_agents = n_agents
-        self.action_space = action_space
+        self.n_actions = n_actions
 
     def initialise(self, state):
         ''' 
@@ -21,14 +21,17 @@ class QLearningTable:
         '''
         state_str = json.dumps(state)  # Convert the state dictionary to a string
         if state_str not in self.q_table:
-            self.q_table[state_str] = np.random.uniform(-0.01, 0.01, (len(self.action_space),) * self.n_agents)
+            self.q_table[state_str] = np.random.uniform(-0.01, 0.01, (self.n_actions,) * self.n_agents)
         return self.q_table[state_str]
 
     def update(self, state, actions, value):
          state_str = json.dumps(state)
          current_q_values = self.initialise(state_str)
-         action_indices = tuple(list(self.action_space).index(action) for action in actions)
-         current_q_values[action_indices] = value
+          # Ensure actions are within the valid range
+         if all(0 <= action < self.n_actions for action in actions):
+            current_q_values[actions] = value
+         else:
+            print("Warning: Invalid actions provided for update.")
 
     def count_elements(self):
         return sum([np.prod(v.shape) for v in self.q_table.values()])
@@ -55,7 +58,7 @@ class QLearning:
     '''
     def __init__(self, env, learning_rate=0.1, discount_factor=0.99, exploration_rate=1.0, exploration_decay=0.995, min_exploration=0.01, learning_rate_decay=0.995, min_learning_rate=0.01, max_steps_per_episode=50):
         self.env = env
-        self.q_table = QLearningTable(n_agents=env.n_agents, action_space=env.get_action_space())
+        self.q_table = QLearningTable(n_agents=env.n_agents, n_actions=env.action_space[0].n)
         self.learning_rate = learning_rate
         self.learning_rate_decay = learning_rate_decay
         self.min_learning_rate = min_learning_rate
@@ -85,7 +88,7 @@ class QLearning:
     def learn(self, state, actions, next_state, rewards, done):
 
         total_reward = sum(rewards)
-        action_indices = tuple(list(self.q_table.action_space).index(action) for action in actions)
+        action_indices = tuple(action for action in actions)
         max_next_q_value = self.q_table.get_max_q_value(next_state)
         if done:
             target = total_reward
@@ -93,6 +96,8 @@ class QLearning:
             target = total_reward + self.discount_factor * max_next_q_value
 
         current_q_values = self.q_table.initialise(state)
+        # print("Q-values shape:", current_q_values.shape)
+        # print("Action indices:", action_indices)
         updated_value = current_q_values[action_indices] + self.learning_rate * (target - current_q_values[action_indices])
 
         self.q_table.update(state, actions, updated_value)
@@ -100,7 +105,6 @@ class QLearning:
         self.learning_rate = max(self.min_learning_rate, self.learning_rate * self.learning_rate_decay)
 
         return total_reward, done, next_state
-
 
 def game_loop(env, agent, training=False, num_episodes=1, steps_per_episode=50, render=False, create_video=False, qtable_file=None):
 
