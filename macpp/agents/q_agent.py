@@ -6,47 +6,45 @@ import json
 import time
 from gym.spaces import Tuple, Discrete, Dict
 import itertools
+from collections import defaultdict
 
-class QLearningTable:
-    def __init__(self, action_space):
-        self.q_table = {}
-        self.n_agents= action_space
-        self.action_size = 10
+class QTable:
 
-    def initialise(self, state):
-        state_str = json.dumps(state)  
-        if state_str not in self.q_table:
-            self.q_table[state_str] = np.random.uniform(-0.01, 0.01, [self.action_size] * self.n_agents)
-        return self.q_table[state_str]
-
-    def update(self, state):
-        state_str = json.dumps(state)
-        current_q_values = self.initialise(state_str)
-
-    def count_elements(self):
-        return sum([np.prod(v.shape) for v in self.q_table.values()])
+    def __init__(self, action_size, learning_rate=0.01, discount_factor=0.9, exploration_rate=1.0, exploration_decay=0.995, min_exploration=0.01):
+        self.q_table = defaultdict(lambda: np.zeros((action_size, action_size)))  # Adjusted for 2 agents. For more agents, you'll need to add more dimensions.
+        self.learning_rate = learning_rate
+        self.discount_factor = discount_factor
+        self.exploration_rate = exploration_rate
+        self.exploration_decay = exploration_decay
+        self.min_exploration = min_exploration
 
     def get_max_q_value(self, state):
-        state_str = json.dumps(state)
-        current_q_values = self.initialise(state_str)
-        return np.max(current_q_values)
+        return np.max(self.q_table[state])
 
-    def save_table(self, filename):
-        print(f"Saving Q-value table: {filename}.")
-        np.save(filename, self.q_table)
-        print(f"Number of elements in the Q table: {self.count_elements()}")
+    def initialise(self, state):
+        if state not in self.q_table:
+            self.q_table[state] = np.zeros((6, 6))  # Adjusted for 2 agents. For more agents, you'll need to add more dimensions.
+        return self.q_table[state]
 
-    def load_table(self, filename):
-        print(f"Loading Q-value table: {filename}.")
-        self.q_table = np.load(filename, allow_pickle=True).item()
-        print(f"Number of elements in the Q table: {self.count_elements()}")
+    def update(self, state, actions, value):
+        self.q_table[state][actions] = value
+
+    # def save_table(self, filename):
+    #     print(f"Saving Q-value table: {filename}.")
+    #     np.save(filename, self.q_table)
+    #     print(f"Number of elements in the Q table: {self.count_elements()}")
+    #
+    # def load_table(self, filename):
+    #     print(f"Loading Q-value table: {filename}.")
+    #     self.q_table = np.load(filename, allow_pickle=True).item()
+    #     print(f"Number of elements in the Q table: {self.count_elements()}")
 
 class QLearning:
     def __init__(self, env, learning_rate=0.1, discount_factor=0.99, exploration_rate=1.0, exploration_decay=0.995, min_exploration=0.01, learning_rate_decay=0.995, min_learning_rate=0.01, max_steps_per_episode=50):
         self.env = env
         self.n_agents = env.n_agents
         self.action_space_size = _get_action_space_size(env.action_space)
-        self.q_table = QLearningTable(self.action_space_size)
+        self.q_table = QTable(env.n_agents, env.action_space[0].n)
         self.learning_rate = learning_rate
         self.learning_rate_decay = learning_rate_decay
         self.min_learning_rate = min_learning_rate
@@ -84,7 +82,9 @@ class QLearning:
             target = total_reward + self.discount_factor * max_next_q_value
         
         current_q_values = self.q_table.initialise(state)
-        action_indices = tuple(actions)
+        
+        action_indices = (state, *actions)
+        
         updated_value = current_q_values[action_indices] + self.learning_rate * (target - current_q_values[action_indices])
         self.q_table.update(state, actions, updated_value)
         
@@ -119,6 +119,13 @@ def game_loop(env, agent, training=False, num_episodes=1, steps_per_episode=50, 
                 actions = agent.act(state, explore=True)
             else:
                 actions = agent.act(state, explore=False)
+
+            print(f"Actions: {actions}")
+
+            for action in actions:
+                if not isinstance(action, tuple):
+                    raise ValueError(f"Invalid action format: {actions}. Expected a list of tuples.")
+
             # execute action
             next_state, rewards, done, _ = env.step(actions)
             episode_returns += sum(rewards)
@@ -164,10 +171,10 @@ if __name__ == "__main__":
     )
     agent = QLearning(env)
 
-    print(env.action_space)
-    print(env._get_action_space_size())
-    print(env.state_space)
-    print(env._get_state_space_size())
+    # print(env.action_space)
+    # print(env._get_action_space_size())
+    # print(env.state_space)
+    # print(env._get_state_space_size())
 
-    # total_steps, total_returns = game_loop(env, agent, True, 1000, 300, render=False, qtable_file='qtable')
+    total_steps, total_returns = game_loop(env, agent, True, 1000, 300, render=False, qtable_file='qtable')
     # total_steps, total_returns = game_loop(env, agent, False, 10, create_video=True, qtable_file='qtable')
