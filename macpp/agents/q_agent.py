@@ -65,51 +65,8 @@ class QLearning:
         actions_indices = np.unravel_index(np.argmax(q_values), q_values.shape)
         return [self.q_table.action_space[index] for index in actions_indices]
 
-    def execute(self, max_num_steps, save_video=False):
 
-        # Get initial state
-        state = self.env.reset()
-        # state = self.env.get_hashed_state()
-
-        done = False
-        success = False
-        total_steps = 0
-        total_return = 0
-
-        print("-----------------------")
-        print("NEW EPISODE STARTS HERE")
-        print(f"Initial state: {state}")
-        print("-----------------------")
-
-        while not done and total_steps < max_num_steps:  
-            total_steps += 1
-
-            print("-----------------------")
-            actions = self.greedy_actions(state)
-            print(f"Agents' actions: {actions}")
-            next_state , rewards, done = self.env.step(actions)
-            # next_state_hash = self.env.get_hashed_state()
-            print(f"Next state: {next_state}")
-            print("-----------------------")
-
-            total_reward = sum(rewards)
-            state = next_state
-            total_return += total_reward
-
-            if done: 
-                print(f"EPISODE ENDED WITH SUCCESS")
-                success = True
-
-        if save_video:
-            script_dir = os.path.dirname(os.path.abspath(__file__))
-            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-            filename=script_dir+f"/videos/episode_{timestamp}.mp4"
-            print(f"Saving movie in {filename}.")
-            self.env.save_video(filename)
-
-        return success, total_return, total_steps
-
-    def train(self, state):
+    def learn(self, state):
 
         # Get actions, next state and rewards
         actions = self.epsilon_greedy_actions(state)
@@ -133,3 +90,64 @@ class QLearning:
         self.learning_rate = max(self.min_learning_rate, self.learning_rate * self.learning_rate_decay)
 
         return total_reward, done, next_state
+
+def training_loop(env, agent, num_episodes):
+
+    for episode in range(num_episodes):
+        state = env.reset()
+        done = False
+        while not done:
+            actions = agent.act(state)
+            next_state, reward, done, _ = env.step(actions)
+            agent.learn()
+            state = next_state
+
+def execution_loop(env, agents, num_episodes):
+
+        # Get initial state
+        state = self.env.reset()
+        # state = self.env.get_hashed_state()
+
+        done = False
+        success = False
+        total_steps = 0
+        total_return = 0
+
+        for episode in range(num_episodes):
+
+            done = False
+            state = env.reset()
+            while not done and total_steps < max_num_steps:  
+                total_steps += 1
+
+                actions = agent.greedy_actions(state)
+                next_state , rewards, done = self.env.step(actions)
+                # next_state_hash = self.env.get_hashed_state()
+
+                total_reward = sum(rewards)
+                state = next_state
+                total_return += total_reward
+
+                if done: 
+                    print(f"EPISODE ENDED WITH SUCCESS")
+                    success = True
+
+            if save_video:
+                script_dir = os.path.dirname(os.path.abspath(__file__))
+                timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+                filename=script_dir+f"/videos/episode_{timestamp}.mp4"
+                print(f"Saving movie in {filename}.")
+                self.env.save_video(filename)
+
+        return success, total_return, total_steps
+
+
+if __name__ == "__main__":
+
+    env = MultiAgentPickAndPlace(
+        width=3, length=3, n_agents=2, n_pickers=1, cell_size=300
+    )
+    agent = QLearning()
+
+    training_loop(env, agent, 200)
+
