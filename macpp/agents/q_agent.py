@@ -2,6 +2,7 @@ import numpy as np
 from datetime import datetime
 import os
 import random
+import json
 
 
 class QLearningTable:
@@ -17,20 +18,23 @@ class QLearningTable:
         ''' 
         Initialising the Q table with small values may help exploration early on
         '''
-        if state not in self.q_table:
-            self.q_table[state] = np.random.uniform(-0.01, 0.01, (len(self.action_space),) * self.n_agents)
-        return self.q_table[state]
+        state_str = json.dumps(state)  # Convert the state dictionary to a string
+        if state_str not in self.q_table:
+            self.q_table[state_str] = np.random.uniform(-0.01, 0.01, (len(self.action_space),) * self.n_agents)
+        return self.q_table[state_str]
 
     def update(self, state, actions, value):
-        current_q_values = self.initialise(state)
-        action_indices = tuple(self.action_space.index(action) for action in actions)
-        current_q_values[action_indices] = value
+         state_str = json.dumps(state)
+         current_q_values = self.initialise(state_str)
+         action_indices = tuple(list(self.action_space).index(action) for action in actions)
+         current_q_values[action_indices] = value
 
     def count_elements(self):
         return sum([np.prod(v.shape) for v in self.q_table.values()])
 
     def get_max_q_value(self, state):
-        current_q_values = self.initialise(state)
+        state_str = json.dumps(state)
+        current_q_values = self.initialise(state_str)
         return np.max(current_q_values)
 
     def save_table(self, filename):
