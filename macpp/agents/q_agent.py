@@ -22,9 +22,8 @@ class QTable:
         return self.q_table[state][agent_actions]
 
     def set_q_value(self, state, actions, value):
-        """Set the Q-value for a given state and actions."""
-        agent_actions = tuple(actions)
-        self.q_table[state][agent_actions] = value
+        actions = actions if isinstance(actions, list) else [actions]
+        self.q_table[state][tuple(actions)] = value
 
     def get_max_q_value(self, state):
         """Retrieve the maximum Q-value for a given state."""
@@ -34,12 +33,12 @@ class QTable:
         return max(all_q_values, default=0.0)
 
     def best_actions(self, state):
-        """Retrieve the actions that yield the maximum Q-value for a given state."""
         if state not in self.q_table:
             return None
         max_q_value = self.get_max_q_value(state)
-        best_actions = [action for action, q_value in self.q_table[state].items() if q_value == max_q_value]
-        return list(best_actions[0]) if best_actions else None
+        best_acts = [act for act, q_value in self.q_table[state].items() if q_value == max_q_value]
+        return list(best_acts[0]) if best_acts else None
+
 
     def initialise(self, state):
         """Ensure the state is initialized in the Q-table."""
@@ -73,21 +72,16 @@ class QLearning:
         self.max_steps_per_episode = max_steps_per_episode
 
     def epsilon_greedy_actions(self, state):
-        state_str = json.dumps(state)
-        if np.random.uniform(0, 1) < self.exploration_rate:
+        if random.random() < self.exploration_rate:
             return self.env.action_space.sample().tolist()
         else:
-            best_actions_list = self.q_table.best_actions(state_str)
-            if best_actions_list:
-                return random.choice(best_actions_list)
-            return self.env.action_space.sample().tolist()
+            return self.greedy_actions(state)
 
     def greedy_actions(self, state):
-        state_str = json.dumps(state)
-        best_actions_list = self.q_table.best_actions(state_str)
-        if best_actions_list:
-            return random.choice(best_actions_list)
-        return self.env.action_space.sample().tolist()
+        best = self.q_table.best_actions(state)
+        if best is None:
+            return self.env.action_space.sample().tolist()
+        return best
 
     def act(self, state, explore=False):
         state_str = json.dumps(state)
