@@ -39,8 +39,7 @@ class QTable:
             return None
         max_q_value = self.get_max_q_value(state)
         best_actions = [action for action, q_value in self.q_table[state].items() if q_value == max_q_value]
-        return best_actions[0] if best_actions else None
-
+        return list(best_actions[0]) if best_actions else None
 
     def initialise(self, state):
         """Ensure the state is initialized in the Q-table."""
@@ -80,7 +79,7 @@ class QLearning:
         best_actions_list = self.q_table.best_actions(state_str)
         if best_actions_list:
             return list(random.choice(best_actions_list))
-        return [self.env.action_space.sample() for _ in range(self.n_agents)]
+        return self.env.action_space.sample().tolist()
 
     def epsilon_greedy_actions(self, state):
         state_str = json.dumps(state)
@@ -90,7 +89,8 @@ class QLearning:
             best_actions_list = self.q_table.best_actions(state_str)
             if best_actions_list:
                 return list(random.choice(best_actions_list))
-            return [self.env.action_space.sample() for _ in range(self.n_agents)]
+            return self.env.action_space.sample().tolist()
+
 
     def act(self, state, explore=False):
         state_str = json.dumps(state)
