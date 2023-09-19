@@ -10,7 +10,8 @@ import numpy as np
 import time
 import sys
 
-sys.path.append("/home/gm13/Dropbox/mycode/envs/collaborative_pick_and_place/macpp/")
+# sys.path.append("/home/gm13/Dropbox/mycode/envs/collaborative_pick_and_place/macpp/")
+sys.path.append("/Users/giovannimontana/Dropbox/mycode/envs/collaborative_pick_and_place/macpp")
 
 
 # Environment's rewards 
@@ -111,7 +112,8 @@ class MultiAgentPickAndPlace(gym.Env):
 
         # Define actions and actions space
         self.action_set = set(action.value for action in Action)
-        self.action_space = spaces.Tuple([spaces.Discrete(6)] * self.n_agents)
+        # self.action_space = spaces.Tuple([spaces.Discrete(6)] * self.n_agents)
+        self.action_space = spaces.MultiDiscrete([6] * self.n_agents)
 
         # Define agent observation space
         self.agent_space = spaces.Dict(
@@ -341,6 +343,9 @@ class MultiAgentPickAndPlace(gym.Env):
         """
         Step through the environment
         """
+
+        # Convert actions to list of integers if they are tuples
+        actions = [int(action) for action in actions]
 
         # Check that no invalid actions are taken 
         if self.debug_mode:
