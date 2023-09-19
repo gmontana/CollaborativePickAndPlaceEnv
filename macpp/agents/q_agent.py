@@ -17,7 +17,8 @@ class QTable:
         """Retrieve the Q-value for a given state and actions."""
         agent_actions = tuple(actions)
         if agent_actions not in self.q_table[state]:
-            return 0.0  
+            # Initialize to a small random value between -0.01 and 0.01
+            self.q_table[state][agent_actions] = np.random.uniform(-0.01, 0.01)
         return self.q_table[state][agent_actions]
 
     def set_q_value(self, state, actions, value):
@@ -38,7 +39,8 @@ class QTable:
             return None
         max_q_value = self.get_max_q_value(state)
         best_actions = [action for action, q_value in self.q_table[state].items() if q_value == max_q_value]
-        return best_actions
+        return best_actions[0] if best_actions else None
+
 
     def initialise(self, state):
         """Ensure the state is initialized in the Q-table."""
@@ -71,13 +73,14 @@ class QLearning:
         self.min_exploration = min_exploration
         self.max_steps_per_episode = max_steps_per_episode
 
+
     def greedy_actions(self, state):
         """Retrieve the actions that yield the maximum Q-value for a given state."""
         state_str = json.dumps(state)
         best_actions_list = self.q_table.best_actions(state_str)
         if best_actions_list:
-            return random.choice(best_actions_list)
-        return [self.env.action_space.sample() for _ in range(self.n_agents)]  # Default action if no best action is found
+            return list(random.choice(best_actions_list))
+        return [self.env.action_space.sample() for _ in range(self.n_agents)]
 
     def epsilon_greedy_actions(self, state):
         state_str = json.dumps(state)
@@ -86,12 +89,12 @@ class QLearning:
         else:
             best_actions_list = self.q_table.best_actions(state_str)
             if best_actions_list:
-                return random.choice(best_actions_list)
+                return list(random.choice(best_actions_list))
             return [self.env.action_space.sample() for _ in range(self.n_agents)]
 
     def act(self, state, explore=False):
         state_str = json.dumps(state)
-        return self.epsilon_greedy_actions(state_str) if explore else self.q_table.best_actions(state_str)
+        return self.epsilon_greedy_actions(state) if explore else self.greedy_actions(state)
 
     def learn(self, state, actions, next_state, rewards, done):
         state_str = json.dumps(state)
@@ -112,8 +115,9 @@ class QLearning:
         self.q_table.set_q_value(state_str, actions, updated_value)
         
         # Decay the exploration and learning rates
-        self.exploration_rate = max(self.min_exploration, self.exploration_rate * self.exploration_decay)
-        self.learning_rate = max(self.min_learning_rate, self.learning_rate * self.learning_rate_decay)
+        # self.exploration_rate = max(self.min_exploration, self.exploration_rate * self.exploration_decay)
+        # self.learning_rate = max(self.min_learning_rate, self.learning_rate * self.learning_rate_decay)
+
 
 def game_loop(env, agent, training=False, num_episodes=1, steps_per_episode=50, render=False, create_video=False, qtable_file=None):
 
@@ -128,21 +132,25 @@ def game_loop(env, agent, training=False, num_episodes=1, steps_per_episode=50, 
         episode_steps = 0
         episode_returns = 0
         while not done:
-            # print(f"Current state: {env._print_state()}")
+            print("State before update:") 
+            env._print_state()
+
             # take action
             if training:
                 actions = agent.act(state, explore=True)
             else:
                 actions = agent.act(state, explore=False)
 
-            # print(f"Actions: {actions}")
+            # actions = random.sample(range(6), 2) 
 
-            for action in actions:
-                if not isinstance(action, tuple):
-                    raise ValueError(f"Invalid action format: {actions}. Expected a list of tuples.")
-
+            print(f"Actions: {actions}")
             # execute action
+
             next_state, rewards, done, _ = env.step(actions)
+            
+            # print("State after update:") 
+            # env._print_state()
+
             episode_returns += sum(rewards)
             episode_steps += 1
             # learn when needed
@@ -164,6 +172,9 @@ def game_loop(env, agent, training=False, num_episodes=1, steps_per_episode=50, 
         avg_return = np.mean(total_returns)
         print(f"Episode {episode+1}/{num_episodes}: Average Steps: {avg_steps:.2f}, Average Return: {avg_return:.2f}")
 
+        agent.exploration_rate = max(agent.min_exploration, agent.exploration_rate * agent.exploration_decay)
+        agent.learning_rate = max(agent.min_learning_rate, agent.learning_rate * agent.learning_rate_decay)
+
     # create a video when needed 
     if create_video:
         script_dir = os.path.dirname(os.path.abspath(__file__))
@@ -171,8 +182,9 @@ def game_loop(env, agent, training=False, num_episodes=1, steps_per_episode=50, 
         filename=script_dir+f"/videos/episode_{timestamp}.mp4"
         print(f"Saving movie in {filename}.")
         env.save_video(filename)
-    if training and qtable_file is not None:
-        agent.q_table.save_table(qtable_file)
+
+    # if training and qtable_file is not None:
+    #     agent.q_table.save_table(qtable_file)
 
 
     return total_steps, total_returns
@@ -185,7 +197,7 @@ if __name__ == "__main__":
         width=3, length=3, n_agents=2, n_pickers=1, cell_size=300, debug_mode=False
     )
     agent = QLearning(env)
-    total_steps, total_returns = game_loop(env, agent, True, 1000, 300, render=False, qtable_file='qtable')
+    total_steps, total_returns = game_loop(env, agent, True, 20, 10, render=False, qtable_file='qtable')
     # total_steps, total_returns = game_loop(env, agent, False, 10, create_video=True, qtable_file='qtable')
     # print(env.action_space)
     # print(env._get_action_space_size())
