@@ -72,25 +72,22 @@ class QLearning:
         self.min_exploration = min_exploration
         self.max_steps_per_episode = max_steps_per_episode
 
-
-    def greedy_actions(self, state):
-        """Retrieve the actions that yield the maximum Q-value for a given state."""
-        state_str = json.dumps(state)
-        best_actions_list = self.q_table.best_actions(state_str)
-        if best_actions_list:
-            return list(random.choice(best_actions_list))
-        return self.env.action_space.sample().tolist()
-
     def epsilon_greedy_actions(self, state):
         state_str = json.dumps(state)
         if np.random.uniform(0, 1) < self.exploration_rate:
-            return [self.env.action_space.sample() for _ in range(self.n_agents)]
+            return self.env.action_space.sample().tolist()
         else:
             best_actions_list = self.q_table.best_actions(state_str)
             if best_actions_list:
-                return list(random.choice(best_actions_list))
+                return random.choice(best_actions_list)
             return self.env.action_space.sample().tolist()
 
+    def greedy_actions(self, state):
+        state_str = json.dumps(state)
+        best_actions_list = self.q_table.best_actions(state_str)
+        if best_actions_list:
+            return random.choice(best_actions_list)
+        return self.env.action_space.sample().tolist()
 
     def act(self, state, explore=False):
         state_str = json.dumps(state)
