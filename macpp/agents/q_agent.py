@@ -10,38 +10,35 @@ from collections import defaultdict
 
 class QTable:
 
-    def __init__(self):
-        self.q_table = defaultdict(lambda: defaultdict(lambda: defaultdict(float)))
+    def __init__(self, initial_value=0.0):
+        self.q_table = defaultdict(lambda: defaultdict(float))
+        self.initial_value = initial_value
 
     def get_q_value(self, state, actions):
-        """Retrieve the Q-value for a given state and actions."""
-        agent_actions = tuple(actions)
-        if agent_actions not in self.q_table[state]:
-            # Initialize to a small random value between -0.01 and 0.01
-            self.q_table[state][agent_actions] = np.random.uniform(-0.01, 0.01)
-        return self.q_table[state][agent_actions]
+        state_str = json.dumps(state)
+        return self.q_table.get(state_str, {}).get(tuple(actions), self.initial_value)
 
     def set_q_value(self, state, actions, value):
-        actions = actions if isinstance(actions, list) else [actions]
-        self.q_table[state][tuple(actions)] = value
+        state_str = json.dumps(state)
+        if state_str not in self.q_table:
+            self.q_table[state_str] = {}
+        self.q_table[state_str][tuple(actions)] = value
 
     def get_max_q_value(self, state):
-        """Retrieve the maximum Q-value for a given state."""
-        if state not in self.q_table:
-            return 0.0
-        all_q_values = [v for action, v in self.q_table[state].items()]
-        return max(all_q_values, default=0.0)
+        state_str = json.dumps(state)
+        if state_str not in self.q_table:
+            return self.initial_value
+        return max(self.q_table[state_str].values())
 
     def best_actions(self, state):
-        if state not in self.q_table:
+        state_str = json.dumps(state)
+        if state_str not in self.q_table:
             return None
-        max_q_value = self.get_max_q_value(state)
-        best_acts = [act for act, q_value in self.q_table[state].items() if q_value == max_q_value]
+        max_q_value = self.get_max_q_value(state_str)
+        best_acts = [act for act, q_value in self.q_table[state_str].items() if q_value == max_q_value]
         return list(best_acts[0]) if best_acts else None
 
-
     def initialise(self, state):
-        """Ensure the state is initialized in the Q-table."""
         if state not in self.q_table:
             self.q_table[state] = defaultdict(lambda: defaultdict(float))
 
@@ -123,8 +120,8 @@ def game_loop(env, agent, training=False, num_episodes=1, steps_per_episode=50, 
         episode_steps = 0
         episode_returns = 0
         while not done:
-            print("State before update:") 
-            env._print_state()
+            # print("State before update:") 
+            # env._print_state()
 
             # take action
             if training:
@@ -133,9 +130,7 @@ def game_loop(env, agent, training=False, num_episodes=1, steps_per_episode=50, 
                 actions = agent.act(state, explore=False)
 
             # actions = random.sample(range(6), 2) 
-
-            print(f"Actions: {actions}")
-            # execute action
+            # print(f"Actions: {actions}")
 
             next_state, rewards, done, _ = env.step(actions)
             
@@ -163,6 +158,7 @@ def game_loop(env, agent, training=False, num_episodes=1, steps_per_episode=50, 
         avg_return = np.mean(total_returns)
         print(f"Episode {episode+1}/{num_episodes}: Average Steps: {avg_steps:.2f}, Average Return: {avg_return:.2f}")
 
+        # adjust exploration and learning rate
         agent.exploration_rate = max(agent.min_exploration, agent.exploration_rate * agent.exploration_decay)
         agent.learning_rate = max(agent.min_learning_rate, agent.learning_rate * agent.learning_rate_decay)
 
@@ -185,10 +181,10 @@ if __name__ == "__main__":
     from macpp.core.environment import MultiAgentPickAndPlace
 
     env = MultiAgentPickAndPlace(
-        width=3, length=3, n_agents=2, n_pickers=1, cell_size=300, debug_mode=False
+        width=3, length=3, n_agents=2, n_objects=1, n_pickers=1, cell_size=300, debug_mode=False
     )
     agent = QLearning(env)
-    total_steps, total_returns = game_loop(env, agent, True, 20, 10, render=False, qtable_file='qtable')
+    total_steps, total_returns = game_loop(env, agent, True, 200000, 300, render=False, qtable_file='qtable')
     # total_steps, total_returns = game_loop(env, agent, False, 10, create_video=True, qtable_file='qtable')
     # print(env.action_space)
     # print(env._get_action_space_size())
