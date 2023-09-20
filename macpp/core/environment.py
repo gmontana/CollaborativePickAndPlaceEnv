@@ -112,8 +112,8 @@ class MultiAgentPickAndPlace(gym.Env):
 
         # Define actions and actions space
         self.action_set = set(action.value for action in Action)
-        self.action_space = spaces.MultiDiscrete([len(Action)] * self.n_agents)
-
+        # self.action_space = spaces.MultiDiscrete([len(Action)] * self.n_agents)
+        self.action_space = spaces.MultiDiscrete([(1, len(Action))] * self.n_agents)
         # Define agent observation space
         self.agent_space = spaces.Dict(
             {
@@ -171,9 +171,10 @@ class MultiAgentPickAndPlace(gym.Env):
             self.frames = []
 
     def _validate_actions(self, actions):
-        for action in actions:
-            if action is None or not (1 <= action <= len(Action)):
-                raise ValueError(f"Unrecognized action: {action}.")
+        for agent_actions in actions:
+            for action in agent_actions:
+                if action is None or not (1 <= action <= len(Action)):
+                    raise ValueError(f"Invalid action: {action}. Action should be between 1 and {len(Action)}")
 
 
     def reset(self):
@@ -190,11 +191,6 @@ class MultiAgentPickAndPlace(gym.Env):
             agent.carrying_object = None
         self.done = False
 
-        # agent_states = [agent.get_state() for agent in self.agents]
-        # object_states = [obj.get_state() for obj in self.objects]
-        # goal_states = self.goals
-
-        # return self.get_hashed_state()
         return self.get_state()
 
     def get_state(self):
@@ -206,23 +202,16 @@ class MultiAgentPickAndPlace(gym.Env):
         return {"agents": agent_states, "objects": object_states, "goals": goal_states}
 
     def state_to_hash(self, state):
-        # Extract information from state dictionary
+
         agents = state["agents"]
         objects = state["objects"]
         goals = state["goals"]
         
-        # Convert agents' data
         agent_hashes = [(a["position"], a["picker"], a["carrying_object"]) for a in agents]
-        
-        # Convert objects' data
         object_hashes = [(o["position"], o["id"]) for o in objects]
-
-        # Convert goals
         goal_hashes = [tuple(g) for g in goals]
-        
-        # Combine all hashes
         combined_hash = (tuple(agent_hashes), tuple(object_hashes), tuple(goal_hashes))
-        
+
         return combined_hash
 
     def get_action_space(self):
@@ -400,7 +389,8 @@ class MultiAgentPickAndPlace(gym.Env):
             x = min(self.width - 1, x + 1)
 
         new_position = (x, y)
-        # Check for collisions with other agents
+
+        # If agents collide, they don't move
         if new_position not in [a.position for a in self.agents]:
             return new_position
         return agent.position
