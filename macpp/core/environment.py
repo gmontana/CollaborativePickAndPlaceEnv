@@ -112,8 +112,7 @@ class MultiAgentPickAndPlace(gym.Env):
 
         # Define actions and actions space
         self.action_set = set(action.value for action in Action)
-        # self.action_space = spaces.Tuple([spaces.Discrete(6)] * self.n_agents)
-        self.action_space = spaces.MultiDiscrete([6] * self.n_agents)
+        self.action_space = spaces.MultiDiscrete([len(Action)] * self.n_agents)
 
         # Define agent observation space
         self.agent_space = spaces.Dict(
@@ -206,18 +205,25 @@ class MultiAgentPickAndPlace(gym.Env):
 
         return {"agents": agent_states, "objects": object_states, "goals": goal_states}
 
-    def get_hashed_state(self):
-        """
-        Return the hashed current state
-        """
-        agent_states = tuple(
-            (agent.position, agent.picker, agent.carrying_object)
-            for agent in self.agents
-        )
-        object_states = tuple(obj.position for obj in self.objects)
-        goals = tuple(self.goals)
-        combined_state = agent_states + object_states + goals
-        return hash(combined_state)
+    def state_to_hash(self, state):
+        # Extract information from state dictionary
+        agents = state["agents"]
+        objects = state["objects"]
+        goals = state["goals"]
+        
+        # Convert agents' data
+        agent_hashes = [(a["position"], a["picker"], a["carrying_object"]) for a in agents]
+        
+        # Convert objects' data
+        object_hashes = [(o["position"], o["id"]) for o in objects]
+
+        # Convert goals
+        goal_hashes = [tuple(g) for g in goals]
+        
+        # Combine all hashes
+        combined_hash = (tuple(agent_hashes), tuple(object_hashes), tuple(goal_hashes))
+        
+        return combined_hash
 
     def get_action_space(self):
         """
@@ -343,9 +349,6 @@ class MultiAgentPickAndPlace(gym.Env):
         """
         Step through the environment
         """
-
-        # Convert actions to list of integers if they are tuples
-        actions = [int(action) for action in actions]
 
         # Check that no invalid actions are taken 
         if self.debug_mode:
@@ -542,7 +545,7 @@ def game_loop(env, render):
 
     while not done:
         # Sample random actions for each agent
-        actions = [env.action_space.sample() for _ in range(env.n_agents)]
+        actions = env.action_space.sample().tolist()
         print(actions)
 
         nobs, nreward, ndone, _ = env.step(actions)
