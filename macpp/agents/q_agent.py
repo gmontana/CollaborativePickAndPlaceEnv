@@ -39,11 +39,6 @@ class QTable:
         best_acts = [act for act, q_value in self.q_table[state_hash].items() if q_value == max_q_value]
         return list(best_acts[0]) if best_acts else None
 
-    def initialise(self, state):
-        if state not in self.q_table:
-            self.q_table[state] = defaultdict(lambda: defaultdict(float))
-
-
     # def save_table(self, filename):
     #     print(f"Saving Q-value table: {filename}.")
     #     np.save(filename, self.q_table)
@@ -81,12 +76,9 @@ class QLearning:
         return best
 
     def act(self, state, explore=False):
-        state_hash = json.dumps(state)
         return self.epsilon_greedy_actions(state) if explore else self.greedy_actions(state)
 
     def learn(self, state, actions, next_state, rewards, done):
-        state_hash = json.dumps(state)
-        next_state_hash = json.dumps(next_state)
 
         total_reward = sum(rewards)
         
@@ -94,13 +86,13 @@ class QLearning:
         if done:
             target = total_reward
         else:
-            max_next_q_value = self.q_table.get_max_q_value(next_state_hash)
+            max_next_q_value = self.q_table.get_max_q_value(next_state)
             target = total_reward + self.discount_factor * max_next_q_value
         
         # Update the Q-value 
-        current_q_value = self.q_table.get_q_value(state_hash, actions)
+        current_q_value = self.q_table.get_q_value(state, actions)
         updated_value = current_q_value + self.learning_rate * (target - current_q_value)
-        self.q_table.set_q_value(state_hash, actions, updated_value)
+        self.q_table.set_q_value(state, actions, updated_value)
         
         # Decay the exploration and learning rates
         # self.exploration_rate = max(self.min_exploration, self.exploration_rate * self.exploration_decay)
