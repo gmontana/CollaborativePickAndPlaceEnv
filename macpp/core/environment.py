@@ -39,11 +39,12 @@ class Agent:
     def __init__(self,
                  position: Tuple[int, int],
                  picker: bool,
-                 carrying_object: Optional[int] = None) -> None:
+                 carrying_object: Optional[int] = None,
+                 reward: Optional[int] =0) -> None:
         self.position = position
         self.picker = picker
         self.carrying_object = carrying_object
-        self.reward = 0.0
+        self.reward = reward
 
     def get_agent_state(self) -> Dict[str, Union[Tuple[int, int], bool, Optional[int]]]:
         return {
@@ -119,12 +120,12 @@ class MultiAgentPickAndPlace(gym.Env):
                 "Grid size not sufficiently large to contain all the entities."
             )
 
-        # Define actions and actions space
+        # The action space
         self.action_set = set(action.value for action in Action)
         self.action_space = spaces.MultiDiscrete([len(Action)] * self.n_agents)
 
-        # Define agent observation space
-        self.agent_space = spaces.Dict(
+        # An agent's observation space
+        agent_space = spaces.Dict(
             {
                 "position": spaces.Tuple(
                     (spaces.Discrete(self.width), spaces.Discrete(self.length))
@@ -136,8 +137,8 @@ class MultiAgentPickAndPlace(gym.Env):
             }
         )
 
-        # Define object observation space
-        self.object_space = spaces.Dict(
+        # An object's observation space
+        object_space = spaces.Dict(
             {
                 "position": spaces.Tuple(
                     (spaces.Discrete(self.width), spaces.Discrete(self.length))
@@ -146,19 +147,31 @@ class MultiAgentPickAndPlace(gym.Env):
             }
         )
 
-        # Define goals space
-        self.goal_space = spaces.Tuple(
+        # A goal's observation space
+        goal_space = spaces.Tuple(
             (spaces.Discrete(self.width), spaces.Discrete(self.length))
         )
 
-        # Combine all spaces into the overall observation space
-        self.observation_space = spaces.Dict(
-            {
-                "agents": spaces.Tuple([self.agent_space] * self.n_agents),
-                "objects": spaces.Tuple([self.object_space] * self.n_objects),
-                "goals": spaces.Tuple([self.goal_space] * self.n_objects),
-            }
-        )
+        # An agent's observation space
+        agent_observation_space = spaces.Dict({
+            "self": agent.space,
+            "agents": spaces.Tuple([agent_space] * (self.n_objects)-1)),
+            "objects": spaces.Tuple([object_space] * self.n_objects),
+            "goals": spaces.Tuple([goal_space] * self.n_goals)
+        })
+
+        # The observation space
+        self.observation_space = spaces.Dict({
+            f"agent_{i}": agent_observation_space for i in range(self.n_agents)
+        })
+
+        # self.observation_space = spaces.Dict(
+        #     {
+        #         "agents": spaces.Tuple([self.agent_space] * self.n_agents),
+        #         "objects": spaces.Tuple([self.object_space] * self.n_objects),
+        #         "goals": spaces.Tuple([self.goal_space] * self.n_objects),
+        #     }
+        # )
 
         self.done = False
 
@@ -356,10 +369,6 @@ class MultiAgentPickAndPlace(gym.Env):
         return (random.randint(0, self.width - 1), random.randint(0, self.length - 1))
 
     def step(self, actions: List[int]) -> Tuple[Dict[str, Any], List[float], Tuple[bool, bool], Dict[str, Any]]:
-
-        """
-        Step through the environment
-        """
 
         # Check that no invalid actions are taken
         if self.debug_mode:
