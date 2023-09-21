@@ -1,11 +1,9 @@
 import gym
 from enum import Enum
+from typing import List, Tuple, Dict, Any, Optional
 from gym import spaces
 import random
 import pygame
-# import json
-# import imageio
-# import os
 import numpy as np
 import time
 import sys
@@ -70,16 +68,17 @@ class MultiAgentPickAndPlace(gym.Env):
 
     def __init__(
         self,
-        width,
-        length,
-        n_agents,
-        n_pickers,
-        n_objects=None,  # default to number of agents
+        width: int,
+        length: int,
+        n_agents: int,
+        n_pickers: int,
+        n_objects: int,
         initial_state=None,
-        cell_size=300,
-        debug_mode=False,
-        create_video=False,
-    ):
+        cell_size: Optional[int]=300,
+        debug_mode: Optional[bool]= False,
+        create_video: Optional[bool]=False,
+        seed: Optional[int]=None
+    ) -> None:
 
         # Dimesions of the grid and cell size
         self.width = width
@@ -177,7 +176,7 @@ class MultiAgentPickAndPlace(gym.Env):
                 raise ValueError(f"Invalid action: {action}. Action should be between 1 and {len(Action)}")
 
 
-    def reset(self, seed=None, options=None):
+    def reset(self, seed: Optional[int]=None, options:Optional[Any] = None) -> Tuple[Dict[str, Any], Dict[str,Any]]:
         """
         Reset the environment to either a random state or an predefined initial state
         """
@@ -191,7 +190,7 @@ class MultiAgentPickAndPlace(gym.Env):
             agent.carrying_object = None
         self.done = False
 
-        return self.get_state(), {}
+        return (self.get_state(), {})
 
     def get_state(self):
 
@@ -220,14 +219,13 @@ class MultiAgentPickAndPlace(gym.Env):
         """
         return self.action_space
 
-    def random_initialize(self, seed=None):
+    def random_initialize(self, seed: Optiomal[int]=None) -> None:
         """
         Initialise the environment with random allocations of agents and objects
         """
-        if seed is not None:
-             np.random.seed(seed)
+        rng = np.random.default_rng(seed)
         all_positions = [(x, y) for x in range(self.width) for y in range(self.length)]
-        random.shuffle(all_positions)
+        rng.shuffle(all_positions)
 
         # Randomly assign Picker flags to agents
         picker_flags = [True] * self.n_pickers + [False] * (
@@ -336,7 +334,7 @@ class MultiAgentPickAndPlace(gym.Env):
     def _random_position(self):
         return (random.randint(0, self.width - 1), random.randint(0, self.length - 1))
 
-    def step(self, actions):
+    def step(self, actions: List[int]) -> Tuple[Dict[str,Any], List[int], Tuple[bool, bool], Dict[str, Any]]:
         """
         Step through the environment
         """
@@ -370,12 +368,12 @@ class MultiAgentPickAndPlace(gym.Env):
         if self.debug_mode:
             self._print_state()
 
-        return self.get_state(), self._get_rewards(), (self.done, False), {}
+        return (self.get_state(), self._get_rewards(), (self.done, {})
 
-    def _get_rewards(self):
+    def _get_rewards(self) -> List[int]:
         return [agent.rewards for agent in self.agents]
 
-    def _move_agent(self, agent, action):
+    def _move_agent(self, agent: Agent, action: int) -> Tuple[int, int]:
         """
         Move the envirnment in the grid. Collisions between agents are not allowed.
         """
@@ -397,7 +395,7 @@ class MultiAgentPickAndPlace(gym.Env):
             return new_position
         return agent.position
 
-    def _handle_moves(self, actions):
+    def _handle_moves(self, actions: List[int]) -> None:
         for idx, agent_action in enumerate(actions):
             agent = self.agents[idx]
             agent.position = self._move_agent(agent, agent_action)
@@ -410,7 +408,7 @@ class MultiAgentPickAndPlace(gym.Env):
                 if carried_object:
                     carried_object.position = agent.position
 
-    def _handle_pickups(self):
+    def _handle_pickups(self) -> None:
         for agent in self.agents:
             if agent.picker and agent.carrying_object is None:
                 for obj in self.objects:
@@ -500,7 +498,7 @@ class MultiAgentPickAndPlace(gym.Env):
             print("Rendering initialised.")
         self._rendering_initialised = True
 
-    def render(self):
+    def render(self, mode: str='human') -> None:
         if not self._rendering_initialised:
             self._init_render()
         return self.renderer.render()
