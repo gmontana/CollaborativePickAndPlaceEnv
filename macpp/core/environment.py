@@ -11,7 +11,7 @@ import time
 import sys
 
 # sys.path.append("/home/gm13/Dropbox/mycode/envs/collaborative_pick_and_place/macpp/")
-sys.path.append("/Users/giovannimontana/Dropbox/mycode/envs/collaborative_pick_and_place/macpp")
+# sys.path.append("/Users/giovannimontana/Dropbox/mycode/envs/collaborative_pick_and_place/macpp")
 
 
 # Environment's rewards 
@@ -23,12 +23,12 @@ REWARD_COMPLETION = 20
 
 
 class Action(Enum):
-    UP = 1
-    DOWN = 2
-    LEFT = 3
-    RIGHT = 4
-    PASS = 5
-    WAIT = 6
+    UP = 0
+    DOWN = 1
+    LEFT = 2
+    RIGHT = 3
+    PASS = 4
+    WAIT = 5
 
     @staticmethod
     def is_valid(value):
@@ -48,7 +48,7 @@ class Agent:
             "position": self.position,
             "picker": self.picker,
             "carrying_object": self.carrying_object,
-            "reward": self.reward,
+            # "reward": self.reward,
         }
 
 
@@ -91,9 +91,10 @@ class MultiAgentPickAndPlace(gym.Env):
         self.create_video = create_video
         self.debug_mode = debug_mode
 
-        # Check if there are enough pickers
-        if n_agents-n_pickers <= 0:
-           raise ValueError("There should be an at least one picker.")
+        # Check if there are enough pickers and that n_pickers is not the same or larger than n_agents
+        if n_pickers <= 0 or n_pickers >= n_agents:
+           raise ValueError("Invalid number of pickers. There should be at least one picker and the number of pickers should be less than the total number of agents.")
+
 
         # Set the number of objects and goals
         if n_objects is None:
@@ -112,8 +113,8 @@ class MultiAgentPickAndPlace(gym.Env):
 
         # Define actions and actions space
         self.action_set = set(action.value for action in Action)
-        # self.action_space = spaces.MultiDiscrete([len(Action)] * self.n_agents)
-        self.action_space = spaces.MultiDiscrete([(1, len(Action))] * self.n_agents)
+        self.action_space = spaces.MultiDiscrete([len(Action)] * self.n_agents)
+        # self.action_space = spaces.MultiDiscrete([(1, len(Action))] * self.n_agents)
         # Define agent observation space
         self.agent_space = spaces.Dict(
             {
@@ -143,7 +144,7 @@ class MultiAgentPickAndPlace(gym.Env):
         )
 
         # Combine all spaces into the overall observation space
-        self.state_space = spaces.Dict(
+        self.observation_space = spaces.Dict(
             {
                 "agents": spaces.Tuple([self.agent_space] * self.n_agents),
                 "objects": spaces.Tuple([self.object_space] * self.n_objects),
@@ -171,27 +172,26 @@ class MultiAgentPickAndPlace(gym.Env):
             self.frames = []
 
     def _validate_actions(self, actions):
-        for agent_actions in actions:
-            for action in agent_actions:
-                if action is None or not (1 <= action <= len(Action)):
-                    raise ValueError(f"Invalid action: {action}. Action should be between 1 and {len(Action)}")
+        for action in actions:
+            if action is None or not (00<= action <= len(Action)-1):
+                raise ValueError(f"Invalid action: {action}. Action should be between 1 and {len(Action)}")
 
 
-    def reset(self):
+    def reset(self, seed=None, options=None):
         """
         Reset the environment to either a random state or an predefined initial state
         """
         if hasattr(self, "initial_state") and self.initial_state is not None:
             self.initialize_from_state(self.initial_state)
         else:
-            self.random_initialize()
+            self.random_initialize(seed)
 
         for agent in self.agents:
             agent.reward = 0
             agent.carrying_object = None
         self.done = False
 
-        return self.get_state()
+        return self.get_state(), {}
 
     def get_state(self):
 
@@ -220,10 +220,12 @@ class MultiAgentPickAndPlace(gym.Env):
         """
         return self.action_space
 
-    def random_initialize(self):
+    def random_initialize(self, seed=None):
         """
         Initialise the environment with random allocations of agents and objects
         """
+        if seed is not None:
+             np.random.seed(seed)
         all_positions = [(x, y) for x in range(self.width) for y in range(self.length)]
         random.shuffle(all_positions)
 
@@ -368,7 +370,7 @@ class MultiAgentPickAndPlace(gym.Env):
         if self.debug_mode:
             self._print_state()
 
-        return self.get_state(), self._get_rewards(), self.done, {}
+        return self.get_state(), self._get_rewards(), (self.done, False), {}
 
     def _get_rewards(self):
         return [agent.rewards for agent in self.agents]
@@ -522,6 +524,12 @@ class MultiAgentPickAndPlace(gym.Env):
         single_agent_action_space = len(Action)
         action_space_size = single_agent_action_space ** self.n_agents
         return action_space_size
+
+def make_env(width, length, n_agents, n_pickers, n_objects=None):
+    def _init():
+        return MultiAgentPickAndPlace(width, length, n_agents, n_pickers, n_objects)
+    return _init
+
 
 def game_loop(env, render):
     """
