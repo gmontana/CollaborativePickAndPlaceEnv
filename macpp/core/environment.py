@@ -1,6 +1,6 @@
 import gym
 from enum import Enum
-from typing import List, Tuple, Dict, Any, Optional
+from typing import List, Tuple, Dict, Any, Optional, Union, Callable
 from gym import spaces
 import random
 import pygame
@@ -170,7 +170,7 @@ class MultiAgentPickAndPlace(gym.Env):
             )
             self.frames = []
 
-    def _validate_actions(self, actions):
+    def _validate_actions(self, actions: List[int]) -> None:
         for action in actions:
             if action is None or not (00<= action <= len(Action)-1):
                 raise ValueError(f"Invalid action: {action}. Action should be between 1 and {len(Action)}")
@@ -192,7 +192,7 @@ class MultiAgentPickAndPlace(gym.Env):
 
         return (self.get_state(), {})
 
-    def get_state(self):
+    def get_state(self) -> Dict[str, Any]:
 
         agent_states = [agent.get_agent_state() for agent in self.agents]
         object_states = [obj.get_object_state() for obj in self.objects]
@@ -200,7 +200,7 @@ class MultiAgentPickAndPlace(gym.Env):
 
         return {"agents": agent_states, "objects": object_states, "goals": goal_states}
 
-    def state_to_hash(self, state):
+    def state_to_hash(self, state: Dict[str, Any]) -> Tuple[Tuple[Tuple[int, int, Optional[int]]], Tuple[Tuple[int, int]], Tuple[Tuple[int, int]]]:
 
         agents = state["agents"]
         objects = state["objects"]
@@ -213,13 +213,13 @@ class MultiAgentPickAndPlace(gym.Env):
 
         return combined_hash
 
-    def get_action_space(self):
+    def get_action_space(self) -> spaces.MultiDiscrete:
         """
         Return the action space of the environment
         """
         return self.action_space
 
-    def random_initialize(self, seed: Optiomal[int]=None) -> None:
+    def random_initialize(self, seed: Optional[int]=None) -> None:
         """
         Initialise the environment with random allocations of agents and objects
         """
@@ -266,7 +266,7 @@ class MultiAgentPickAndPlace(gym.Env):
         # Assign goals
         self.goals = goal_positions
 
-    def initialize_from_state(self, initial_state):
+    def initialize_from_state(self, initial_state: Dict[str, Any]) -> None:  
         """
         Initiate environment at a predefined state
         """
@@ -368,7 +368,7 @@ class MultiAgentPickAndPlace(gym.Env):
         if self.debug_mode:
             self._print_state()
 
-        return (self.get_state(), self._get_rewards(), (self.done, {})
+        return (self.get_state(), self._get_rewards(), self.done, {})
 
     def _get_rewards(self) -> List[int]:
         return [agent.rewards for agent in self.agents]
@@ -416,7 +416,7 @@ class MultiAgentPickAndPlace(gym.Env):
                         agent.carrying_object = obj.id
                         break
 
-    def _handle_passes(self, actions):
+    def _handle_passes(self, actions: List[int]) -> None:
 
         # Create a list to store agents that will receive objects
         receiving_agents = [None] * len(self.agents)
@@ -462,7 +462,7 @@ class MultiAgentPickAndPlace(gym.Env):
             if obj_id is not None:
                 self.agents[idx].carrying_object = obj_id
 
-    def check_termination(self):
+    def check_termination(self) -> bool:
         goal_positions = set(self.goals)
         object_positions = {obj.position for obj in self.objects}
         carrying_agents = {agent.position for agent in self.agents if agent.carrying_object is not None}
@@ -477,7 +477,7 @@ class MultiAgentPickAndPlace(gym.Env):
         return False
 
 
-    def _handle_drops(self):
+    def _handle_drops(self) -> None:
         for agent in self.agents:
             # Check if the agent is carrying an object and is NOT a picker
             if agent.carrying_object is not None and not agent.picker:
@@ -491,19 +491,19 @@ class MultiAgentPickAndPlace(gym.Env):
                         agent.carrying_object = None
 
 
-    def _init_render(self):
+    def _init_render(self) -> None:
         from core.rendering import Viewer
         self.renderer = Viewer(self)
         if self.debug_mode:
             print("Rendering initialised.")
         self._rendering_initialised = True
 
-    def render(self, mode: str='human') -> None:
+    def render(self, mode: str='human') -> Union[None, np.ndarray]:
         if not self._rendering_initialised:
             self._init_render()
         return self.renderer.render()
 
-    def close(self):
+    def close(self) -> None:
         # Close the renderer
         if self.renderer:
             self.renderer.close()
@@ -511,19 +511,19 @@ class MultiAgentPickAndPlace(gym.Env):
         if self.create_video:
             pass
 
-    def _get_state_space_size(self):
+    def _get_state_space_size(self) -> int:
         agent_space_size = self.width * self.length * 2 * (self.n_objects + 1)
         object_space_size = self.width * self.length * self.n_objects
         goal_space_size = self.width * self.length
         state_space_size = (agent_space_size ** self.n_agents) * (object_space_size ** self.n_objects) * (goal_space_size ** self.n_objects)
         return state_space_size
 
-    def _get_action_space_size(self):
+    def _get_action_space_size(self) -> int:
         single_agent_action_space = len(Action)
         action_space_size = single_agent_action_space ** self.n_agents
         return action_space_size
 
-def make_env(width, length, n_agents, n_pickers, n_objects=None):
+def make_env(width: int, length:int, n_agents: int, n_pickers: int, n_objects: Optional[int]=None) -> Callable[[], MultiAgentPickAndPlace]:
     def _init():
         return MultiAgentPickAndPlace(width, length, n_agents, n_pickers, n_objects)
     return _init
