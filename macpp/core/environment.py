@@ -200,7 +200,7 @@ class MultiAgentPickAndPlace(gym.Env):
 
         self.done = [False for _ in range(self.n_agents)]
 
-        return self.get_state()
+        return self.get_state(), {}
 
     def get_state(self) -> Dict[str, Any]:
         agent_states = tuple(agent.get_agent_state() for agent in self.agents)
@@ -391,7 +391,7 @@ class MultiAgentPickAndPlace(gym.Env):
         if self.debug_mode:
             self._print_state()
 
-        return (self.get_state(), self._get_rewards(), (self.done, self.done), {})
+        return self.get_state(), sum(self._get_rewards()), all(self.done), {}
 
     def _get_rewards(self) -> List[int]:
         return [agent.rewards for agent in self.agents]
