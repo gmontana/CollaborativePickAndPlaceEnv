@@ -7,6 +7,7 @@ import time
 from gym.spaces import Tuple, Discrete, Dict
 import itertools
 from collections import defaultdict
+from gym import spaces
 
 class QTable:
 
@@ -15,24 +16,20 @@ class QTable:
         self.q_table = defaultdict(lambda: defaultdict(float))
         self.initial_value = initial_value
 
-    def get_q_value(self, state, actions):
-        state_hash = self.env.state_to_hash(state)
+    def get_q_value(self, state_hash, actions):
         return self.q_table.get(state_hash, {}).get(tuple(actions), self.initial_value)
 
-    def set_q_value(self, state, actions, value):
-        state_hash = self.env.state_to_hash(state)
+    def set_q_value(self, state_hash, actions, value):
         if state_hash not in self.q_table:
             self.q_table[state_hash] = {}
         self.q_table[state_hash][tuple(actions)] = value
 
-    def get_max_q_value(self, state):
-        state_hash = self.env.state_to_hash(state)
+    def get_max_q_value(self, state_hash):
         if state_hash not in self.q_table:
             return self.initial_value
         return max(self.q_table[state_hash].values())
 
-    def best_actions(self, state):
-        state_hash = self.env.state_to_hash(state)
+    def best_actions(self, state_hash):
         if state_hash not in self.q_table:
             return None
         max_q_value = self.get_max_q_value(state_hash)
@@ -47,10 +44,9 @@ class QTable:
     # def load_table(self, filename):
     #     print(f"Loading Q-value table: {filename}.")
     #     self.q_table = np.load(filename, allow_pickle=True).item()
-    #     print(f"Number of elements in the Q table: {self.count_elements()}")
 
 class QLearning:
-    def __init__(self, env, learning_rate=0.1, discount_factor=0.9, exploration_rate=1.0, exploration_decay=0.999, min_exploration=0.03, learning_rate_decay=0.999, min_learning_rate=0.01):
+    def __init__(self, env, learning_rate=0.1, discount_factor=0.9, exploration_rate=1.0, exploration_decay=0.99999, min_exploration=0.03, learning_rate_decay=0.99999, min_learning_rate=0.01):
         self.env = env
         self.n_agents = env.n_agents
         self.action_space_size = env.n_agents
@@ -75,10 +71,10 @@ class QLearning:
             return self.env.action_space.sample().tolist()
         return best
 
-    def act(self, state, explore=False):
-        return self.epsilon_greedy_actions(state) if explore else self.greedy_actions(state)
+    def act(self, state_hash, explore=False):
+        return self.epsilon_greedy_actions(state_hash) if explore else self.greedy_actions(state_hash)
 
-    def learn(self, state, actions, next_state, rewards, done):
+    def learn(self, state_hash, actions, next_state_hash, rewards, done):
 
         total_reward = sum(rewards)
         
@@ -86,13 +82,13 @@ class QLearning:
         if done:
             target = total_reward
         else:
-            max_next_q_value = self.q_table.get_max_q_value(next_state)
+            max_next_q_value = self.q_table.get_max_q_value(next_state_hash)
             target = total_reward + self.discount_factor * max_next_q_value
         
         # Update the Q-value 
-        current_q_value = self.q_table.get_q_value(state, actions)
+        current_q_value = self.q_table.get_q_value(state_hash, actions)
         updated_value = current_q_value + self.learning_rate * (target - current_q_value)
-        self.q_table.set_q_value(state, actions, updated_value)
+        self.q_table.set_q_value(state_hash, actions, updated_value)
         
         # Decay the exploration and learning rates
         # self.exploration_rate = max(self.min_exploration, self.exploration_rate * self.exploration_decay)
@@ -107,25 +103,33 @@ def game_loop(env, agent, training=False, num_episodes=1, steps_per_episode=300,
     for episode in range(num_episodes):
         # print(f"Episode #{episode+1}\n")
         state = env.reset()
-        # print(env._print_state())
+        state_hash = env.state_to_hash(state)
         done = False
         episode_steps = 0
         episode_returns = 0
         while not done:
-            # print("State before update:") 
-            # env._print_state()
+            print("State before update:") 
+            env._print_state()
 
             # take action
             if training:
-                actions = agent.act(state, explore=True)
+                actions = agent.act(state_hash, explore=True)
             else:
-                actions = agent.act(state, explore=False)
+                actions = agent.act(state_hash, explore=False)
 
-            # print(f"Actions: {actions}")
+            print(f"Actions: {actions}")
 
             # transition to new state 
             next_state, rewards, done, _ = env.step(actions)
-            
+
+            print(f'Rewards: {rewards}')
+
+            # print("State after update:") 
+            # env._print_state()
+
+            # Hash the next state
+            next_state_hash = env.state_to_hash(next_state) 
+
             # print("State after update:") 
             # env._print_state()
 
@@ -134,7 +138,7 @@ def game_loop(env, agent, training=False, num_episodes=1, steps_per_episode=300,
 
             # learn when needed
             if training:
-                agent.learn(state, actions, next_state, rewards, done)
+                agent.learn(state_hash, actions, next_state_hash, rewards, done)
             state = next_state
 
             # render when needed
@@ -151,7 +155,7 @@ def game_loop(env, agent, training=False, num_episodes=1, steps_per_episode=300,
         # print some stats
         avg_steps = np.mean(total_steps)
         avg_return = np.mean(total_returns)
-        print(f"Episode {episode+1}/{num_episodes}: Average Steps: {avg_steps:.2f}, Average Return: {avg_return:.2f}")
+        print(f"Episode {episode+1}/{num_episodes}: Avg Steps: {avg_steps:.2f}, Avg Return: {avg_return:.2f}, epsilon: {agent.exploration_rate:.3f}, alpha: {agent.learning_rate:.3f}")
 
         # adjust exploration and learning rate
         agent.exploration_rate = max(agent.min_exploration, agent.exploration_rate * agent.exploration_decay)
@@ -169,20 +173,25 @@ def game_loop(env, agent, training=False, num_episodes=1, steps_per_episode=300,
     #     agent.q_table.save_table(qtable_file)
 
 
-    return total_steps, total_returns
-
 if __name__ == "__main__":
 
     from macpp.core.environment import MultiAgentPickAndPlace
 
+    # Set up the environment
     env = MultiAgentPickAndPlace(
         width=3, length=3, n_agents=2, n_pickers=1, n_objects=1, cell_size=300, debug_mode=False
     )
-    agent = QLearning(env)
-    total_steps, total_returns = game_loop(env, agent, True, 20000, steps_per_episode=200, render=False, qtable_file='qtable')
-    # total_steps, total_returns = game_loop(env, agent, False, 10, create_video=True, qtable_file='qtable')
-    # print(env.action_space)
-    # print(env._get_action_space_size())
-    # print(env.state_space)
-    # print(env._get_state_space_size())
+
+    # Set up the Q agent
+    agent = QLearning(env, 
+                      learning_rate=0.1, 
+                      discount_factor=0.9, 
+                      exploration_rate=1.0, 
+                      exploration_decay=0.99999, 
+                      min_exploration=0.03, 
+                      learning_rate_decay=0.998, 
+                      min_learning_rate=0.01)
+
+    # Train the agent
+    game_loop(env, agent, training=True, num_episodes=1, steps_per_episode=300, render=False, qtable_file='qtable')
 
