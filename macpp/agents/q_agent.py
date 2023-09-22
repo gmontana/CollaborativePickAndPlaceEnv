@@ -2,12 +2,9 @@ import numpy as np
 from datetime import datetime
 import os
 import random
-import json
 import time
-from gym.spaces import Tuple, Discrete, Dict
-import itertools
 from collections import defaultdict
-from gym import spaces
+import matplotlib.pyplot as plt
 
 class QTable:
 
@@ -72,18 +69,17 @@ class QLearning:
         return best
 
     def act(self, state_hash, explore=False):
-        return self.epsilon_greedy_actions(state_hash) if explore else self.greedy_actions(state_hash)
+        # return self.epsilon_greedy_actions(state_hash) if explore else self.greedy_actions(state_hash)
+        return self.epsilon_greedy_actions(state_hash) if explore else self.env.action_space.sample().tolist() 
 
     def learn(self, state_hash, actions, next_state_hash, rewards, done):
 
-        total_reward = sum(rewards)
-        
         # Calculate the target Q-value
         if done:
-            target = total_reward
+            target = rewards
         else:
             max_next_q_value = self.q_table.get_max_q_value(next_state_hash)
-            target = total_reward + self.discount_factor * max_next_q_value
+            target = rewards + self.discount_factor * max_next_q_value
         
         # Update the Q-value 
         current_q_value = self.q_table.get_q_value(state_hash, actions)
@@ -100,46 +96,50 @@ def game_loop(env, agent, training=False, num_episodes=1, steps_per_episode=300,
     print("Game loop started...")
     total_steps = []
     total_returns = []
+    total_success_rate = []
+    total_avg_steps = []
+    total_failures = 0
     for episode in range(num_episodes):
         # print(f"Episode #{episode+1}\n")
-        state = env.reset()
-        state_hash = env.state_to_hash(state)
+        obs, _ = env.reset()
+        obs_hash = env.obs_to_hash(obs)
         done = False
         episode_steps = 0
         episode_returns = 0
         while not done:
-            print("State before update:") 
-            env._print_state()
+
+            # print("State before update:") 
+            # env._print_state()
 
             # take action
             if training:
-                actions = agent.act(state_hash, explore=True)
+                actions = agent.act(obs_hash, explore=True)
             else:
-                actions = agent.act(state_hash, explore=False)
+                actions = agent.act(obs_hash, explore=False)
 
-            print(f"Actions: {actions}")
+            # print(f"Actions: {actions}")
 
             # transition to new state 
-            next_state, rewards, done, _ = env.step(actions)
+            next_obs, rewards, done, _ = env.step(actions)
 
-            print(f'Rewards: {rewards}')
+            # print(f'Rewards: {rewards}')
 
             # print("State after update:") 
             # env._print_state()
 
             # Hash the next state
-            next_state_hash = env.state_to_hash(next_state) 
+            next_obs_hash = env.obs_to_hash(next_obs) 
 
             # print("State after update:") 
             # env._print_state()
 
-            episode_returns += sum(rewards)
+            episode_returns += rewards
             episode_steps += 1
 
             # learn when needed
             if training:
-                agent.learn(state_hash, actions, next_state_hash, rewards, done)
-            state = next_state
+                agent.learn(obs_hash, actions, next_obs_hash, rewards, done)
+            obs = next_obs
 
             # render when needed
             if render:
@@ -148,6 +148,7 @@ def game_loop(env, agent, training=False, num_episodes=1, steps_per_episode=300,
             
             # check for failed episode 
             if episode_steps > steps_per_episode:
+                total_failures +=1
                 break
         total_steps.append(episode_steps)
         total_returns.append(episode_returns)
@@ -155,11 +156,23 @@ def game_loop(env, agent, training=False, num_episodes=1, steps_per_episode=300,
         # print some stats
         avg_steps = np.mean(total_steps)
         avg_return = np.mean(total_returns)
-        print(f"Episode {episode+1}/{num_episodes}: Avg Steps: {avg_steps:.2f}, Avg Return: {avg_return:.2f}, epsilon: {agent.exploration_rate:.3f}, alpha: {agent.learning_rate:.3f}")
+        success_rate = 1- (total_failures/(episode+1))
+        print(f"Episode {episode+1}/{num_episodes}: Avg Steps: {avg_steps:.2f}, Avg Return: {avg_return:.2f}, Success rate: {success_rate:.2f}, epsilon: {agent.exploration_rate:.3f}, alpha: {agent.learning_rate:.3f}")
+        total_success_rate.append(success_rate)
+        total_avg_steps.append(avg_steps)
 
         # adjust exploration and learning rate
         agent.exploration_rate = max(agent.min_exploration, agent.exploration_rate * agent.exploration_decay)
         agent.learning_rate = max(agent.min_learning_rate, agent.learning_rate * agent.learning_rate_decay)
+
+    plt.figure(figsize=(10, 6))
+    plt.plot(range(num_episodes), total_avg_steps)
+    plt.xlabel('Episode')
+    plt.ylabel('Avg steps')
+    plt.legend()
+    plt.grid(True)
+    plt.show()
+
 
     # create a video when needed 
     if create_video:
@@ -172,26 +185,24 @@ def game_loop(env, agent, training=False, num_episodes=1, steps_per_episode=300,
     # if training and qtable_file is not None:
     #     agent.q_table.save_table(qtable_file)
 
-
 if __name__ == "__main__":
 
-    from macpp.core.environment import MultiAgentPickAndPlace
+    from macpp.core.environment import MACPPEnv
 
     # Set up the environment
-    env = MultiAgentPickAndPlace(
-        width=3, length=3, n_agents=2, n_pickers=1, n_objects=1, cell_size=300, debug_mode=False
+    env = MACPPEnv(
+        grid_size=(3, 3), n_agents=2, n_pickers=1, n_objects=1, cell_size=300, debug_mode=False
     )
 
     # Set up the Q agent
     agent = QLearning(env, 
                       learning_rate=0.1, 
-                      discount_factor=0.9, 
+                      discount_factor=0.95, 
                       exploration_rate=1.0, 
-                      exploration_decay=0.99999, 
-                      min_exploration=0.03, 
-                      learning_rate_decay=0.998, 
+                      exploration_decay=0.8, 
+                      min_exploration=0.01, 
+                      learning_rate_decay=0.9999, 
                       min_learning_rate=0.01)
 
     # Train the agent
-    game_loop(env, agent, training=True, num_episodes=1, steps_per_episode=300, render=False, qtable_file='qtable')
-
+    game_loop(env, agent, training=True, num_episodes=1000, steps_per_episode=300, render=False, qtable_file='qtable')
