@@ -92,9 +92,7 @@ class MACPPEnv(gym.Env):
         seed: Optional[int] = None
     ) -> None:
 
-        # Dimesions of the grid and cell size
-        self.grid_width = grid_size[0]
-        self.grid_length = grid_size[1]
+        self.grid_width, self.grid_length = grid_size
         self.cell_size = cell_size
         self.n_agents = n_agents
         self.n_pickers = n_pickers
@@ -179,7 +177,7 @@ class MACPPEnv(gym.Env):
         #     }
         # )
 
-        self.done = False
+        self.done = [False for _ in range(self.n_agents)]
 
         # Initialise the environment either randomly or from a state
         if initial_state is None:
@@ -215,20 +213,19 @@ class MACPPEnv(gym.Env):
         Reset the environment to either a random state or an predefined initial state
         """
         if self.initial_state:
-            observations = self.reset_from_obs(self.initial_state)
+            self.reset_from_obs(self.initial_state)
         else:
-            observations = self.random_reset(seed)
+            self.random_reset(seed)
 
         self.done = [False for _ in range(self.n_agents)]
 
-        return observation, {}
-
+        return get_obs, {}
 
     def obs_to_hash(self, obs: Dict[str, Dict[str, Any]]) -> str:
         concatenated_obs = ''.join([str(obs[agent_id]) for agent_id in sorted(obs.keys())])
         return hashlib.md5(concatenated_obs.encode()).hexdigest()
 
-    def random_reset(self, seed: Optional[int] = None) -> Dict[str, Dict[str, Any]]:
+    def random_reset(self, seed: Optional[int] = None) -> None:
         """
         Initialise the environment with random allocations of agents and objects
         """
@@ -277,9 +274,8 @@ class MACPPEnv(gym.Env):
         # Assign goals
         self.goals = goal_positions
 
-        return self.get_obs()
 
-    def reset_from_obs(self, obs: Dict[str, Dict[str, Any]]) -> Dict[str, Dict[str, Any]]:
+    def reset_from_obs(self, obs: Dict[str, Dict[str, Any]]) -> None:
         """
         Reset the environment to a predefined initial state.
         """
@@ -310,7 +306,6 @@ class MACPPEnv(gym.Env):
         # Reset goals
         self.goals = [tuple(goal) for goal in goal_states]
 
-        return self.get_obs()
 
     def _print_state(self):
         print("-" * 30)

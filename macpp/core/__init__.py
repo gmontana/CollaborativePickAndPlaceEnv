@@ -1,1 +1,1 @@
-from macpp.core.environment import MultiAgentPickAndPlace
+from macpp.core.environment import MACPPEnv
