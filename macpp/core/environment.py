@@ -46,13 +46,25 @@ class Agent:
         self.carrying_object = carrying_object
         self.reward = reward
 
-    def get_agent_state(self) -> Dict[str, Union[Tuple[int, int], bool, Optional[int]]]:
-        return {
-            "position": self.position,
-            "picker": self.picker,
-            "carrying_object": self.carrying_object,
+    def get_agent_observation(self, all_agents, all_objects, goals) -> Dict[str, Any]:
+        obs = {
+            'self': {
+                'position': self.position,
+                'picker': self.picker,
+                'carrying_object': self.carrying_object
+            },
+            'agents': [other_agent.get_basic_state() for other_agent in all_agents if other_agent != self],
+            'objects': [obj.get_object_state() for obj in all_objects],
+            'goals': goals
         }
+        return obs
 
+    def get_basic_state(self) -> Dict[str, Any]:
+        return {
+            'position': self.position,
+            'picker': self.picker,
+            'carrying_object': self.carrying_object
+        }
 
 class Object:
     def __init__(self,
@@ -177,9 +189,9 @@ class MultiAgentPickAndPlace(gym.Env):
 
         # Initialise the environment either randomly or from a state
         if initial_state is None:
-            self.random_initialize()
+            self.random_reset()
         else:
-            self.initialize_from_state(initial_state)
+            self.reset_from_state(initial_state)
 
         # Rendering
         self._rendering_initialised = False
@@ -198,22 +210,28 @@ class MultiAgentPickAndPlace(gym.Env):
                 raise ValueError(
                     f"Invalid action: {action}. Action should be between 1 and {len(Action)}")
 
-    def reset(self, seed: Optional[int] = None, options: Optional[Any] = None) -> Dict[str, Any]:
+    def get_observations(self) -> Dict[str, Dict[str, Any]]:
+        observations = {}
+        for agent in self.agents:
+            observations[f"agent_{agent.id}"] = agent.get_agent_observation(self.agents, self.objects, self.goals)
+        return observations
+
+    def reset(self, seed: Optional[int] = None, options: Optional[Any] = None) -> Dict[str, Dict[str, Any]]:
         """
         Reset the environment to either a random state or an predefined initial state
         """
-        if hasattr(self, "initial_state") and self.initial_state is not None:
-            self.initialize_from_state(self.initial_state)
+        if self.initial_state:
+            observations = self.reset_from_state(self.initial_state)
         else:
-            self.random_initialize(seed)
+            observations = self.random_reset(seed)
 
-        for agent in self.agents:
-            agent.reward = 0
-            agent.carrying_object = None
-
+        # for agent in self.agents:
+        #     agent.reward = 0
+        #     agent.carrying_object = None
+        #
         self.done = [False for _ in range(self.n_agents)]
 
-        return self.get_state(), {}
+        return observation, {}
 
     def get_state(self) -> Dict[str, Any]:
         agent_states = tuple(agent.get_agent_state() for agent in self.agents)
@@ -242,7 +260,7 @@ class MultiAgentPickAndPlace(gym.Env):
         """
         return self.action_space
 
-    def random_initialize(self, seed: Optional[int] = None) -> None:
+    def random_reset(self, seed: Optional[int] = None) -> Dict[str, Dict[str, Any]]:
         """
         Initialise the environment with random allocations of agents and objects
         """
@@ -279,6 +297,7 @@ class MultiAgentPickAndPlace(gym.Env):
                     position=agent_position,
                     picker=picker_flags.pop(),
                     carrying_object=None,
+                    reward=0
                 )
             )
 
@@ -290,7 +309,9 @@ class MultiAgentPickAndPlace(gym.Env):
         # Assign goals
         self.goals = goal_positions
 
-    def initialize_from_state(self, initial_state: Dict[str, Any]) -> None:
+        return self.get_observations()
+
+    def reset_from_state(self, initial_state: Dict[str, Any]) -> None:
         """
         Initiate environment at a predefined state
         """
@@ -327,18 +348,6 @@ class MultiAgentPickAndPlace(gym.Env):
         if self.debug_mode:
             self._print_state()
 
-    def get_agent_observations(self) -> Dict[str, Dict[str, Any]]:
-        observations = {}
-        for idx, agent in enumerate(self.agents):
-            obs = {
-                'self': agent.get_agent_state(),
-                'agents': [other_agent.get_agent_state() for other_agent in self.agents if other_agent != agent],
-                'objects': [obj.get_object_state() for obj in self.objects],
-                'goals': self.goals
-            }
-            observations[f"agent_{idx}"] = obs
-        return observations
-
     def _print_state(self):
         print("-" * 30)
         for idx, agent in enumerate(self.agents, start=1):
@@ -368,8 +377,7 @@ class MultiAgentPickAndPlace(gym.Env):
     def _random_position(self):
         return (random.randint(0, self.width - 1), random.randint(0, self.length - 1))
 
-    def step(self, actions: List[int]) -> Tuple[Dict[str, Any], List[float], Tuple[bool, bool], Dict[str, Any]]:
-
+    def step(self, actions: Dict[str, int]) -> Tuple[Dict[str, Dict[str, Any]], Dict[str, float], Dict[str, bool], Dict[str, Any]]:
         # Check that no invalid actions are taken
         if self.debug_mode:
             self._validate_actions(actions)
