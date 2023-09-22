@@ -18,7 +18,7 @@ REWARD_STEP = -1
 REWARD_GOOD_PASS = 5
 REWARD_BAD_PASS = -5
 REWARD_DROP = 10
-REWARD_COMPLETION = 20
+REWARD_COMPLETION = 50
 
 
 class Action(Enum):
@@ -28,6 +28,10 @@ class Action(Enum):
     RIGHT = 3
     PASS = 4
     WAIT = 5
+
+    @staticmethod
+    def is_valid(action):
+        return action in Action._value2member_map_
 
 
 class Agent:
@@ -177,7 +181,7 @@ class MACPPEnv(gym.Env):
         #     }
         # )
 
-        self.done = [False for _ in range(self.n_agents)]
+        self.done = False
 
         # Initialise the environment either randomly or from a state
         if initial_state is None:
@@ -217,18 +221,52 @@ class MACPPEnv(gym.Env):
         else:
             self.random_reset(seed)
 
-        self.done = [False for _ in range(self.n_agents)]
+        self.done = False
 
-        return get_obs, {}
+        return self.get_obs(), {}
+
+    # def obs_to_hash(self, obs: Dict[str, Dict[str, Any]]) -> str:
+    #     concatenated_obs = ''.join([str(obs[agent_id]) for agent_id in sorted(obs.keys())])
+    #     return hashlib.md5(concatenated_obs.encode()).hexdigest()
 
     def obs_to_hash(self, obs: Dict[str, Dict[str, Any]]) -> str:
-        concatenated_obs = ''.join([str(obs[agent_id]) for agent_id in sorted(obs.keys())])
+        def position_to_number(pos, length):
+            return pos[0] * length + pos[1]
+
+        encoded_obs = []
+
+        for agent_id in sorted(obs.keys()):
+            agent_data = obs[agent_id]
+            # Encode agent's own observation
+            encoded_obs.append(position_to_number(agent_data['self']['position'], self.grid_length))
+            encoded_obs.append(1 if agent_data['self']['picker'] else 0)
+            encoded_obs.append(agent_data['self']['carrying_object'] if agent_data['self']['carrying_object'] is not None else -1)
+            # Encode other agents' observations
+            for other_agent in agent_data['agents']:
+                encoded_obs.append(position_to_number(other_agent['position'], self.grid_length))
+                encoded_obs.append(1 if other_agent['picker'] else 0)
+                encoded_obs.append(other_agent['carrying_object'] if other_agent['carrying_object'] is not None else -1)
+            # Encode objects' observations
+            for obj in agent_data['objects']:
+                encoded_obs.append(position_to_number(obj['position'], self.grid_length))
+                encoded_obs.append(obj['id'])
+            # Encode goals
+            for goal in agent_data['goals']:
+                encoded_obs.append(position_to_number(goal, self.grid_length))
+
+        # Convert the list of numbers to a single string and hash it
+        concatenated_obs = ''.join(map(str, encoded_obs))
         return hashlib.md5(concatenated_obs.encode()).hexdigest()
+
+
 
     def random_reset(self, seed: Optional[int] = None) -> None:
         """
         Initialise the environment with random allocations of agents and objects
         """
+
+        if self.debug_mode:
+            print("Random reset.")
         rng = np.random.default_rng(seed)
         all_positions = [(x, y) for x in range(self.grid_width)
                          for y in range(self.grid_length)]
@@ -279,6 +317,10 @@ class MACPPEnv(gym.Env):
         """
         Reset the environment to a predefined initial state.
         """
+
+        if self.debug_mode:
+            print("Reset from state.")
+
         agent_states = obs['agents']
         object_states = obs['objects']
         goal_states = obs['goals']
@@ -493,7 +535,7 @@ class MACPPEnv(gym.Env):
                         agent.carrying_object = None
 
     def _init_render(self) -> None:
-        from core.rendering import Viewer
+        from macpp.core.rendering import Viewer
         self.renderer = Viewer(self)
         if self.debug_mode:
             print("Rendering initialised.")
