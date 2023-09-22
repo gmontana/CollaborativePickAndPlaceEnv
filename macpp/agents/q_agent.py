@@ -6,9 +6,11 @@ import time
 from collections import defaultdict
 import matplotlib.pyplot as plt
 
+
+
 class QTable:
 
-    def __init__(self, env, initial_value=0.1):
+    def __init__(self, env, initial_value=0.0):
         self.env = env
         self.q_table = defaultdict(lambda: defaultdict(float))
         self.initial_value = initial_value
@@ -55,24 +57,50 @@ class QLearning:
         self.exploration_rate = exploration_rate
         self.exploration_decay = exploration_decay
         self.min_exploration = min_exploration
+        self.state_visits = {}  
+        self.state_action_visits = {}  
 
-    def epsilon_greedy_actions(self, state):
+    def epsilon_greedy_actions(self, obs):
         if random.random() < self.exploration_rate:
             return self.env.action_space.sample().tolist()
         else:
-            return self.greedy_actions(state)
+            return self.greedy_actions(obs)
 
-    def greedy_actions(self, state):
-        best = self.q_table.best_actions(state)
+    def greedy_actions(self, obs):
+        best = self.q_table.best_actions(obs)
         if best is None:
             return self.env.action_space.sample().tolist()
         return best
 
-    def act(self, state_hash, explore=False):
-        # return self.epsilon_greedy_actions(state_hash) if explore else self.greedy_actions(state_hash)
-        return self.epsilon_greedy_actions(state_hash) if explore else self.env.action_space.sample().tolist() 
+    def ucb_action_selection(self, obs_hash):
+        c = 1.0  # Exploration parameter
+        max_ucb = float('-inf')
+        best_action = None
 
-    def learn(self, state_hash, actions, next_state_hash, rewards, done):
+        # Generate all possible action combinations for the MultiDiscrete action space
+        action_combinations = [list(x) for x in np.ndindex(*self.env.action_space.nvec)]
+
+        for action in action_combinations:
+            q_value = self.q_table.get_q_value(obs_hash, action)
+            state_count = self.state_visits.get(obs_hash, 1)  # Avoid division by zero
+            state_action_key = (obs_hash, tuple(action))
+            state_action_count = self.state_action_visits.get(state_action_key, 1)
+            ucb_value = q_value + c * np.sqrt(np.log(state_count) / state_action_count)
+
+            if ucb_value > max_ucb:
+                max_ucb = ucb_value
+                best_action = action
+
+        return best_action
+
+
+    def act(self, obs_hash, explore=False):
+        if explore:
+            return self.ucb_action_selection(obs_hash)
+        else:
+            return self.greedy_actions(obs_hash)
+
+    def learn(self, obs_hash, actions, next_state_hash, rewards, done):
 
         # Calculate the target Q-value
         if done:
@@ -82,9 +110,9 @@ class QLearning:
             target = rewards + self.discount_factor * max_next_q_value
         
         # Update the Q-value 
-        current_q_value = self.q_table.get_q_value(state_hash, actions)
+        current_q_value = self.q_table.get_q_value(obs_hash, actions)
         updated_value = current_q_value + self.learning_rate * (target - current_q_value)
-        self.q_table.set_q_value(state_hash, actions, updated_value)
+        self.q_table.set_q_value(obs_hash, actions, updated_value)
         
         # Decay the exploration and learning rates
         # self.exploration_rate = max(self.min_exploration, self.exploration_rate * self.exploration_decay)
@@ -98,62 +126,52 @@ def game_loop(env, agent, training=False, num_episodes=1, steps_per_episode=300,
     total_returns = []
     total_success_rate = []
     total_avg_steps = []
+    total_avg_returns = []
     total_failures = 0
+
+    state_visits = {}
+    state_action_visits = {}
+
     for episode in range(num_episodes):
-        # print(f"Episode #{episode+1}\n")
         obs, _ = env.reset()
         obs_hash = env.obs_to_hash(obs)
         done = False
         episode_steps = 0
         episode_returns = 0
+
         while not done:
-
-            # print("State before update:") 
-            # env._print_state()
-
-            # take action
             if training:
                 actions = agent.act(obs_hash, explore=True)
             else:
                 actions = agent.act(obs_hash, explore=False)
 
-            # print(f"Actions: {actions}")
+            # Update the state visit count
+            state_visits[obs_hash] = state_visits.get(obs_hash, 0) + 1
 
-            # transition to new state 
+            # Update state-action visit count
+            state_action_key = (obs_hash, tuple(actions))
+            state_action_visits[state_action_key] = state_action_visits.get(state_action_key, 0) + 1
+
             next_obs, rewards, done, _ = env.step(actions)
-
-            # print(f'Rewards: {rewards}')
-
-            # print("State after update:") 
-            # env._print_state()
-
-            # Hash the next state
-            next_obs_hash = env.obs_to_hash(next_obs) 
-
-            # print("State after update:") 
-            # env._print_state()
+            next_obs_hash = env.obs_to_hash(next_obs)
 
             episode_returns += rewards
             episode_steps += 1
 
-            # learn when needed
             if training:
                 agent.learn(obs_hash, actions, next_obs_hash, rewards, done)
             obs = next_obs
 
-            # render when needed
             if render:
                 env.render()
                 time.sleep(0.5)
             
-            # check for failed episode 
             if episode_steps > steps_per_episode:
                 total_failures +=1
                 break
         total_steps.append(episode_steps)
         total_returns.append(episode_returns)
 
-        # print some stats
         avg_steps = np.mean(total_steps)
         avg_return = np.mean(total_returns)
         success_rate = 1- (total_failures/(episode+1))
@@ -161,18 +179,28 @@ def game_loop(env, agent, training=False, num_episodes=1, steps_per_episode=300,
         total_success_rate.append(success_rate)
         total_avg_steps.append(avg_steps)
 
-        # adjust exploration and learning rate
         agent.exploration_rate = max(agent.min_exploration, agent.exploration_rate * agent.exploration_decay)
         agent.learning_rate = max(agent.min_learning_rate, agent.learning_rate * agent.learning_rate_decay)
 
-    plt.figure(figsize=(10, 6))
-    plt.plot(range(num_episodes), total_avg_steps)
-    plt.xlabel('Episode')
-    plt.ylabel('Avg steps')
-    plt.legend()
-    plt.grid(True)
-    plt.show()
+    # Create the main figure and axis
+    fig, ax1 = plt.subplots(figsize=(10, 6))
 
+    # Plot the first metric on the primary y-axis
+    ax1.plot(range(num_episodes), total_avg_returns, 'b-', label='Avg Return')
+    ax1.set_xlabel('Episode')
+    ax1.set_ylabel('Avg Return', color='b')
+    ax1.tick_params('y', colors='b')
+    ax1.legend(loc='upper left')
+    ax1.grid(True)
+
+    # Create the second y-axis and plot the second metric on it
+    ax2 = ax1.twinx()
+    ax2.plot(range(num_episodes), total_avg_steps, 'r-', label='Avg Steps')
+    ax2.set_ylabel('Avg Steps', color='r')
+    ax2.tick_params('y', colors='r')
+    ax2.legend(loc='upper right')
+
+    plt.show()
 
     # create a video when needed 
     if create_video:
@@ -196,13 +224,13 @@ if __name__ == "__main__":
 
     # Set up the Q agent
     agent = QLearning(env, 
-                      learning_rate=0.1, 
-                      discount_factor=0.95, 
+                      learning_rate=0.1,
+                      discount_factor=0.98, 
                       exploration_rate=1.0, 
-                      exploration_decay=0.8, 
+                      exploration_decay=0.995, 
                       min_exploration=0.01, 
-                      learning_rate_decay=0.9999, 
+                      learning_rate_decay=0.995, 
                       min_learning_rate=0.01)
 
     # Train the agent
-    game_loop(env, agent, training=True, num_episodes=1000, steps_per_episode=300, render=False, qtable_file='qtable')
+    game_loop(env, agent, training=True, num_episodes=2000, steps_per_episode=200, render=False, qtable_file='qtable')
