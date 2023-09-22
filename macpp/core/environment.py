@@ -191,7 +191,7 @@ class MultiAgentPickAndPlace(gym.Env):
         if initial_state is None:
             self.random_reset()
         else:
-            self.reset_from_state(initial_state)
+            self.reset_from_observation(initial_state)
 
         # Rendering
         self._rendering_initialised = False
@@ -221,14 +221,10 @@ class MultiAgentPickAndPlace(gym.Env):
         Reset the environment to either a random state or an predefined initial state
         """
         if self.initial_state:
-            observations = self.reset_from_state(self.initial_state)
+            observations = self.reset_from_observation(self.initial_state)
         else:
             observations = self.random_reset(seed)
 
-        # for agent in self.agents:
-        #     agent.reward = 0
-        #     agent.carrying_object = None
-        #
         self.done = [False for _ in range(self.n_agents)]
 
         return observation, {}
@@ -311,43 +307,76 @@ class MultiAgentPickAndPlace(gym.Env):
 
         return self.get_observations()
 
-    def reset_from_state(self, initial_state: Dict[str, Any]) -> None:
+    def reset_from_observation(self, state: Dict[str, Dict[str, Any]]) -> Dict[str, Dict[str, Any]]:
         """
-        Initiate environment at a predefined state
+        Reset the environment to a predefined initial state.
         """
+        agent_states = state['agents']
+        object_states = state['objects']
+        goal_states = state['goals']
 
-        if self.debug_mode:
-            print(f"\n--- Initialisation from state --- \n {initial_state} \n")
-
-        # Initialise objects
-        self.objects = [
-            Object(position=obj["position"], id=obj.get("id", None))
-            for obj in initial_state["objects"]
-        ]
-
-        # Initialise goals
-        self.goals = initial_state.get("goals", [])
-
-        # Initialise agents
+        # Reset agents
         self.agents = []
-        for i in range(self.n_agents):
-            agent_x, agent_y = initial_state["agents"][i]["position"]
-            picker = initial_state["agents"][i]["picker"]
-
-            # Assign the carrying_object from the initial state if it exists.
-            carrying_object = initial_state["agents"][i].get(
-                "carrying_object", None)
-
+        for agent_state in agent_states.values():
             agent = Agent(
-                position=(agent_x, agent_y),
-                picker=picker,
-                carrying_object=carrying_object,
+                position=tuple(agent_state['position']),
+                picker=agent_state['picker'],
+                carrying_object=agent_state['carrying_object'],
+                reward=0  # Reset reward to 0
             )
             self.agents.append(agent)
 
-        if self.debug_mode:
-            self._print_state()
+        # Reset objects
+        self.objects = []
+        for object_state in object_states.values():
+            obj = Object(
+                position=tuple(object_state['position']),
+                id=object_state['id']
+            )
+            self.objects.append(obj)
 
+        # Reset goals
+        self.goals = [tuple(goal) for goal in goal_states]
+
+        return self.get_observations()
+
+    # def reset_from_state(self, _state: Dict[str, Any]) -> None:
+    #     """
+    #     Initiate environment at a predefined state
+    #     """
+    #
+    #     if self.debug_mode:
+    #         print(f"\n--- Initialisation from state --- \n {initial_state} \n")
+    #
+    #     # Initialise objects
+    #     self.objects = [
+    #         Object(position=obj["position"], id=obj.get("id", None))
+    #         for obj in initial_state["objects"]
+    #     ]
+    #
+    #     # Initialise goals
+    #     self.goals = initial_state.get("goals", [])
+    #
+    #     # Initialise agents
+    #     self.agents = []
+    #     for i in range(self.n_agents):
+    #         agent_x, agent_y = initial_state["agents"][i]["position"]
+    #         picker = initial_state["agents"][i]["picker"]
+    #
+    #         # Assign the carrying_object from the initial state if it exists.
+    #         carrying_object = initial_state["agents"][i].get(
+    #             "carrying_object", None)
+    #
+    #         agent = Agent(
+    #             position=(agent_x, agent_y),
+    #             picker=picker,
+    #             carrying_object=carrying_object,
+    #         )
+    #         self.agents.append(agent)
+    #
+    #     if self.debug_mode:
+    #         self._print_state()
+    #
     def _print_state(self):
         print("-" * 30)
         for idx, agent in enumerate(self.agents, start=1):
