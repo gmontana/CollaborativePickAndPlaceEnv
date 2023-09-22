@@ -197,7 +197,7 @@ def game_loop(env, agent, training=False, num_episodes=1, msx_steps_per_episode=
         total_avg_returns.append(avg_return)
 
         agent.learning_rate = max(agent.min_learning_rate, agent.learning_rate * agent.learning_rate_decay)
-        # agent.exploration_strategy.decay_exploration_rate()
+        agent.exploration_strategy.decay_exploration_rate()
 
         if (episode+1) % 100 == 0:
             print(f"Episode {episode+1}/{num_episodes}: Avg Steps: {avg_steps:.2f}, Avg Return: {avg_return:.2f}, Success rate: {success_rate:.2f}, alpha: {agent.learning_rate:.3f}")
@@ -243,12 +243,12 @@ if __name__ == "__main__":
     )
 
     # Set up exploration strategy
-    # epsilon_greedy_strategy = EpsilonGreedy(exploration_rate=1.0, min_exploration=0.01, exploration_decay=0.995)
-    ucb_strategy = UCB(c=5)
+    epsilon_greedy_strategy = EpsilonGreedy(exploration_rate=1.0, min_exploration=0.01, exploration_decay=0.995)
+    # ucb_strategy = UCB(c=2)
 
     # Set up the Q agent
     agent = QLearning(env, 
-                      exploration_strategy=ucb_strategy,
+                      exploration_strategy=epsilon_greedy_strategy,
                       learning_rate=0.3,
                       discount_factor=0.98, 
                       learning_rate_decay=0.999, 
