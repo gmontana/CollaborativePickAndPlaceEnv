@@ -56,17 +56,18 @@ def game_loop(env):
                 policy.handle_key(event.key, pressed)
 
         actions = policy.action()
+        print(f"Actions: {actions}")
         if actions and all(Action.is_valid(action) for action in actions):
             _, _, done, _ = env.step(actions)
             env.render()
-            print(env._print_state())
+            env._print_state()
         pygame.time.wait(100)
 
     env.close()
 
 if __name__ == "__main__":
     env = MultiAgentPickAndPlace(
-        width=4, length=4, n_agents=2, n_pickers=1, n_objects=3, debug_mode=True
+        width=4, length=4, n_agents=2, n_pickers=1, n_objects=3, debug_mode=True, cell_size=150
     )
     game_loop(env)
 
