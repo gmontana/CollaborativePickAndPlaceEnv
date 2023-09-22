@@ -39,7 +39,7 @@ class MACPPTests(unittest.TestCase):
                 },  # Non-picker Agent not carrying any object
             ],
             "objects": [{"position": (0, 0), "id": 0}],
-            "goals": [1,1],
+            "goals": [2,2],
         }
         env = MultiAgentPickAndPlace(10, 10, 2, 1, initial_state=get_obs(initial_state), debug_mode=DEBUG)
         actions = [4,4]
@@ -216,7 +216,7 @@ class MACPPTests(unittest.TestCase):
                 {"position": (1, 0), "picker": True, "carrying_object": None},
             ],
             "objects": [{"position": (0, 0), "id": 0}],
-            "goals": [],
+            "goals": [0,2],
         }
         env = MultiAgentPickAndPlace(10, 10, 2, 1, initial_state=get_obs(initial_state), debug_mode=DEBUG)
         actions = [4,4]
