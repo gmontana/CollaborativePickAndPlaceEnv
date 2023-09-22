@@ -1,5 +1,5 @@
 import pygame
-from macpp.core.environment import MultiAgentPickAndPlace
+from macpp.core.environment import MACPPEnv
 from macpp.core.environment import Action
 
 class InteractivePolicy:
@@ -56,18 +56,19 @@ def game_loop(env):
                 policy.handle_key(event.key, pressed)
 
         actions = policy.action()
-        print(f"Actions: {actions}")
+        # print(f"Actions: {actions}")
         if actions and all(Action.is_valid(action) for action in actions):
-            _, _, done, _ = env.step(actions)
+            _, reward, done, _ = env.step(actions)
+            # env._print_state()
+            print(f"Reward: {reward}")
             env.render()
-            env._print_state()
         pygame.time.wait(100)
 
     env.close()
 
 if __name__ == "__main__":
-    env = MultiAgentPickAndPlace(
-        width=4, length=4, n_agents=2, n_pickers=1, n_objects=3, debug_mode=True, cell_size=150
+    env = MACPPEnv(
+        grid_size=(4, 4), n_agents=2, n_pickers=1, n_objects=3, debug_mode=False, cell_size=150
     )
     game_loop(env)
 
