@@ -3,20 +3,21 @@ from itertools import product
 
 
 grid_sizes = [(3, 3), (5, 5), (10, 10)]
+n_agents_values = [2, 4]
+n_pickers_values = [1, 2]
+n_objects_values = [1, 2, 3]
 
 # Register the environments
-for grid_size in grid_sizes:
-    for n_agents in [2, 4]:
-        for n_pickers in [1, 2]:
-            for n_objects in [1, 2, 3]:
-                env_name = f"macpp-{grid_size[0]}x{grid_size[1]}-{n_agents}-{n_pickers}-{n_objects}-v0"
-                register(
-                    id=env_name,
-                    entry_point='macpp.envs:MultiAgentPickAndPlace',
-                    kwargs={
-                        'grid_size': grid_size,
-                        'n_agents': n_agents,
-                        'n_pickers': n_pickers,
-                        'n_objects': n_objects
-                    }
-               )
+for grid_size, n_agents, n_pickers, n_objects in product(grid_sizes, n_agents_values, n_pickers_values, n_objects_values):
+    env_name = f"macpp-{grid_size[0]}x{grid_size[1]}-{n_agents}-{n_pickers}-{n_objects}-v0"
+    register(
+        id=env_name,
+        entry_point='macpp.core.environment:MACPPEnv',
+        kwargs={
+            'grid_size': grid_size,
+            'n_agents': n_agents,
+            'n_pickers': n_pickers,
+            'n_objects': n_objects
+        }
+    )
+
