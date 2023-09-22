@@ -47,20 +47,20 @@ class Agent:
         self.carrying_object = carrying_object
         self.reward = reward
 
-    def get_agent_observation(self, all_agents, all_objects, goals) -> Dict[str, Any]:
+    def get_agent_obs(self, all_agents, all_objects, goals) -> Dict[str, Any]:
         obs = {
             'self': {
                 'position': self.position,
                 'picker': self.picker,
                 'carrying_object': self.carrying_object
             },
-            'agents': [other_agent.get_basic_state() for other_agent in all_agents if other_agent != self],
-            'objects': [obj.get_object_state() for obj in all_objects],
+            'agents': [other_agent.get_basic_agent_obs() for other_agent in all_agents if other_agent != self],
+            'objects': [obj.get_object_obs() for obj in all_objects],
             'goals': goals
         }
         return obs
 
-    def get_basic_state(self) -> Dict[str, Any]:
+    def get_basic_agent_obs(self) -> Dict[str, Any]:
         return {
             'position': self.position,
             'picker': self.picker,
@@ -74,7 +74,7 @@ class Object:
         self.position = position
         self.id = id
 
-    def get_object_state(self) -> Dict[str, Union[Tuple[int, int], int]]:
+    def get_object_obs(self) -> Dict[str, Union[Tuple[int, int], int]]:
         return {"id": self.id, "position": self.position}
 
 
@@ -167,10 +167,10 @@ class MultiAgentPickAndPlace(gym.Env):
 
         # An agent's observation space
         agent_observation_space = spaces.Dict({
-            "self": agent.space,
+            "self": agent_space,
             "agents": spaces.Tuple([agent_space] * (self.n_objects-1)),
             "objects": spaces.Tuple([object_space] * self.n_objects),
-            "goals": spaces.Tuple([goal_space] * len(self.goals))
+            "goals": spaces.Tuple([goal_space] * self.n_objects)
         })
 
         # The observation space
@@ -213,8 +213,8 @@ class MultiAgentPickAndPlace(gym.Env):
 
     def get_observations(self) -> Dict[str, Dict[str, Any]]:
         observations = {}
-        for agent in self.agents:
-            observations[f"agent_{agent.id}"] = agent.get_agent_observation(self.agents, self.objects, self.goals)
+        for idx, agent in enumerate(self.agents):
+            observations[f"agent_{idx}"] = agent.get_agent_obs(self.agents, self.objects, self.goals)
         return observations
 
     def reset(self, seed: Optional[int] = None, options: Optional[Any] = None) -> Dict[str, Dict[str, Any]]:
@@ -231,8 +231,8 @@ class MultiAgentPickAndPlace(gym.Env):
         return observation, {}
 
     def get_state(self) -> Dict[str, Any]:
-        agent_states = tuple(agent.get_agent_state() for agent in self.agents)
-        object_states = tuple(obj.get_object_state() for obj in self.objects)
+        agent_states = tuple(agent.get_agent_obs() for agent in self.agents)
+        object_states = tuple(obj.get_object_obs() for obj in self.objects)
         goal_states = tuple(self.goals)
         return {"agents": agent_states, "objects": object_states, "goals": goal_states}
 
@@ -313,7 +313,7 @@ class MultiAgentPickAndPlace(gym.Env):
 
         # Reset objects
         self.objects = []
-        for object_state in object_states.values():
+        for object_state in object_states:
             obj = Object(
                 position=tuple(object_state['position']),
                 id=object_state['id']
