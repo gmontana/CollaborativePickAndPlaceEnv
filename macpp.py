@@ -1,6 +1,7 @@
 import argparse
 import gym
 import macpp
+import time
 
 def game_loop(env, render=False):
     """
@@ -16,8 +17,10 @@ def game_loop(env, render=False):
         if render:
             env.render()
 
+        time.sleep(0.5)
+
 def main(game_count=1, render=False):
-    env = gym.make('macpp-3x3-2-1-1-v0', debug_mode=True)
+    env = gym.make('macpp-3x3-2-1-1-v0')
 
     for episode in range(game_count):
         game_loop(env, render)
