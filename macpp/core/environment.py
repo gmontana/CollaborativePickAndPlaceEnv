@@ -7,6 +7,7 @@ import pygame
 import numpy as np
 import time
 import sys
+import hashlib
 
 # sys.path.append("/home/gm13/Dropbox/mycode/envs/collaborative_pick_and_place/macpp/")
 # sys.path.append("/Users/giovannimontana/Dropbox/mycode/envs/collaborative_pick_and_place/macpp")
@@ -191,7 +192,7 @@ class MultiAgentPickAndPlace(gym.Env):
         if initial_state is None:
             self.random_reset()
         else:
-            self.reset_from_observation(initial_state)
+            self.reset_from_obs(initial_state)
 
         # Rendering
         self._rendering_initialised = False
@@ -221,7 +222,7 @@ class MultiAgentPickAndPlace(gym.Env):
         Reset the environment to either a random state or an predefined initial state
         """
         if self.initial_state:
-            observations = self.reset_from_observation(self.initial_state)
+            observations = self.reset_from_obs(self.initial_state)
         else:
             observations = self.random_reset(seed)
 
@@ -235,26 +236,10 @@ class MultiAgentPickAndPlace(gym.Env):
         goal_states = tuple(self.goals)
         return {"agents": agent_states, "objects": object_states, "goals": goal_states}
 
-    def state_to_hash(self, state: Dict[str, Any]) -> Tuple[Tuple[Tuple[int, int, Optional[int]]], Tuple[Tuple[int, int]], Tuple[Tuple[int, int]]]:
 
-        agents = state["agents"]
-        objects = state["objects"]
-        goals = state["goals"]
-
-        agent_hashes = [(a["position"], a["picker"],
-                         a["carrying_object"]) for a in agents]
-        object_hashes = [(o["position"], o["id"]) for o in objects]
-        goal_hashes = [tuple(g) for g in goals]
-        combined_hash = (tuple(agent_hashes), tuple(
-            object_hashes), tuple(goal_hashes))
-
-        return combined_hash
-
-    def get_action_space(self) -> spaces.MultiDiscrete:
-        """
-        Return the action space of the environment
-        """
-        return self.action_space
+    def obs_to_hash(self, obs: Dict[str, Dict[str, Any]]) -> str:
+        concatenated_obs = ''.join([str(obs[agent_id]) for agent_id in sorted(obs.keys())])
+        return hashlib.md5(concatenated_obs.encode()).hexdigest()
 
     def random_reset(self, seed: Optional[int] = None) -> Dict[str, Dict[str, Any]]:
         """
@@ -307,13 +292,13 @@ class MultiAgentPickAndPlace(gym.Env):
 
         return self.get_observations()
 
-    def reset_from_observation(self, state: Dict[str, Dict[str, Any]]) -> Dict[str, Dict[str, Any]]:
+    def reset_from_obs(self, obs: Dict[str, Dict[str, Any]]) -> Dict[str, Dict[str, Any]]:
         """
         Reset the environment to a predefined initial state.
         """
-        agent_states = state['agents']
-        object_states = state['objects']
-        goal_states = state['goals']
+        agent_states = obs['agents']
+        object_states = obs['objects']
+        goal_states = obs['goals']
 
         # Reset agents
         self.agents = []
@@ -340,43 +325,6 @@ class MultiAgentPickAndPlace(gym.Env):
 
         return self.get_observations()
 
-    # def reset_from_state(self, _state: Dict[str, Any]) -> None:
-    #     """
-    #     Initiate environment at a predefined state
-    #     """
-    #
-    #     if self.debug_mode:
-    #         print(f"\n--- Initialisation from state --- \n {initial_state} \n")
-    #
-    #     # Initialise objects
-    #     self.objects = [
-    #         Object(position=obj["position"], id=obj.get("id", None))
-    #         for obj in initial_state["objects"]
-    #     ]
-    #
-    #     # Initialise goals
-    #     self.goals = initial_state.get("goals", [])
-    #
-    #     # Initialise agents
-    #     self.agents = []
-    #     for i in range(self.n_agents):
-    #         agent_x, agent_y = initial_state["agents"][i]["position"]
-    #         picker = initial_state["agents"][i]["picker"]
-    #
-    #         # Assign the carrying_object from the initial state if it exists.
-    #         carrying_object = initial_state["agents"][i].get(
-    #             "carrying_object", None)
-    #
-    #         agent = Agent(
-    #             position=(agent_x, agent_y),
-    #             picker=picker,
-    #             carrying_object=carrying_object,
-    #         )
-    #         self.agents.append(agent)
-    #
-    #     if self.debug_mode:
-    #         self._print_state()
-    #
     def _print_state(self):
         print("-" * 30)
         for idx, agent in enumerate(self.agents, start=1):
@@ -406,7 +354,7 @@ class MultiAgentPickAndPlace(gym.Env):
     def _random_position(self):
         return (random.randint(0, self.width - 1), random.randint(0, self.length - 1))
 
-    def step(self, actions: Dict[str, int]) -> Tuple[Dict[str, Dict[str, Any]], Dict[str, float], Dict[str, bool], Dict[str, Any]]:
+    def step(self, actions: List[int]) -> Tuple[Dict[str, Dict[str, Any]], Dict[str, float], Dict[str, bool], Dict[str, Any]]:
         # Check that no invalid actions are taken
         if self.debug_mode:
             self._validate_actions(actions)
