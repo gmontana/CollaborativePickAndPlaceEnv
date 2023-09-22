@@ -6,6 +6,38 @@ DEBUG=False
 
 class MACPPTests(unittest.TestCase):
 
+    def test_pass_between_two_agents(self):
+        initial_state = {
+            "agents": [
+                {
+                    "position": (0, 0),
+                    "picker": True,
+                    "carrying_object": 0,
+                },  # Picker Agent carrying Object with ID 0
+                {
+                    "position": (0, 1),
+                    "picker": False,
+                    "carrying_object": None,
+                },  # Non-picker Agent not carrying any object
+            ],
+            "objects": [{"position": (0, 0), "id": 0}],
+            "goals": [1,1],
+        }
+        env = MultiAgentPickAndPlace(10, 10, 2, 1, initial_state=initial_state)
+        actions = [4,4]
+        env.step(actions)
+        
+        # Check that the picker agent passed its object to the non-picker agent
+        self.assertIsNone(
+            env.agents[0].carrying_object, "Picker Agent did not pass the object."
+        )
+        self.assertEqual(
+            env.agents[1].carrying_object,
+            0,
+            "Non-picker Agent did not receive the object.",
+        )
+
+
     def test_invalid_moves(self):
         initial_state = {
             "agents": [
@@ -18,7 +50,7 @@ class MACPPTests(unittest.TestCase):
 
         env = MultiAgentPickAndPlace(width=10, length=10, n_agents=2, n_pickers=1, initial_state=initial_state, debug_mode=DEBUG)
 
-        actions = [Action.RIGHT, Action.LEFT]
+        actions = [3,2]
         env.step(actions)
         self.assertEqual(
             env.agents[0].position,
@@ -36,7 +68,7 @@ class MACPPTests(unittest.TestCase):
             "goals": [(1, 2)],
         }
         env = MultiAgentPickAndPlace(10, 10, 2, 1, initial_state=initial_state, debug_mode=DEBUG)
-        actions = [Action.LEFT, Action.WAIT]
+        actions = [2,5]
         env.step(actions)
         self.assertIsNone(
             env.agents[0].carrying_object, "Agent failed to drop off the object."
@@ -57,7 +89,7 @@ class MACPPTests(unittest.TestCase):
             "goals": [(1,2)],
         }
         env = MultiAgentPickAndPlace(10, 10, 2, 1, initial_state=initial_state, debug_mode=DEBUG)
-        actions = [Action.DOWN, Action.WAIT]
+        actions = [1,5]
         env.step(actions)
         self.assertEqual(
             env.agents[0].carrying_object,
@@ -75,7 +107,7 @@ class MACPPTests(unittest.TestCase):
             "goals": [],
         }
         env = MultiAgentPickAndPlace(10, 10, 2, 1, initial_state=initial_state, debug_mode=DEBUG)
-        actions = [Action.PASS, Action.WAIT]
+        actions = [4,5]
         env.step(actions)
         self.assertIsNone(
             env.agents[0].carrying_object,
@@ -92,7 +124,7 @@ class MACPPTests(unittest.TestCase):
             "goals": [],
         }
         env = MultiAgentPickAndPlace(10, 10, 2, 1, initial_state=initial_state, debug_mode=DEBUG)
-        actions = [Action.PASS, Action.WAIT]
+        actions = [4,5]
         env.step(actions)
         self.assertNotIn(
             {"position": (0, 0), "id": 0},
@@ -111,7 +143,7 @@ class MACPPTests(unittest.TestCase):
             "goals": [],
         }
         env = MultiAgentPickAndPlace(10, 10, 3, 2, initial_state=initial_state, debug_mode=DEBUG)
-        actions = [Action.PASS, Action.PASS, Action.PASS]
+        actions = [4,4,4]
         env.step(actions)
         self.assertTrue(
             env.agents[2].carrying_object in [0, 1], "Agent did not receive an object."
@@ -131,7 +163,7 @@ class MACPPTests(unittest.TestCase):
             "goals": [(1, 0)],
         }
         env = MultiAgentPickAndPlace(10, 10, 2, 1, initial_state=initial_state, debug_mode=DEBUG)
-        actions = [Action.RIGHT, Action.WAIT]
+        actions = [3,5]
         env.step(actions)
         self.assertIsNone(
             env.agents[0].carrying_object,
@@ -151,10 +183,11 @@ class MACPPTests(unittest.TestCase):
         }
         env = MultiAgentPickAndPlace(10, 10, n_agents=2, n_pickers=1, initial_state=initial_state, debug_mode=DEBUG)
         # First pass the object from picker to non picker
-        actions = [Action.PASS, Action.PASS]
+        actions = [4,4]
+        print(actions)
         env.step(actions)
         # Then move to goal position
-        actions = [Action.DOWN, Action.DOWN]
+        actions = [1,1]
         _, _, done, _ = env.step(actions)
         self.assertTrue(env.done, "Termination condition not recognized.")
 
@@ -168,7 +201,7 @@ class MACPPTests(unittest.TestCase):
             "goals": [],
         }
         env = MultiAgentPickAndPlace(10, 10, 2, 1, initial_state=initial_state, debug_mode=DEBUG)
-        actions = [Action.PASS, Action.PASS]
+        actions = [4,4]
         env.step(actions)
         self.assertIsNone(
             env.agents[0].carrying_object, "Agent 1 did not pass the object"
@@ -187,7 +220,7 @@ class MACPPTests(unittest.TestCase):
             "goals": [],
         }
         env = MultiAgentPickAndPlace(10, 10, 2, 1, initial_state=initial_state, debug_mode=DEBUG)
-        actions = [Action.PASS, Action.LEFT]
+        actions = [4,2]
         env.step(actions)
         self.assertTrue(
             env.agents[0].carrying_object is not None
@@ -210,7 +243,7 @@ class MACPPTests(unittest.TestCase):
             "goals": [],
         }
         env = MultiAgentPickAndPlace(10, 10, 2, 1, initial_state=initial_state, debug_mode=DEBUG)
-        actions = [Action.PASS, Action.PASS]
+        actions = [4,4]
         env.step(actions)
         self.assertTrue(
             env.agents[0].carrying_object is not None
@@ -228,7 +261,7 @@ class MACPPTests(unittest.TestCase):
             "goals": [],
         }
         env = MultiAgentPickAndPlace(10, 10, 2, 1, initial_state=initial_state, debug_mode=DEBUG)
-        actions = [Action.PASS, Action.WAIT]
+        actions = [4,5]
         env.step(actions)
         self.assertEqual(
             env.agents[0].carrying_object,
@@ -246,7 +279,7 @@ class MACPPTests(unittest.TestCase):
             "goals": [],
         }
         env = MultiAgentPickAndPlace(10, 10, 2, 1, initial_state=initial_state, debug_mode=DEBUG)
-        actions = [Action.PASS, Action.WAIT]
+        actions = [4,5]
         env.step(actions)
         self.assertIsNone(
             env.agents[0].carrying_object,
@@ -263,7 +296,7 @@ class MACPPTests(unittest.TestCase):
             "goals": [],
         }
         env = MultiAgentPickAndPlace(10, 10, 2, 1, initial_state=initial_state, debug_mode=DEBUG)
-        actions = [Action.PASS, Action.PASS]
+        actions = [4,4]
         env.step(actions)
         # Check that both agents still have their objects after trying to pass to each other
         self.assertEqual(env.agents[0].carrying_object, 0, "Agent 1 lost its object.")
@@ -297,9 +330,10 @@ class MACPPTests(unittest.TestCase):
             "goals": [],
         }
         env = MultiAgentPickAndPlace(10, 10, 4, 2, initial_state=initial_state, debug_mode=DEBUG)
-        actions = [Action.PASS, Action.PASS, Action.PASS, Action.PASS]
+
+        actions = [4,4,4,4]
         env.step(actions)
-        # Check that the picker agents passed their objects to the non-picker agents
+
         self.assertIsNone(
             env.agents[0].carrying_object, "Picker Agent 1 did not pass the object."
         )
@@ -327,7 +361,7 @@ class MACPPTests(unittest.TestCase):
             "goals": [(2, 1)],
         }
         env = MultiAgentPickAndPlace(10, 10, 2, 1, initial_state=initial_state, debug_mode=DEBUG)
-        actions = [Action.RIGHT, Action.WAIT]
+        actions = [3,5]
         env.step(actions)
         # Check that the object is still in the environment after being dropped on a goal
         self.assertTrue(
@@ -345,7 +379,7 @@ class MACPPTests(unittest.TestCase):
             "goals": [(2, 1)],
         }
         env = MultiAgentPickAndPlace(10, 10, 2, 1, initial_state=initial_state, debug_mode=DEBUG)
-        actions = [Action.RIGHT, Action.WAIT]
+        actions = [3,5]
         env.step(actions)
         # Check that the object is still in the environment after being dropped on a goal by a picker agent
         self.assertTrue(
