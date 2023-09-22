@@ -5,8 +5,7 @@ import random
 import time
 from collections import defaultdict
 import matplotlib.pyplot as plt
-
-
+import pickle
 
 class QTable:
 
@@ -35,14 +34,14 @@ class QTable:
         best_acts = [act for act, q_value in self.q_table[state_hash].items() if q_value == max_q_value]
         return list(best_acts[0]) if best_acts else None
 
-    # def save_table(self, filename):
-    #     print(f"Saving Q-value table: {filename}.")
-    #     np.save(filename, self.q_table)
-    #     print(f"Number of elements in the Q table: {self.count_elements()}")
-    #
-    # def load_table(self, filename):
-    #     print(f"Loading Q-value table: {filename}.")
-    #     self.q_table = np.load(filename, allow_pickle=True).item()
+    def save_q_table(self, filename):
+        print(f"Saving Q-value table: {filename}.")
+        np.save(filename, self.q_table)
+        print(f"Number of elements in the Q table: {self.count_elements()}")
+
+    def load_q_table(self, filename):
+        print(f"Loading Q-value table: {filename}.")
+        self.q_table = np.load(filename, allow_pickle=True).item()
 
 class QLearning:
     def __init__(self, env, learning_rate=0.1, discount_factor=0.9, exploration_rate=1.0, exploration_decay=0.99999, min_exploration=0.03, learning_rate_decay=0.99999, min_learning_rate=0.01):
@@ -73,7 +72,7 @@ class QLearning:
         return best
 
     def ucb_action_selection(self, obs_hash):
-        c = 1.0  # Exploration parameter
+        c = 0.9
         max_ucb = float('-inf')
         best_action = None
 
@@ -119,7 +118,7 @@ class QLearning:
         # self.learning_rate = max(self.min_learning_rate, self.learning_rate * self.learning_rate_decay)
 
 
-def game_loop(env, agent, training=False, num_episodes=1, steps_per_episode=300, render=False, create_video=False, qtable_file=None):
+def game_loop(env, agent, training=False, num_episodes=1, msx_steps_per_episode=300, render=False, create_video=False, qtable_file=None):
 
     print("Game loop started...")
     total_steps = []
@@ -128,9 +127,6 @@ def game_loop(env, agent, training=False, num_episodes=1, steps_per_episode=300,
     total_avg_steps = []
     total_avg_returns = []
     total_failures = 0
-
-    state_visits = {}
-    state_action_visits = {}
 
     for episode in range(num_episodes):
         obs, _ = env.reset()
@@ -146,11 +142,11 @@ def game_loop(env, agent, training=False, num_episodes=1, steps_per_episode=300,
                 actions = agent.act(obs_hash, explore=False)
 
             # Update the state visit count
-            state_visits[obs_hash] = state_visits.get(obs_hash, 0) + 1
+            agent.state_visits[obs_hash] = agent.state_visits.get(obs_hash, 0) + 1
 
             # Update state-action visit count
             state_action_key = (obs_hash, tuple(actions))
-            state_action_visits[state_action_key] = state_action_visits.get(state_action_key, 0) + 1
+            agent.state_action_visits[state_action_key] = agent.state_action_visits.get(state_action_key, 0) + 1
 
             next_obs, rewards, done, _ = env.step(actions)
             next_obs_hash = env.obs_to_hash(next_obs)
@@ -166,7 +162,7 @@ def game_loop(env, agent, training=False, num_episodes=1, steps_per_episode=300,
                 env.render()
                 time.sleep(0.5)
             
-            if episode_steps > steps_per_episode:
+            if episode_steps > msx_steps_per_episode:
                 total_failures +=1
                 break
         total_steps.append(episode_steps)
@@ -175,12 +171,15 @@ def game_loop(env, agent, training=False, num_episodes=1, steps_per_episode=300,
         avg_steps = np.mean(total_steps)
         avg_return = np.mean(total_returns)
         success_rate = 1- (total_failures/(episode+1))
-        print(f"Episode {episode+1}/{num_episodes}: Avg Steps: {avg_steps:.2f}, Avg Return: {avg_return:.2f}, Success rate: {success_rate:.2f}, epsilon: {agent.exploration_rate:.3f}, alpha: {agent.learning_rate:.3f}")
         total_success_rate.append(success_rate)
         total_avg_steps.append(avg_steps)
+        total_avg_returns.append(avg_return)
 
         agent.exploration_rate = max(agent.min_exploration, agent.exploration_rate * agent.exploration_decay)
         agent.learning_rate = max(agent.min_learning_rate, agent.learning_rate * agent.learning_rate_decay)
+
+        if (episode+1) % 100 == 0:
+            print(f"Episode {episode+1}/{num_episodes}: Avg Steps: {avg_steps:.2f}, Avg Return: {avg_return:.2f}, Success rate: {success_rate:.2f}, epsilon: {agent.exploration_rate:.3f}, alpha: {agent.learning_rate:.3f}")
 
     # Create the main figure and axis
     fig, ax1 = plt.subplots(figsize=(10, 6))
@@ -224,13 +223,13 @@ if __name__ == "__main__":
 
     # Set up the Q agent
     agent = QLearning(env, 
-                      learning_rate=0.1,
+                      learning_rate=0.3,
                       discount_factor=0.98, 
                       exploration_rate=1.0, 
                       exploration_decay=0.995, 
                       min_exploration=0.01, 
-                      learning_rate_decay=0.995, 
+                      learning_rate_decay=0.999, 
                       min_learning_rate=0.01)
 
     # Train the agent
-    game_loop(env, agent, training=True, num_episodes=2000, steps_per_episode=200, render=False, qtable_file='qtable')
+    game_loop(env, agent, training=True, num_episodes=100000, msx_steps_per_episode=300, render=False, qtable_file='qtable')
