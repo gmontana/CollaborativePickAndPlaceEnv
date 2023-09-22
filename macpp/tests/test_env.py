@@ -1,5 +1,5 @@
 import unittest
-from ..core.environment import MultiAgentPickAndPlace
+from ..core.environment import MACPPEnv
 from ..core.environment import Action
 
 DEBUG=False
@@ -39,9 +39,9 @@ class MACPPTests(unittest.TestCase):
                 },  # Non-picker Agent not carrying any object
             ],
             "objects": [{"position": (0, 0), "id": 0}],
-            "goals": [2,2],
+            "goals": [(2,2)],
         }
-        env = MultiAgentPickAndPlace(10, 10, 2, 1, initial_state=get_obs(initial_state), debug_mode=DEBUG)
+        env = MACPPEnv(10, 10, 2, 1, initial_state=get_obs(initial_state), debug_mode=DEBUG)
         actions = [4,4]
         env.step(actions)
         
@@ -66,7 +66,7 @@ class MACPPTests(unittest.TestCase):
             "goals": [(0, 0)],
         }
 
-        env = MultiAgentPickAndPlace(width=10, length=10, n_agents=2, n_pickers=1, initial_state=get_obs(initial_state), debug_mode=DEBUG)
+        env = MACPPEnv(width=10, length=10, n_agents=2, n_pickers=1, initial_state=get_obs(initial_state), debug_mode=DEBUG)
 
         actions = [3,2]
         env.step(actions)
@@ -85,7 +85,7 @@ class MACPPTests(unittest.TestCase):
             "objects": [{"position": (2, 2), "id": 0}],
             "goals": [(1, 2)],
         }
-        env = MultiAgentPickAndPlace(10, 10, 2, 1, initial_state=get_obs(initial_state), debug_mode=DEBUG)
+        env = MACPPEnv(10, 10, 2, 1, initial_state=get_obs(initial_state), debug_mode=DEBUG)
         actions = [2,5]
         env.step(actions)
         self.assertIsNone(
@@ -106,7 +106,7 @@ class MACPPTests(unittest.TestCase):
             "objects": [{"position": (1, 2), "id": 0}],
             "goals": [(1,2)],
         }
-        env = MultiAgentPickAndPlace(10, 10, 2, 1, initial_state=get_obs(initial_state), debug_mode=DEBUG)
+        env = MACPPEnv(10, 10, 2, 1, initial_state=get_obs(initial_state), debug_mode=DEBUG)
         actions = [1,5]
         env.step(actions)
         self.assertEqual(
@@ -124,7 +124,7 @@ class MACPPTests(unittest.TestCase):
             "objects": [{"position": (0, 0), "id": 0}],
             "goals": [],
         }
-        env = MultiAgentPickAndPlace(10, 10, 2, 1, initial_state=get_obs(initial_state), debug_mode=DEBUG)
+        env = MACPPEnv(10, 10, 2, 1, initial_state=get_obs(initial_state), debug_mode=DEBUG)
         actions = [4,5]
         env.step(actions)
         self.assertIsNone(
@@ -141,7 +141,7 @@ class MACPPTests(unittest.TestCase):
             "objects": [{"position": (0, 0), "id": 0}],
             "goals": [],
         }
-        env = MultiAgentPickAndPlace(10, 10, 2, 1, initial_state=get_obs(initial_state), debug_mode=DEBUG)
+        env = MACPPEnv(10, 10, 2, 1, initial_state=get_obs(initial_state), debug_mode=DEBUG)
         actions = [4,5]
         env.step(actions)
         self.assertNotIn(
@@ -160,7 +160,7 @@ class MACPPTests(unittest.TestCase):
             "objects": [{"position": (0, 0), "id": 0}, {"position": (0, 1), "id": 1}],
             "goals": [],
         }
-        env = MultiAgentPickAndPlace(10, 10, 3, 2, initial_state=get_obs(initial_state), debug_mode=DEBUG)
+        env = MACPPEnv(10, 10, 3, 2, initial_state=get_obs(initial_state), debug_mode=DEBUG)
         actions = [4,4,4]
         env.step(actions)
         self.assertTrue(
@@ -180,7 +180,7 @@ class MACPPTests(unittest.TestCase):
             "objects": [],
             "goals": [(1, 0)],
         }
-        env = MultiAgentPickAndPlace(10, 10, 2, 1, initial_state=get_obs(initial_state), debug_mode=DEBUG)
+        env = MACPPEnv(10, 10, 2, 1, initial_state=get_obs(initial_state), debug_mode=DEBUG)
         actions = [3,5]
         env.step(actions)
         self.assertIsNone(
@@ -199,7 +199,7 @@ class MACPPTests(unittest.TestCase):
             ],
             "goals": [(0, 2)]
         }
-        env = MultiAgentPickAndPlace(10, 10, n_agents=2, n_pickers=1, initial_state=get_obs(initial_state), debug_mode=DEBUG)
+        env = MACPPEnv(10, 10, n_agents=2, n_pickers=1, initial_state=get_obs(initial_state), debug_mode=DEBUG)
         # First pass the object from picker to non picker
         actions = [4,4]
         print(actions)
@@ -216,9 +216,9 @@ class MACPPTests(unittest.TestCase):
                 {"position": (1, 0), "picker": True, "carrying_object": None},
             ],
             "objects": [{"position": (0, 0), "id": 0}],
-            "goals": [0,2],
+            "goals": [(0,2)],
         }
-        env = MultiAgentPickAndPlace(10, 10, 2, 1, initial_state=get_obs(initial_state), debug_mode=DEBUG)
+        env = MACPPEnv(10, 10, 2, 1, initial_state=get_obs(initial_state), debug_mode=DEBUG)
         actions = [4,4]
         env.step(actions)
         self.assertIsNone(
@@ -237,7 +237,7 @@ class MACPPTests(unittest.TestCase):
             "objects": [{"position": (0, 0), "id": 0}],
             "goals": [],
         }
-        env = MultiAgentPickAndPlace(10, 10, 2, 1, initial_state=get_obs(initial_state), debug_mode=DEBUG)
+        env = MACPPEnv(10, 10, 2, 1, initial_state=get_obs(initial_state), debug_mode=DEBUG)
         actions = [4,2]
         env.step(actions)
         self.assertTrue(
@@ -260,7 +260,7 @@ class MACPPTests(unittest.TestCase):
             "objects": [{"position": (0, 0), "id": 0}, {"position": (1, 0), "id": 1}],
             "goals": [],
         }
-        env = MultiAgentPickAndPlace(10, 10, 2, 1, initial_state=get_obs(initial_state), debug_mode=DEBUG)
+        env = MACPPEnv(10, 10, 2, 1, initial_state=get_obs(initial_state), debug_mode=DEBUG)
         actions = [4,4]
         env.step(actions)
         self.assertTrue(
@@ -278,7 +278,7 @@ class MACPPTests(unittest.TestCase):
             "objects": [{"position": (0, 0), "id": 0}],
             "goals": [],
         }
-        env = MultiAgentPickAndPlace(10, 10, 2, 1, initial_state=get_obs(initial_state), debug_mode=DEBUG)
+        env = MACPPEnv(10, 10, 2, 1, initial_state=get_obs(initial_state), debug_mode=DEBUG)
         actions = [4,5]
         env.step(actions)
         self.assertEqual(
@@ -296,7 +296,7 @@ class MACPPTests(unittest.TestCase):
             "objects": [{"position": (0, 0), "id": 0}],
             "goals": [],
         }
-        env = MultiAgentPickAndPlace(10, 10, 2, 1, initial_state=get_obs(initial_state), debug_mode=DEBUG)
+        env = MACPPEnv(10, 10, 2, 1, initial_state=get_obs(initial_state), debug_mode=DEBUG)
         actions = [4,5]
         env.step(actions)
         self.assertIsNone(
@@ -313,7 +313,7 @@ class MACPPTests(unittest.TestCase):
             "objects": [{"position": (0, 0), "id": 0}, {"position": (1, 0), "id": 1}],
             "goals": [],
         }
-        env = MultiAgentPickAndPlace(10, 10, 2, 1, initial_state=get_obs(initial_state), debug_mode=DEBUG)
+        env = MACPPEnv(10, 10, 2, 1, initial_state=get_obs(initial_state), debug_mode=DEBUG)
         actions = [4,4]
         env.step(actions)
         # Check that both agents still have their objects after trying to pass to each other
@@ -347,7 +347,7 @@ class MACPPTests(unittest.TestCase):
             "objects": [{"position": (0, 0), "id": 0}, {"position": (0, 1), "id": 1}],
             "goals": [],
         }
-        env = MultiAgentPickAndPlace(10, 10, 4, 2, initial_state=get_obs(initial_state), debug_mode=DEBUG)
+        env = MACPPEnv(10, 10, 4, 2, initial_state=get_obs(initial_state), debug_mode=DEBUG)
 
         actions = [4,4,4,4]
         env.step(actions)
@@ -378,7 +378,7 @@ class MACPPTests(unittest.TestCase):
             "objects": [{"position": (1, 1), "id": 0}],
             "goals": [(2, 1)],
         }
-        env = MultiAgentPickAndPlace(10, 10, 2, 1, initial_state=get_obs(initial_state), debug_mode=DEBUG)
+        env = MACPPEnv(10, 10, 2, 1, initial_state=get_obs(initial_state), debug_mode=DEBUG)
         actions = [3,5]
         env.step(actions)
         # Check that the object is still in the environment after being dropped on a goal
@@ -396,7 +396,7 @@ class MACPPTests(unittest.TestCase):
             "objects": [{"position": (1, 1), "id": 0}],
             "goals": [(2, 1)],
         }
-        env = MultiAgentPickAndPlace(10, 10, 2, 1, initial_state=get_obs(initial_state), debug_mode=DEBUG)
+        env = MACPPEnv(10, 10, 2, 1, initial_state=get_obs(initial_state), debug_mode=DEBUG)
         actions = [3,5]
         env.step(actions)
         # Check that the object is still in the environment after being dropped on a goal by a picker agent

@@ -29,12 +29,6 @@ class Action(Enum):
     PASS = 4
     WAIT = 5
 
-    @staticmethod
-    def is_valid(value):
-        if value is None:
-            return False
-        return 1 <= value <= len(Action)
-
 
 class Agent:
     def __init__(self,
@@ -78,7 +72,7 @@ class Object:
         return {"id": self.id, "position": self.position}
 
 
-class MultiAgentPickAndPlace(gym.Env):
+class MACPPEnv(gym.Env):
     """
     Class implementing the logic for the collaborative pick and place environment
     """
@@ -87,8 +81,7 @@ class MultiAgentPickAndPlace(gym.Env):
 
     def __init__(
         self,
-        width: int,
-        length: int,
+        grid_size: Tuple[int, int],
         n_agents: int,
         n_pickers: int,
         n_objects: Optional[int] = 1,
@@ -100,8 +93,8 @@ class MultiAgentPickAndPlace(gym.Env):
     ) -> None:
 
         # Dimesions of the grid and cell size
-        self.width = width
-        self.length = length
+        self.grid_width = grid_size[0]
+        self.grid_length = grid_size[1]
         self.cell_size = cell_size
         self.n_agents = n_agents
         self.n_pickers = n_pickers
@@ -126,7 +119,7 @@ class MultiAgentPickAndPlace(gym.Env):
             self.n_objects = n_objects
 
         # Check if the grid size is sufficiently large
-        total_cells = self.width * self.length
+        total_cells = self.grid_width * self.grid_length
         total_entities = self.n_agents + self.n_objects
         if total_entities > total_cells:
             raise ValueError(
@@ -141,7 +134,7 @@ class MultiAgentPickAndPlace(gym.Env):
         agent_space = spaces.Dict(
             {
                 "position": spaces.Tuple(
-                    (spaces.Discrete(self.width), spaces.Discrete(self.length))
+                    (spaces.Discrete(self.grid_width), spaces.Discrete(self.grid_length))
                 ),
                 "picker": spaces.Discrete(2),  # 0 or 1
                 "carrying_object": spaces.Discrete(
@@ -154,7 +147,7 @@ class MultiAgentPickAndPlace(gym.Env):
         object_space = spaces.Dict(
             {
                 "position": spaces.Tuple(
-                    (spaces.Discrete(self.width), spaces.Discrete(self.length))
+                    (spaces.Discrete(self.grid_width), spaces.Discrete(self.grid_length))
                 ),
                 "id": spaces.Discrete(self.n_objects),
             }
@@ -162,7 +155,7 @@ class MultiAgentPickAndPlace(gym.Env):
 
         # A goal's observation space
         goal_space = spaces.Tuple(
-            (spaces.Discrete(self.width), spaces.Discrete(self.length))
+            (spaces.Discrete(self.grid_width), spaces.Discrete(self.grid_length))
         )
 
         # An agent's observation space
@@ -201,7 +194,7 @@ class MultiAgentPickAndPlace(gym.Env):
         # If a video is required, create frames
         if self.create_video:
             self.offscreen_surface = pygame.Surface(
-                (self.width * self.cell_size, self.length * self.cell_size)
+                (self.grid_width * self.cell_size, self.grid_length * self.cell_size)
             )
             self.frames = []
 
@@ -209,7 +202,7 @@ class MultiAgentPickAndPlace(gym.Env):
         for action in actions:
             if action is None or not (00 <= action <= len(Action)-1):
                 raise ValueError(
-                    f"Invalid action: {action}. Action should be between 1 and {len(Action)}")
+                    f"Invalid action: {action}.")
 
     def get_obs(self) -> Dict[str, Dict[str, Any]]:
         observations = {}
@@ -230,12 +223,6 @@ class MultiAgentPickAndPlace(gym.Env):
 
         return observation, {}
 
-    # def get_state(self) -> Dict[str, Any]:
-    #     agent_states = tuple(agent.get_agent_obs() for agent in self.agents)
-    #     object_states = tuple(obj.get_object_obs() for obj in self.objects)
-    #     goal_states = tuple(self.goals)
-    #     return {"agents": agent_states, "objects": object_states, "goals": goal_states}
-
 
     def obs_to_hash(self, obs: Dict[str, Dict[str, Any]]) -> str:
         concatenated_obs = ''.join([str(obs[agent_id]) for agent_id in sorted(obs.keys())])
@@ -246,8 +233,8 @@ class MultiAgentPickAndPlace(gym.Env):
         Initialise the environment with random allocations of agents and objects
         """
         rng = np.random.default_rng(seed)
-        all_positions = [(x, y) for x in range(self.width)
-                         for y in range(self.length)]
+        all_positions = [(x, y) for x in range(self.grid_width)
+                         for y in range(self.grid_length)]
         rng.shuffle(all_positions)
 
         # Randomly assign Picker flags to agents
@@ -352,9 +339,9 @@ class MultiAgentPickAndPlace(gym.Env):
         print("-" * 30)
 
     def _random_position(self):
-        return (random.randint(0, self.width - 1), random.randint(0, self.length - 1))
+        return (random.randint(0, self.grid_width - 1), random.randint(0, self.grid_length - 1))
 
-    def step(self, actions: List[int]) -> Tuple[Dict[str, Dict[str, Any]], Dict[str, float], Dict[str, bool], Dict[str, Any]]:
+    def step(self, actions: List[int]) -> Tuple[Dict[str, Dict[str, Any]], int, bool, Dict[str, Any]]:
         # Check that no invalid actions are taken
         if self.debug_mode:
             self._validate_actions(actions)
@@ -385,7 +372,7 @@ class MultiAgentPickAndPlace(gym.Env):
         if self.debug_mode:
             self._print_state()
 
-        return self.get_obs(), sum(self._get_rewards()), all(self.done), {}
+        return self.get_obs(), sum(self._get_rewards()), self.done, {}
 
     def _get_rewards(self) -> List[int]:
         return [agent.rewards for agent in self.agents]
@@ -399,11 +386,11 @@ class MultiAgentPickAndPlace(gym.Env):
         if action == Action.UP.value:
             y = max(0, y - 1)
         elif action == Action.DOWN.value:
-            y = min(self.length - 1, y + 1)
+            y = min(self.grid_length - 1, y + 1)
         elif action == Action.LEFT.value:
             x = max(0, x - 1)
         elif action == Action.RIGHT.value:
-            x = min(self.width - 1, x + 1)
+            x = min(self.grid_width - 1, x + 1)
 
         new_position = (x, y)
 
@@ -531,9 +518,9 @@ class MultiAgentPickAndPlace(gym.Env):
             pass
 
     def _get_state_space_size(self) -> int:
-        agent_space_size = self.width * self.length * 2 * (self.n_objects + 1)
-        object_space_size = self.width * self.length * self.n_objects
-        goal_space_size = self.width * self.length
+        agent_space_size = self.grid_width * self.grid_length * 2 * (self.n_objects + 1)
+        object_space_size = self.grid_width * self.grid_length * self.n_objects
+        goal_space_size = self.grid_width * self.grid_length
         state_space_size = (agent_space_size ** self.n_agents) * (
             object_space_size ** self.n_objects) * (goal_space_size ** self.n_objects)
         return state_space_size
@@ -544,9 +531,9 @@ class MultiAgentPickAndPlace(gym.Env):
         return action_space_size
 
 
-def make_env(width: int, length: int, n_agents: int, n_pickers: int, n_objects: Optional[int] = None) -> Callable[[], MultiAgentPickAndPlace]:
+def make_env(width: int, length: int, n_agents: int, n_pickers: int, n_objects: Optional[int] = None) -> Callable[[], MACPPEnv]:
     def _init():
-        return MultiAgentPickAndPlace(width, length, n_agents, n_pickers, n_objects)
+        return MACPPEnv(width, length, n_agents, n_pickers, n_objects)
     return _init
 
 
@@ -577,12 +564,3 @@ def game_loop(env, render):
     env.close()
     print("Episode finished.")
 
-
-if __name__ == "__main__":
-    env = MultiAgentPickAndPlace(
-        width=3, length=3, n_agents=2, n_pickers=1, cell_size=300
-    )
-    for episode in range(10):
-        print(f"Episode {episode}:")
-        game_loop(env, render=True)
-    print("Done")
