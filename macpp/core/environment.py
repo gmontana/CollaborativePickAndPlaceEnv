@@ -18,8 +18,8 @@ REWARD_STEP = -1
 REWARD_GOOD_PASS = 5
 REWARD_BAD_PASS = -5
 REWARD_DROP = 10
+REWARD_PICKUP = 10
 REWARD_COMPLETION = 50
-
 
 class Action(Enum):
     UP = 0
@@ -455,7 +455,23 @@ class MACPPEnv(gym.Env):
                 for obj in self.objects:
                     if obj.position == agent.position:
                         agent.carrying_object = obj.id
+                        agent.reward += REWARD_PICKUP
                         break
+
+    def _handle_drops(self) -> None:
+        for agent in self.agents:
+            # Check if the agent is carrying an object and is NOT a picker
+            if agent.carrying_object is not None and not agent.picker:
+                # Check if the agent's position matches any of the goal positions
+                if agent.position in self.goals:
+                    # Check if the goal position already has an object
+                    if not any(obj.position == agent.position and obj.id != agent.carrying_object for obj in self.objects):
+                        # Drop the object at the goal position
+                        obj = next(
+                            obj for obj in self.objects if obj.id == agent.carrying_object)
+                        obj.position = agent.position
+                        agent.carrying_object = None
+                        agent.reward += REWARD_DROP
 
     def _handle_passes(self, actions: List[int]) -> None:
 
@@ -520,19 +536,6 @@ class MACPPEnv(gym.Env):
             return True
         return False
 
-    def _handle_drops(self) -> None:
-        for agent in self.agents:
-            # Check if the agent is carrying an object and is NOT a picker
-            if agent.carrying_object is not None and not agent.picker:
-                # Check if the agent's position matches any of the goal positions
-                if agent.position in self.goals:
-                    # Check if the goal position already has an object
-                    if not any(obj.position == agent.position and obj.id != agent.carrying_object for obj in self.objects):
-                        # Drop the object at the goal position
-                        obj = next(
-                            obj for obj in self.objects if obj.id == agent.carrying_object)
-                        obj.position = agent.position
-                        agent.carrying_object = None
 
     def _init_render(self) -> None:
         from macpp.core.rendering import Viewer
