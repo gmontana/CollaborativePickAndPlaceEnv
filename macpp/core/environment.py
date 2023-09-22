@@ -211,7 +211,7 @@ class MultiAgentPickAndPlace(gym.Env):
                 raise ValueError(
                     f"Invalid action: {action}. Action should be between 1 and {len(Action)}")
 
-    def get_observations(self) -> Dict[str, Dict[str, Any]]:
+    def get_obs(self) -> Dict[str, Dict[str, Any]]:
         observations = {}
         for idx, agent in enumerate(self.agents):
             observations[f"agent_{idx}"] = agent.get_agent_obs(self.agents, self.objects, self.goals)
@@ -230,11 +230,11 @@ class MultiAgentPickAndPlace(gym.Env):
 
         return observation, {}
 
-    def get_state(self) -> Dict[str, Any]:
-        agent_states = tuple(agent.get_agent_obs() for agent in self.agents)
-        object_states = tuple(obj.get_object_obs() for obj in self.objects)
-        goal_states = tuple(self.goals)
-        return {"agents": agent_states, "objects": object_states, "goals": goal_states}
+    # def get_state(self) -> Dict[str, Any]:
+    #     agent_states = tuple(agent.get_agent_obs() for agent in self.agents)
+    #     object_states = tuple(obj.get_object_obs() for obj in self.objects)
+    #     goal_states = tuple(self.goals)
+    #     return {"agents": agent_states, "objects": object_states, "goals": goal_states}
 
 
     def obs_to_hash(self, obs: Dict[str, Dict[str, Any]]) -> str:
@@ -290,7 +290,7 @@ class MultiAgentPickAndPlace(gym.Env):
         # Assign goals
         self.goals = goal_positions
 
-        return self.get_observations()
+        return self.get_obs()
 
     def reset_from_obs(self, obs: Dict[str, Dict[str, Any]]) -> Dict[str, Dict[str, Any]]:
         """
@@ -323,7 +323,7 @@ class MultiAgentPickAndPlace(gym.Env):
         # Reset goals
         self.goals = [tuple(goal) for goal in goal_states]
 
-        return self.get_observations()
+        return self.get_obs()
 
     def _print_state(self):
         print("-" * 30)
@@ -385,7 +385,7 @@ class MultiAgentPickAndPlace(gym.Env):
         if self.debug_mode:
             self._print_state()
 
-        return self.get_state(), sum(self._get_rewards()), all(self.done), {}
+        return self.get_obs(), sum(self._get_rewards()), all(self.done), {}
 
     def _get_rewards(self) -> List[int]:
         return [agent.rewards for agent in self.agents]
