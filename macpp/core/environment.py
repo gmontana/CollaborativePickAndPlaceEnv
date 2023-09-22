@@ -155,9 +155,9 @@ class MultiAgentPickAndPlace(gym.Env):
         # An agent's observation space
         agent_observation_space = spaces.Dict({
             "self": agent.space,
-            "agents": spaces.Tuple([agent_space] * (self.n_objects)-1)),
+            "agents": spaces.Tuple([agent_space] * (self.n_objects-1)),
             "objects": spaces.Tuple([object_space] * self.n_objects),
-            "goals": spaces.Tuple([goal_space] * self.n_goals)
+            "goals": spaces.Tuple([goal_space] * len(self.goals))
         })
 
         # The observation space
