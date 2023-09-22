@@ -6,6 +6,7 @@ import time
 from collections import defaultdict
 import matplotlib.pyplot as plt
 import pickle
+from abc import ABC, abstractmethod
 
 class QTable:
 
@@ -43,8 +44,58 @@ class QTable:
         print(f"Loading Q-value table: {filename}.")
         self.q_table = np.load(filename, allow_pickle=True).item()
 
+class ExplorationStrategy(ABC):
+
+    @abstractmethod
+    def select_action(self, agent, obs):
+        pass
+
+class EpsilonGreedy(ExplorationStrategy):
+
+    def __init__(self, exploration_rate=1.0, min_exploration=0.01, exploration_decay=0.995):
+        self.exploration_rate = exploration_rate
+        self.min_exploration = min_exploration
+        self.exploration_decay = exploration_decay
+
+    def select_action(self, agent, obs_hash):
+        if random.random() < self.exploration_rate:
+            return agent.env.action_space.sample().tolist()
+        else:
+            best = agent.q_table.best_actions(obs_hash)
+            if best is None:
+                return agent.env.action_space.sample().tolist()
+            return best
+
+    def decay_exploration_rate(self):
+        self.exploration_rate = max(self.min_exploration, self.exploration_rate * self.exploration_decay)
+
+class UCB(ExplorationStrategy):
+
+    def __init__(self, c=0.9):
+        self.c = c
+
+    def select_action(self, agent, obs):
+        max_ucb = float('-inf')
+        best_action = None
+
+        # Generate all possible action combinations for the MultiDiscrete action space
+        action_combinations = [list(x) for x in np.ndindex(*agent.env.action_space.nvec)]
+
+        for action in action_combinations:
+            q_value = agent.q_table.get_q_value(obs, action)
+            state_count = agent.state_visits.get(obs, 1)  # Avoid division by zero
+            state_action_key = (obs, tuple(action))
+            state_action_count = agent.state_action_visits.get(state_action_key, 1)
+            ucb_value = q_value + self.c * np.sqrt(np.log(state_count) / state_action_count)
+
+            if ucb_value > max_ucb:
+                max_ucb = ucb_value
+                best_action = action
+
+        return best_action
+
 class QLearning:
-    def __init__(self, env, learning_rate=0.1, discount_factor=0.9, exploration_rate=1.0, exploration_decay=0.99999, min_exploration=0.03, learning_rate_decay=0.99999, min_learning_rate=0.01):
+    def __init__(self, env, exploration_strategy, learning_rate=0.1, discount_factor=0.9, learning_rate_decay=0.99999, min_learning_rate=0.01):
         self.env = env
         self.n_agents = env.n_agents
         self.action_space_size = env.n_agents
@@ -53,17 +104,9 @@ class QLearning:
         self.learning_rate_decay = learning_rate_decay
         self.min_learning_rate = min_learning_rate
         self.discount_factor = discount_factor
-        self.exploration_rate = exploration_rate
-        self.exploration_decay = exploration_decay
-        self.min_exploration = min_exploration
+        self.exploration_strategy= exploration_strategy
         self.state_visits = {}  
         self.state_action_visits = {}  
-
-    def epsilon_greedy_actions(self, obs):
-        if random.random() < self.exploration_rate:
-            return self.env.action_space.sample().tolist()
-        else:
-            return self.greedy_actions(obs)
 
     def greedy_actions(self, obs):
         best = self.q_table.best_actions(obs)
@@ -71,31 +114,9 @@ class QLearning:
             return self.env.action_space.sample().tolist()
         return best
 
-    def ucb_action_selection(self, obs_hash):
-        c = 0.9
-        max_ucb = float('-inf')
-        best_action = None
-
-        # Generate all possible action combinations for the MultiDiscrete action space
-        action_combinations = [list(x) for x in np.ndindex(*self.env.action_space.nvec)]
-
-        for action in action_combinations:
-            q_value = self.q_table.get_q_value(obs_hash, action)
-            state_count = self.state_visits.get(obs_hash, 1)  # Avoid division by zero
-            state_action_key = (obs_hash, tuple(action))
-            state_action_count = self.state_action_visits.get(state_action_key, 1)
-            ucb_value = q_value + c * np.sqrt(np.log(state_count) / state_action_count)
-
-            if ucb_value > max_ucb:
-                max_ucb = ucb_value
-                best_action = action
-
-        return best_action
-
-
     def act(self, obs_hash, explore=False):
         if explore:
-            return self.ucb_action_selection(obs_hash)
+            return self.exploration_strategy.select_action(self, obs_hash)
         else:
             return self.greedy_actions(obs_hash)
 
@@ -175,11 +196,11 @@ def game_loop(env, agent, training=False, num_episodes=1, msx_steps_per_episode=
         total_avg_steps.append(avg_steps)
         total_avg_returns.append(avg_return)
 
-        agent.exploration_rate = max(agent.min_exploration, agent.exploration_rate * agent.exploration_decay)
         agent.learning_rate = max(agent.min_learning_rate, agent.learning_rate * agent.learning_rate_decay)
+        # agent.exploration_strategy.decay_exploration_rate()
 
         if (episode+1) % 100 == 0:
-            print(f"Episode {episode+1}/{num_episodes}: Avg Steps: {avg_steps:.2f}, Avg Return: {avg_return:.2f}, Success rate: {success_rate:.2f}, epsilon: {agent.exploration_rate:.3f}, alpha: {agent.learning_rate:.3f}")
+            print(f"Episode {episode+1}/{num_episodes}: Avg Steps: {avg_steps:.2f}, Avg Return: {avg_return:.2f}, Success rate: {success_rate:.2f}, alpha: {agent.learning_rate:.3f}")
 
     # Create the main figure and axis
     fig, ax1 = plt.subplots(figsize=(10, 6))
@@ -221,15 +242,17 @@ if __name__ == "__main__":
         grid_size=(3, 3), n_agents=2, n_pickers=1, n_objects=1, cell_size=300, debug_mode=False
     )
 
+    # Set up exploration strategy
+    # epsilon_greedy_strategy = EpsilonGreedy(exploration_rate=1.0, min_exploration=0.01, exploration_decay=0.995)
+    ucb_strategy = UCB(c=5)
+
     # Set up the Q agent
     agent = QLearning(env, 
+                      exploration_strategy=ucb_strategy,
                       learning_rate=0.3,
                       discount_factor=0.98, 
-                      exploration_rate=1.0, 
-                      exploration_decay=0.995, 
-                      min_exploration=0.01, 
                       learning_rate_decay=0.999, 
                       min_learning_rate=0.01)
 
     # Train the agent
-    game_loop(env, agent, training=True, num_episodes=100000, msx_steps_per_episode=300, render=False, qtable_file='qtable')
+    game_loop(env, agent, training=True, num_episodes=100000, msx_steps_per_episode=150, render=False, qtable_file='qtable')
