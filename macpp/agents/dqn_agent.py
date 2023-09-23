@@ -110,15 +110,16 @@ class DQNAgent:
         states, actions, rewards, next_states, dones = zip(*batch)
 
         states = torch.FloatTensor(states).to(self.device)
-        actions = torch.LongTensor(actions).unsqueeze(1).to(self.device)
+
+        actions = torch.LongTensor(actions).to(self.device)
+
         rewards = torch.FloatTensor(rewards).to(self.device)
         next_states = torch.FloatTensor(next_states).to(self.device)
         dones = torch.BoolTensor(dones).to(self.device)
 
-        # print(f'state shape: {states.shape}')
-        # print(f'action shape: {actions.shape}')
+        # print(self.network(states).shape)
+        # print(actions.shape)
 
-        actions = torch.LongTensor(actions).unsqueeze(1).to(self.device)
         current_q_values = self.network(states).gather(1, actions)
 
         next_q_values = self.target_network(next_states).max(1)[0].detach()
@@ -129,7 +130,7 @@ class DQNAgent:
         # print("current_q_values shape:", current_q_values.shape)
         # print("target_q_values shape:", target_q_values.shape)
 
-        loss = F.mse_loss(current_q_values, target_q_values.unsqueeze(1))
+        loss = F.mse_loss(current_q_values, target_q_values)
         self.optimizer.zero_grad()
         loss.backward()
         torch.nn.utils.clip_grad.clip_grad_norm_(self.network.parameters(), max_norm=1.0)
