@@ -42,6 +42,7 @@ class QTable:
         instance.q_table = defaultdict(lambda: defaultdict(lambda: initial_value), loaded_q_table)
         return instance
 
+
 class ExplorationStrategy(ABC):
 
     @abstractmethod
@@ -132,6 +133,8 @@ class QLearning(BaseAgent):
         current_q_value = self.q_table.get_q_value(obs_hash, actions)
         updated_value = current_q_value + self.learning_rate * (target - current_q_value)
         self.q_table.set_q_value(obs_hash, actions, updated_value)
+
+
 
 class DoubleQLearning(BaseAgent):
     def __init__(self, env, exploration_strategy, discount_factor, learning_rate, min_learning_rate, learning_rate_decay):
