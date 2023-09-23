@@ -9,7 +9,7 @@ import pickle
 from abc import ABC, abstractmethod
 
 class QTable:
-    def __init__(self, initial_value=0.0):
+    def __init__(self, initial_value=0.001):
         self.q_table = defaultdict(lambda: defaultdict(lambda: initial_value))
         self.initial_value = initial_value
 
@@ -216,6 +216,7 @@ def game_loop(env, agent, training=False, num_episodes=1, msx_steps_per_episode=
             if episode_steps > msx_steps_per_episode:
                 total_failures +=1
                 break
+
         total_steps.append(episode_steps)
         total_returns.append(episode_returns)
 
@@ -230,7 +231,7 @@ def game_loop(env, agent, training=False, num_episodes=1, msx_steps_per_episode=
         agent.exploration_strategy.decay_exploration_rate()
 
         if (episode+1) % 100 == 0:
-            print(f"Episode {episode+1}/{num_episodes}: Avg Steps: {avg_steps:.2f}, Avg Return: {avg_return:.2f}, Success rate: {success_rate:.2f}, alpha: {agent.learning_rate:.3f}")
+            print(f"Episode {episode+1}/{num_episodes}: Avg Steps: {avg_steps:.2f}, Avg Return: {avg_return:.2f}, Success rate: {success_rate:.0f}%, alpha: {agent.learning_rate:.3f}")
 
     # Create the main figure and axis
     fig, ax1 = plt.subplots(figsize=(10, 6))
@@ -252,6 +253,7 @@ def game_loop(env, agent, training=False, num_episodes=1, msx_steps_per_episode=
 
     plt.show()
 
+
     # create a video when needed 
     if create_video:
         script_dir = os.path.dirname(os.path.abspath(__file__))
@@ -260,8 +262,8 @@ def game_loop(env, agent, training=False, num_episodes=1, msx_steps_per_episode=
         print(f"Saving movie in {filename}.")
         env.save_video(filename)
 
-    if training and qtable_file is not None:
-        agent.q_table.save_table(qtable_file)
+    # if training and qtable_file is not None:
+    #     agent.q_table.save(qtable_file)
 
 if __name__ == "__main__":
 
@@ -286,4 +288,4 @@ if __name__ == "__main__":
                       min_learning_rate=0.01)
 
     # Train the agent
-    game_loop(env, agent, training=True, num_episodes=10000, msx_steps_per_episode=300, render=False, qtable_file='qtable')
+    game_loop(env, agent, training=True, num_episodes=5000, msx_steps_per_episode=500, render=False, qtable_file='qtable')
