@@ -15,11 +15,11 @@ import hashlib
 
 # Environment's rewards
 REWARD_STEP = -1
-REWARD_GOOD_PASS = 5
-REWARD_BAD_PASS = -5
-REWARD_DROP = 10
-REWARD_PICKUP = 10
-REWARD_COMPLETION = 500
+REWARD_GOOD_PASS = 1
+REWARD_BAD_PASS = -1
+REWARD_DROP = 2
+REWARD_PICKUP = 2
+REWARD_COMPLETION = 5
 
 class Action(Enum):
     UP = 0
@@ -212,7 +212,8 @@ class MACPPEnv(gym.Env):
             observations[f"agent_{idx}"] = agent.get_agent_obs(self.agents, self.objects, self.goals)
         return observations
 
-    def reset(self, seed: Optional[int] = None, options: Optional[Any] = None) -> Dict[str, Dict[str, Any]]:
+    def reset(self, seed: Optional[int] = None, options: Optional[Any] = None) -> Tuple[Dict[str, Dict[str, Any]], Dict[str, Any]]:
+
         """
         Reset the environment to either a random state or an predefined initial state
         """
@@ -222,11 +223,37 @@ class MACPPEnv(gym.Env):
             self.random_reset(seed)
 
         self.done = False
+        obs = self.get_obs()
 
-        return self.get_obs(), {}
+        return obs, {}
 
     # def obs_to_hash(self, obs: Dict[str, Dict[str, Any]]) -> str:
-    #     concatenated_obs = ''.join([str(obs[agent_id]) for agent_id in sorted(obs.keys())])
+    #     def position_to_number(pos, length):
+    #         return pos[0] * length + pos[1]
+    #
+    #     encoded_obs = []
+    #
+    #     for agent_id in sorted(obs.keys()):
+    #         agent_data = obs[agent_id]
+    #         # Encode agent's own observation
+    #         encoded_obs.append(position_to_number(agent_data['self']['position'], self.grid_length))
+    #         encoded_obs.append(1 if agent_data['self']['picker'] else 0)
+    #         encoded_obs.append(agent_data['self']['carrying_object'] if agent_data['self']['carrying_object'] is not None else -1)
+    #         # Encode other agents' observations
+    #         for other_agent in agent_data['agents']:
+    #             encoded_obs.append(position_to_number(other_agent['position'], self.grid_length))
+    #             encoded_obs.append(1 if other_agent['picker'] else 0)
+    #             encoded_obs.append(other_agent['carrying_object'] if other_agent['carrying_object'] is not None else -1)
+    #         # Encode objects' observations
+    #         for obj in agent_data['objects']:
+    #             encoded_obs.append(position_to_number(obj['position'], self.grid_length))
+    #             encoded_obs.append(obj['id'])
+    #         # Encode goals
+    #         for goal in agent_data['goals']:
+    #             encoded_obs.append(position_to_number(goal, self.grid_length))
+    #
+    #     # Convert the list of numbers to a single string and hash it
+    #     concatenated_obs = ''.join(map(str, encoded_obs))
     #     return hashlib.md5(concatenated_obs.encode()).hexdigest()
 
     def obs_to_hash(self, obs: Dict[str, Dict[str, Any]]) -> str:
@@ -241,23 +268,19 @@ class MACPPEnv(gym.Env):
             encoded_obs.append(position_to_number(agent_data['self']['position'], self.grid_length))
             encoded_obs.append(1 if agent_data['self']['picker'] else 0)
             encoded_obs.append(agent_data['self']['carrying_object'] if agent_data['self']['carrying_object'] is not None else -1)
-            # Encode other agents' observations
-            for other_agent in agent_data['agents']:
-                encoded_obs.append(position_to_number(other_agent['position'], self.grid_length))
-                encoded_obs.append(1 if other_agent['picker'] else 0)
-                encoded_obs.append(other_agent['carrying_object'] if other_agent['carrying_object'] is not None else -1)
-            # Encode objects' observations
-            for obj in agent_data['objects']:
-                encoded_obs.append(position_to_number(obj['position'], self.grid_length))
-                encoded_obs.append(obj['id'])
-            # Encode goals
-            for goal in agent_data['goals']:
-                encoded_obs.append(position_to_number(goal, self.grid_length))
+
+        # Encode objects' observations
+        for obj in obs['agent_0']['objects']:  # We can use 'agent_0' as a reference since all agents see the same objects
+            encoded_obs.append(position_to_number(obj['position'], self.grid_length))
+            encoded_obs.append(obj['id'])
+
+        # Encode goals
+        for goal in obs['agent_0']['goals']:  # We can use 'agent_0' as a reference since all agents see the same goals
+            encoded_obs.append(position_to_number(goal, self.grid_length))
 
         # Convert the list of numbers to a single string and hash it
         concatenated_obs = ''.join(map(str, encoded_obs))
         return hashlib.md5(concatenated_obs.encode()).hexdigest()
-
 
 
     def random_reset(self, seed: Optional[int] = None) -> None:
@@ -414,7 +437,13 @@ class MACPPEnv(gym.Env):
         if self.debug_mode:
             self._print_state()
 
-        return self.get_obs(), sum(self._get_rewards()), self.done, {}
+        total_reward = sum(self._get_rewards())
+        if self.debug_mode:
+            print(f'Total reward: {total_reward}')
+
+        obs = self.get_obs()
+
+        return obs, total_reward, self.done, {}
 
     def _get_rewards(self) -> List[int]:
         return [agent.reward for agent in self.agents]
