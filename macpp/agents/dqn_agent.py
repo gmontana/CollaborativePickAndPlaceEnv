@@ -142,7 +142,7 @@ def game_loop(env, agent, training=True, num_episodes=10000, max_steps_per_episo
             next_obs = flatten_obs(next_obs)
 
             if training:
-                agent.memory.push(obs, action, reward, next_obs, done)
+                agent.memory.push(obs, actions, reward, next_obs, done)
                 loss = agent.train()
                 all_losses.append(loss)
 
@@ -189,7 +189,7 @@ if __name__ == "__main__":
 
     # Set up the environment
     env = MACPPEnv(
-        grid_size=(3, 3), n_agents=2, n_pickers=1, n_objects=1, cell_size=300, debug_mode=False
+        grid_size=(3, 3), n_agents=2, n_pickers=1, n_objects=1, cell_size=300, debug_mode=True
     )
 
     # Set up exploration strategy
