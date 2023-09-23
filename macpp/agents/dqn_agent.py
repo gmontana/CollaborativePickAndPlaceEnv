@@ -91,6 +91,7 @@ class DQNAgent:
         with torch.no_grad():
             q_values = self.network(state_tensor)
         q_values = q_values.reshape(self.env.n_agents, -1)
+        # print("Shape of q_values in select_action:", q_values.shape)
 
         actions = []
         for agent_idx in range(self.env.n_agents):
@@ -110,24 +111,30 @@ class DQNAgent:
         states, actions, rewards, next_states, dones = zip(*batch)
 
         states = torch.FloatTensor(states).to(self.device)
-
-        actions = torch.LongTensor(actions).to(self.device)
+        actions = torch.LongTensor(actions).reshape(-1, self.env.n_agents).to(self.device)
 
         rewards = torch.FloatTensor(rewards).to(self.device)
         next_states = torch.FloatTensor(next_states).to(self.device)
         dones = torch.BoolTensor(dones).to(self.device)
 
-        # print(f'Action shape for current_q_values: {actions.shape}')
-
         current_q_values = self.network(states).gather(1, actions)
+        # print("Shape of current_q_values:", current_q_values.shape)
 
-        next_q_values = self.target_network(next_states).max(1)[0].detach()
-        target_q_values = rewards + (self.gamma * next_q_values * (~dones))
+        next_q_values_all = self.target_network(next_states)
+        next_q_values_all = next_q_values_all.view(-1, self.env.n_agents, self.n_actions)
+        # print("Shape of next_q_values_all:", next_q_values_all.shape)
 
-        target_q_values = target_q_values.unsqueeze(1)
+        next_q_values_max = next_q_values_all.max(2)[0].detach()
+        # print("Shape of next_q_values_max:", next_q_values_max.shape)
 
-        # print("current_q_values shape:", current_q_values.shape)
-        # print("target_q_values shape:", target_q_values.shape)
+        expanded_rewards = rewards.unsqueeze(1).expand_as(next_q_values_max)
+        expanded_dones = dones.int().unsqueeze(1).expand_as(next_q_values_max)
+        target_q_values = (expanded_rewards + (1 - expanded_dones) * self.gamma * next_q_values_max).unsqueeze(2)
+
+        target_q_values = target_q_values.squeeze(2)
+
+
+        # print("Shape of target_q_values:", target_q_values.shape)
 
         loss = F.mse_loss(current_q_values, target_q_values)
         self.optimizer.zero_grad()
@@ -158,7 +165,10 @@ def game_loop(env, agent, training=True, num_episodes=10000, max_steps_per_episo
                 env.render()
 
             actions = agent.select_action(obs_flat)
-            # print(f'Actions: {actions}')
+
+            # print("Length of actions in game_loop:", len(actions))
+            # print("Actions in game_loop:", actions)
+
             next_obs, reward, done, _ = env.step(actions)
 
             # print(f'---- Obs after step type: {type(next_obs)}')
