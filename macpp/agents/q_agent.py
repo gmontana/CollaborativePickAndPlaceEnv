@@ -97,7 +97,7 @@ class BaseAgent(ABC):
         self.env = env
         self.q_table = QTable()
         self.exploration_strategy = exploration_strategy
-        self.discount_rate = discount_factor
+        self.discount_factor = discount_factor
         self.learning_rate = learning_rate
         self.min_learning_rate = min_learning_rate
         self.learning_rate_decay = learning_rate_decay
@@ -114,10 +114,8 @@ class BaseAgent(ABC):
 
 
 class QLearning(BaseAgent):
-    def __init__(self, env, exploration_strategy, discount_factor, learning_rate, min_learning_rate, learning_rate_decay, gamma, *args, **kwargs):
-            super().__init__(env, exploration_strategy, discount_factor, learning_rate, min_learning_rate, learning_rate_decay, *args, **kwargs)
-            self.learning_rate = learning_rate
-            self.discount_factor = discount_factor
+    def __init__(self, env, exploration_strategy, discount_factor, learning_rate, min_learning_rate, learning_rate_decay):
+        super().__init__(env, exploration_strategy, discount_factor, learning_rate, min_learning_rate, learning_rate_decay)
 
     def act(self, obs_hash, explore=False):
         if explore:
@@ -135,10 +133,9 @@ class QLearning(BaseAgent):
         updated_value = current_q_value + self.learning_rate * (target - current_q_value)
         self.q_table.set_q_value(obs_hash, actions, updated_value)
 
-
 class DoubleQLearning(BaseAgent):
-    def __init__(self, env, exploration_strategy, learning_rate=0.1, discount_factor=0.9):
-        super().__init__(env, exploration_strategy)
+    def __init__(self, env, exploration_strategy, discount_factor, learning_rate, min_learning_rate, learning_rate_decay):
+        super().__init__(env, exploration_strategy, learning_rate, min_learning_rate, learning_rate_decay, discount_factor)
         self.q_table2 = QTable()
         self.learning_rate = learning_rate
         self.discount_factor = discount_factor
@@ -277,7 +274,7 @@ if __name__ == "__main__":
     # ucb_strategy = UCB(c=5)
 
     # Set up the Q agent
-    agent = QLearning(env, 
+    agent = DoubleQLearning(env, 
                       exploration_strategy=epsilon_greedy_strategy,
                       # exploration_strategy=ucb_strategy,
                       learning_rate=0.1,
