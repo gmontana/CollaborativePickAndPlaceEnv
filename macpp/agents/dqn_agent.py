@@ -5,11 +5,9 @@ import torch.nn.functional as F
 from collections import namedtuple, deque
 import random
 from exploration import EpsilonGreedy
-
-BATCH_SIZE = 64
-GAMMA = 0.99
-LEARNING_RATE = 0.001
-TARGET_UPDATE = 10
+import numpy as np
+from torch.optim.lr_scheduler import StepLR
+from torch.nn.utils.clip_grad import clip_grad_norm_
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -25,6 +23,9 @@ class ExperienceReplay:
 
     def sample(self, batch_size):
         return random.sample(self.buffer, batch_size)
+
+    def can_sample(self, batch_size):
+        return len(self.buffer) >= batch_size
 
     def __len__(self):
         return len(self.buffer)
@@ -56,6 +57,7 @@ class DQNAgent:
         self.target_network.eval()
 
         self.optimizer = torch.optim.Adam(self.network.parameters(), lr=learning_rate)
+        self.scheduler = StepLR(self.optimizer, step_size=1000, gamma=0.9)
         self.memory = ExperienceReplay(buffer_size)
         self.exploration_strategy = exploration_strategy
 
@@ -92,7 +94,9 @@ class DQNAgent:
         loss = F.mse_loss(current_q_values, target_q_values.unsqueeze(1))
         self.optimizer.zero_grad()
         loss.backward()
+        torch.nn.utils.clip_grad.clip_grad_norm_(self.network.parameters(), max_norm=1.0)
         self.optimizer.step()
+        self.scheduler.step()
 
     def update_target_network(self):
         self.target_network.load_state_dict(self.network.state_dict())
@@ -103,6 +107,7 @@ class DQNAgent:
 
 def game_loop(env, agent, training=True, num_episodes=10000, max_steps_per_episode=300, render=False, model_file='dqn_model'):
     total_rewards = []
+    all_losses = []
     failure_count = 0
     for episode in range(num_episodes):
         state = env.reset()
@@ -116,7 +121,8 @@ def game_loop(env, agent, training=True, num_episodes=10000, max_steps_per_episo
 
             if training:
                 agent.memory.push(state, action, reward, next_state, done)
-                agent.train()
+                loss = agent.train()
+                all_losses.append(loss)
 
             episode_reward += reward
             state = next_state
@@ -141,11 +147,14 @@ def game_loop(env, agent, training=True, num_episodes=10000, max_steps_per_episo
         if episode % 100 == 0:
             avg_reward = sum(total_rewards[-100:]) / 100
             success_rate = 1 - (failure_count / 100)
-            print(f"Episode {episode}/{num_episodes}: Avg Reward: {avg_reward:.2f}, Success rate: {success_rate:.2f}, Epsilon: {agent.exploration_strategy.epsilon:.3f}")
+            avg_loss = np.mean(all_losses[-100:])
+            print(f"Episode {episode}/{num_episodes}: Avg Reward: {avg_reward:.2f}, Success rate: {success_rate:.2f}, Avg Loss: {avg_loss:.4f}, Epsilon: {agent.exploration_strategy.epsilon:.2f}")
 
         # Save the model periodically
         if training and episode % 1000 == 0:
             torch.save(agent.network.state_dict(), model_file + f"_{episode}.pth")
+
+    agent.exploration_strategy.decay()
 
     if training:
         torch.save(agent.network.state_dict(), model_file + "_final.pth")
@@ -162,7 +171,6 @@ if __name__ == "__main__":
 
     # Set up exploration strategy
     epsilon_greedy_strategy = EpsilonGreedy(exploration_rate=1.0, min_exploration=0.02, exploration_decay=0.99)
-    # ucb_strategy = UCB(c=5)
 
     # Set up the agent
     agent = DQNAgent(env, epsilon_greedy_strategy,learning_rate=0.001, gamma=0.99, buffer_size=10000, batch_size=64, tau=0.1)
