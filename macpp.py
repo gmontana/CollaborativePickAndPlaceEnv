@@ -7,12 +7,12 @@ def game_loop(env, render=False):
     """
     Run a single game loop.
     """
-    obs = env.reset()
+    env.reset()
     done = False
 
     while not done:
         actions = env.action_space.sample()
-        obs, reward, done, _ = env.step(actions)
+        _, _, done, _ = env.step(actions)
 
         if render:
             env.render()
@@ -20,7 +20,7 @@ def game_loop(env, render=False):
         time.sleep(0.5)
 
 def main(game_count=1, render=False):
-    env = gym.make('macpp-3x3-2-1-1-v0')
+    env = gym.make('macpp-3x3-2-1-1-v0', debug_mode=True)
 
     for episode in range(game_count):
         game_loop(env, render)
