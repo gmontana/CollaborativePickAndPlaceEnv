@@ -19,7 +19,7 @@ REWARD_GOOD_PASS = 5
 REWARD_BAD_PASS = -5
 REWARD_DROP = 10
 REWARD_PICKUP = 10
-REWARD_COMPLETION = 50
+REWARD_COMPLETION = 500
 
 class Action(Enum):
     UP = 0
@@ -362,7 +362,8 @@ class MACPPEnv(gym.Env):
             )
             print(
                 f"- Agent {idx:<2}: Position: {agent.position}, "
-                f"Picker: {str(agent.picker):<5}, Status: {carrying_status:<12}, {carrying_object}"
+                f"Picker: {str(agent.picker):<5}, Status: {carrying_status:<12}, {carrying_object}, "
+                f"Reward: {agent.reward}"
             )
 
         for idx, obj in enumerate(self.objects, start=1):
@@ -386,7 +387,9 @@ class MACPPEnv(gym.Env):
 
         # Negative reward given at every step
         for agent in self.agents:
-            agent.rewards = REWARD_STEP
+            agent.reward += REWARD_STEP
+            if self.debug_mode:
+                print(f'Rewarded for step: {REWARD_STEP}')
 
         # Execute the actions
         self._handle_moves(actions)
@@ -398,6 +401,8 @@ class MACPPEnv(gym.Env):
         if self.check_termination():
             for agent in self.agents:
                 agent.reward += REWARD_COMPLETION
+                if self.debug_mode:
+                    print(f'Rewarded for completion: {REWARD_COMPLETION}')
             self.done = True
 
         # Collect frames for the video when required
@@ -412,7 +417,7 @@ class MACPPEnv(gym.Env):
         return self.get_obs(), sum(self._get_rewards()), self.done, {}
 
     def _get_rewards(self) -> List[int]:
-        return [agent.rewards for agent in self.agents]
+        return [agent.reward for agent in self.agents]
 
     def _move_agent(self, agent: Agent, action: int) -> Tuple[int, int]:
         """
@@ -456,6 +461,8 @@ class MACPPEnv(gym.Env):
                     if obj.position == agent.position:
                         agent.carrying_object = obj.id
                         agent.reward += REWARD_PICKUP
+                        if self.debug_mode:
+                            print(f'Rewarded for pickup: {REWARD_PICKUP}')
                         break
 
     def _handle_drops(self) -> None:
@@ -472,6 +479,8 @@ class MACPPEnv(gym.Env):
                         obj.position = agent.position
                         agent.carrying_object = None
                         agent.reward += REWARD_DROP
+                        if self.debug_mode:
+                            print(f'Rewarded for dropoff: {REWARD_DROP}')
 
     def _handle_passes(self, actions: List[int]) -> None:
 
@@ -510,9 +519,13 @@ class MACPPEnv(gym.Env):
                         if agent.picker and not adj_agent.picker:
                             agent.reward += REWARD_GOOD_PASS
                             adj_agent.reward += REWARD_GOOD_PASS
+                            if self.debug_mode:
+                                print(f'Rewarded for good pass: {REWARD_GOOD_PASS}')
                         elif not agent.picker and adj_agent.picker:
                             agent.reward += REWARD_BAD_PASS
                             adj_agent.reward += REWARD_BAD_PASS
+                            if self.debug_mode:
+                                print(f'Rewarded for bad pass: {REWARD_BAD_PASS}')
 
                         break
 
