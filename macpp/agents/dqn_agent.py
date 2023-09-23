@@ -14,17 +14,21 @@ device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 Experience = namedtuple('Experience', ['state', 'action', 'reward', 'next_state', 'done'])
 
 
-def flatten_obs(obs: Dict[str, Dict[str, Any]]) -> np.ndarray:
-    flat_list = []
-    for agent_key, agent_obs in obs.items():
-        for key, value in agent_obs.items():
-            if isinstance(value, (int, float)):
-                flat_list.append(value)
-            elif isinstance(value, (list, np.ndarray)):
-                flat_list.extend(value)
-            else:
-                raise ValueError(f"Unsupported data type for key {key}: {type(value)}")
-    return np.array(flat_list)
+def flatten_obs(obs_dict):
+    flattened_obs = []
+    for _, agent_obs in obs_dict.items():
+        agent_data = [
+            agent_obs['self']['position'][0], agent_obs['self']['position'][1],
+            agent_obs['self']['picker_status'], agent_obs['self']['carrying_object']
+        ]
+        for other_agent in agent_obs['agents']:
+            agent_data.extend([other_agent['position'][0], other_agent['position'][1], other_agent['picker_status'], other_agent['carrying_object']])
+        for obj in agent_obs['objects']:
+            agent_data.extend([obj['position'][0], obj['position'][1], obj['id']])
+        for goal in agent_obs['goals']:
+            agent_data.extend([goal[0], goal[1]])
+        flattened_obs.extend(agent_data)
+    return flattened_obs
 
 
 class ExperienceReplay:
@@ -61,7 +65,8 @@ class DQNNetwork(nn.Module):
 class DQNAgent:
     def __init__(self, env, exploration_strategy, learning_rate=0.001, gamma=0.99, buffer_size=10000, batch_size=64, tau=0.1):
         self.env = env
-        self.state_size = env.observation_space.shape[0]
+        agent_obs_len = 4 + (4 * (self.env.n_agents - 1)) + (3 * self.env.n_objects) + (2 * self.env.n_objects)
+        self.state_size = agent_obs_len * self.env.n_agents
         self.action_size = len(env.action_space)
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -87,6 +92,7 @@ class DQNAgent:
             with torch.no_grad():
                 q_values = self.network(state)
                 return torch.argmax(q_values).item()
+
 
     def train(self):
         if len(self.memory) < self.batch_size:
@@ -132,7 +138,7 @@ def game_loop(env, agent, training=True, num_episodes=10000, max_steps_per_episo
                 env.render()
 
             action = agent.select_action(obs)
-            next_obs, reward, done, _ = env.step(action)
+            next_obs, reward, done, _ = env.step([action])
             next_obs = flatten_obs(next_obs)
 
             if training:
