@@ -9,40 +9,38 @@ import pickle
 from abc import ABC, abstractmethod
 
 class QTable:
-
-    def __init__(self, env, initial_value=0.0):
-        self.env = env
-        self.q_table = defaultdict(lambda: defaultdict(float))
+    def __init__(self, initial_value=0.0):
+        self.q_table = defaultdict(lambda: defaultdict(lambda: initial_value))
         self.initial_value = initial_value
 
     def get_q_value(self, state_hash, actions):
-        return self.q_table.get(state_hash, {}).get(tuple(actions), self.initial_value)
+        return self.q_table[state_hash][tuple(actions)]
 
     def set_q_value(self, state_hash, actions, value):
-        if state_hash not in self.q_table:
-            self.q_table[state_hash] = {}
         self.q_table[state_hash][tuple(actions)] = value
 
     def get_max_q_value(self, state_hash):
-        if state_hash not in self.q_table:
-            return self.initial_value
-        return max(self.q_table[state_hash].values())
+        return max(self.q_table[state_hash].values(), default=self.initial_value)
 
     def best_actions(self, state_hash):
         if state_hash not in self.q_table:
             return None
         max_q_value = self.get_max_q_value(state_hash)
         best_acts = [act for act, q_value in self.q_table[state_hash].items() if q_value == max_q_value]
-        return list(best_acts[0]) if best_acts else None
+        return random.choice(best_acts) if best_acts else None
 
-    def save_q_table(self, filename):
-        print(f"Saving Q-value table: {filename}.")
-        np.save(filename, self.q_table)
-        print(f"Number of elements in the Q table: {self.count_elements()}")
+    def save(self, filename):
+        with open(filename, 'wb') as file:
+            pickle.dump(dict(self.q_table), file)
 
-    def load_q_table(self, filename):
-        print(f"Loading Q-value table: {filename}.")
-        self.q_table = np.load(filename, allow_pickle=True).item()
+    @classmethod
+    def load(cls, filename, initial_value=0.0):
+        with open(filename, 'rb') as file:
+            loaded_q_table = pickle.load(file)
+        
+        instance = cls(initial_value)
+        instance.q_table = defaultdict(lambda: defaultdict(lambda: initial_value), loaded_q_table)
+        return instance
 
 class ExplorationStrategy(ABC):
 
@@ -94,49 +92,81 @@ class UCB(ExplorationStrategy):
 
         return best_action
 
-class QLearning:
-    def __init__(self, env, exploration_strategy, learning_rate=0.1, discount_factor=0.9, learning_rate_decay=0.99999, min_learning_rate=0.01):
+class BaseAgent(ABC):
+    def __init__(self, env, exploration_strategy, discount_factor, learning_rate, min_learning_rate, learning_rate_decay):
         self.env = env
-        self.n_agents = env.n_agents
-        self.action_space_size = env.n_agents
-        self.q_table = QTable(self.env)
+        self.q_table = QTable()
+        self.exploration_strategy = exploration_strategy
+        self.discount_rate = discount_factor
         self.learning_rate = learning_rate
-        self.learning_rate_decay = learning_rate_decay
         self.min_learning_rate = min_learning_rate
-        self.discount_factor = discount_factor
-        self.exploration_strategy= exploration_strategy
-        self.state_visits = {}  
-        self.state_action_visits = {}  
+        self.learning_rate_decay = learning_rate_decay
+        self.state_visits = defaultdict(int)
+        self.state_action_visits = defaultdict(int)
 
-    def greedy_actions(self, obs):
-        best = self.q_table.best_actions(obs)
-        if best is None:
-            return self.env.action_space.sample().tolist()
-        return best
+    @abstractmethod
+    def act(self, obs_hash, explore=False):
+        pass
+
+    @abstractmethod
+    def learn(self, obs_hash, actions, next_state_hash, rewards, done):
+        pass
+
+
+class QLearning(BaseAgent):
+    def __init__(self, env, exploration_strategy, discount_factor, learning_rate, min_learning_rate, learning_rate_decay, gamma, *args, **kwargs):
+            super().__init__(env, exploration_strategy, discount_factor, learning_rate, min_learning_rate, learning_rate_decay, *args, **kwargs)
+            self.learning_rate = learning_rate
+            self.discount_factor = discount_factor
 
     def act(self, obs_hash, explore=False):
         if explore:
             return self.exploration_strategy.select_action(self, obs_hash)
         else:
-            return self.greedy_actions(obs_hash)
+            best = self.q_table.best_actions(obs_hash)
+            if best is None:
+                return self.env.action_space.sample().tolist()
+            return best
 
     def learn(self, obs_hash, actions, next_state_hash, rewards, done):
-
-        # Calculate the target Q-value
-        if done:
-            target = rewards
-        else:
-            max_next_q_value = self.q_table.get_max_q_value(next_state_hash)
-            target = rewards + self.discount_factor * max_next_q_value
-        
-        # Update the Q-value 
+        max_next_q_value = self.q_table.get_max_q_value(next_state_hash)
+        target = rewards + self.discount_factor * max_next_q_value if not done else rewards
         current_q_value = self.q_table.get_q_value(obs_hash, actions)
         updated_value = current_q_value + self.learning_rate * (target - current_q_value)
         self.q_table.set_q_value(obs_hash, actions, updated_value)
-        
-        # Decay the exploration and learning rates
-        # self.exploration_rate = max(self.min_exploration, self.exploration_rate * self.exploration_decay)
-        # self.learning_rate = max(self.min_learning_rate, self.learning_rate * self.learning_rate_decay)
+
+
+class DoubleQLearning(BaseAgent):
+    def __init__(self, env, exploration_strategy, learning_rate=0.1, discount_factor=0.9):
+        super().__init__(env, exploration_strategy)
+        self.q_table2 = QTable()
+        self.learning_rate = learning_rate
+        self.discount_factor = discount_factor
+
+    def act(self, obs_hash, explore=False):
+        if explore:
+            return self.exploration_strategy.select_action(self, obs_hash)
+        else:
+            q1_best = self.q_table.best_actions(obs_hash)
+            q2_best = self.q_table2.best_actions(obs_hash)
+            best = q1_best if q1_best is not None else q2_best
+            if best is None:
+                return self.env.action_space.sample().tolist()
+            return best
+
+    def learn(self, obs_hash, actions, next_state_hash, rewards, done):
+        if random.random() < 0.5:
+            max_next_q_value = self.q_table.get_max_q_value(next_state_hash)
+            target = rewards + self.discount_factor * max_next_q_value if not done else rewards
+            current_q_value = self.q_table2.get_q_value(obs_hash, actions)
+            updated_value = current_q_value + self.learning_rate * (target - current_q_value)
+            self.q_table2.set_q_value(obs_hash, actions, updated_value)
+        else:
+            max_next_q_value = self.q_table2.get_max_q_value(next_state_hash)
+            target = rewards + self.discount_factor * max_next_q_value if not done else rewards
+            current_q_value = self.q_table.get_q_value(obs_hash, actions)
+            updated_value = current_q_value + self.learning_rate * (target - current_q_value)
+            self.q_table.set_q_value(obs_hash, actions, updated_value)
 
 
 def game_loop(env, agent, training=False, num_episodes=1, msx_steps_per_episode=300, render=False, create_video=False, qtable_file=None):
@@ -181,7 +211,7 @@ def game_loop(env, agent, training=False, num_episodes=1, msx_steps_per_episode=
 
             if render:
                 env.render()
-                time.sleep(0.5)
+                time.sleep(0.1)
             
             if episode_steps > msx_steps_per_episode:
                 total_failures +=1
@@ -191,7 +221,7 @@ def game_loop(env, agent, training=False, num_episodes=1, msx_steps_per_episode=
 
         avg_steps = np.mean(total_steps)
         avg_return = np.mean(total_returns)
-        success_rate = 1- (total_failures/(episode+1))
+        success_rate = (1- (total_failures/(episode+1)))*100
         total_success_rate.append(success_rate)
         total_avg_steps.append(avg_steps)
         total_avg_returns.append(avg_return)
@@ -230,8 +260,8 @@ def game_loop(env, agent, training=False, num_episodes=1, msx_steps_per_episode=
         print(f"Saving movie in {filename}.")
         env.save_video(filename)
 
-    # if training and qtable_file is not None:
-    #     agent.q_table.save_table(qtable_file)
+    if training and qtable_file is not None:
+        agent.q_table.save_table(qtable_file)
 
 if __name__ == "__main__":
 
@@ -243,16 +273,17 @@ if __name__ == "__main__":
     )
 
     # Set up exploration strategy
-    epsilon_greedy_strategy = EpsilonGreedy(exploration_rate=1.0, min_exploration=0.01, exploration_decay=0.995)
-    # ucb_strategy = UCB(c=2)
+    epsilon_greedy_strategy = EpsilonGreedy(exploration_rate=1.0, min_exploration=0.02, exploration_decay=0.99)
+    # ucb_strategy = UCB(c=5)
 
     # Set up the Q agent
     agent = QLearning(env, 
                       exploration_strategy=epsilon_greedy_strategy,
-                      learning_rate=0.3,
-                      discount_factor=0.98, 
-                      learning_rate_decay=0.999, 
+                      # exploration_strategy=ucb_strategy,
+                      learning_rate=0.1,
+                      discount_factor=0.9,
+                      learning_rate_decay=0.995,
                       min_learning_rate=0.01)
 
     # Train the agent
-    game_loop(env, agent, training=True, num_episodes=100000, msx_steps_per_episode=150, render=False, qtable_file='qtable')
+    game_loop(env, agent, training=True, num_episodes=10000, msx_steps_per_episode=300, render=False, qtable_file='qtable')
