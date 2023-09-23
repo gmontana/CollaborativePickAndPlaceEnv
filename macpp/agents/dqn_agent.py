@@ -67,7 +67,7 @@ class DQNAgent:
         self.env = env
         agent_obs_len = 4 + (4 * (self.env.n_agents - 1)) + (3 * self.env.n_objects) + (2 * self.env.n_objects)
         self.state_size = agent_obs_len * self.env.n_agents
-        self.action_size = len(env.action_space)
+        self.action_size = np.prod(env.action_space.nvec)
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
         self.network = DQNNetwork(self.state_size, self.action_size).to(device)
@@ -85,13 +85,13 @@ class DQNAgent:
         self.batch_size = batch_size
 
     def select_action(self, state):
-        state = torch.FloatTensor(state).unsqueeze(0).to(self.device)
+        state_tensor = torch.FloatTensor(state).unsqueeze(0).to(self.device)
+        with torch.no_grad():
+            q_values = self.network(state_tensor)
         if self.exploration_strategy.select_action(self, state):
-            return random.choice(range(self.action_size))
+            return [random.choice(range(n)) for n in self.env.action_space.nvec]
         else:
-            with torch.no_grad():
-                q_values = self.network(state)
-                return torch.argmax(q_values).item()
+            return [torch.argmax(q_values[i]).item() for i in range(self.env.n_agents)]
 
 
     def train(self):
@@ -137,8 +137,8 @@ def game_loop(env, agent, training=True, num_episodes=10000, max_steps_per_episo
             if render:
                 env.render()
 
-            action = agent.select_action(obs)
-            next_obs, reward, done, _ = env.step([action])
+            actions = agent.select_action(obs)
+            next_obs, reward, done, _ = env.step(actions)
             next_obs = flatten_obs(next_obs)
 
             if training:
