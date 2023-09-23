@@ -24,7 +24,7 @@ class EpsilonGreedy(ExplorationStrategy):
                 return agent.env.action_space.sample().tolist()
             return best
 
-    def decay_exploration_rate(self):
+    def decay(self):
         self.exploration_rate = max(self.min_exploration, self.exploration_rate * self.exploration_decay)
 
 class UCB(ExplorationStrategy):

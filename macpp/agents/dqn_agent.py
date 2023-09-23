@@ -4,7 +4,6 @@ import torch.optim as optim
 import torch.nn.functional as F
 from collections import namedtuple, deque
 import random
-from exploration import EpsilonGreedy
 import numpy as np
 from torch.optim.lr_scheduler import StepLR
 from torch.nn.utils.clip_grad import clip_grad_norm_
@@ -163,6 +162,7 @@ def game_loop(env, agent, training=True, num_episodes=10000, max_steps_per_episo
 if __name__ == "__main__":
 
     from macpp.core.environment import MACPPEnv
+    from macpp.agents.exploration import EpsilonGreedy
 
     # Set up the environment
     env = MACPPEnv(
