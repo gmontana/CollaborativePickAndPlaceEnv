@@ -7,10 +7,25 @@ import random
 import numpy as np
 from torch.optim.lr_scheduler import StepLR
 from torch.nn.utils.clip_grad import clip_grad_norm_
+from typing import Dict, Any
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 Experience = namedtuple('Experience', ['state', 'action', 'reward', 'next_state', 'done'])
+
+
+def flatten_obs(obs: Dict[str, Dict[str, Any]]) -> np.ndarray:
+    flat_list = []
+    for agent_key, agent_obs in obs.items():
+        for key, value in agent_obs.items():
+            if isinstance(value, (int, float)):
+                flat_list.append(value)
+            elif isinstance(value, (list, np.ndarray)):
+                flat_list.extend(value)
+            else:
+                raise ValueError(f"Unsupported data type for key {key}: {type(value)}")
+    return np.array(flat_list)
+
 
 class ExperienceReplay:
     def __init__(self, capacity):
@@ -47,7 +62,7 @@ class DQNAgent:
     def __init__(self, env, exploration_strategy, learning_rate=0.001, gamma=0.99, buffer_size=10000, batch_size=64, tau=0.1):
         self.env = env
         self.state_size = env.observation_space.shape[0]
-        self.action_size = env.action_space.n
+        self.action_size = len(env.action_space)
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
         self.network = DQNNetwork(self.state_size, self.action_size).to(device)
@@ -109,22 +124,24 @@ def game_loop(env, agent, training=True, num_episodes=10000, max_steps_per_episo
     all_losses = []
     failure_count = 0
     for episode in range(num_episodes):
-        state = env.reset()
+        obs = env.reset()
+        obs = flatten_obs(obs)
         episode_reward = 0
         for step in range(max_steps_per_episode):
             if render:
                 env.render()
 
-            action = agent.select_action(state)
-            next_state, reward, done, _ = env.step(action)
+            action = agent.select_action(obs)
+            next_obs, reward, done, _ = env.step(action)
+            next_obs = flatten_obs(next_obs)
 
             if training:
-                agent.memory.push(state, action, reward, next_state, done)
+                agent.memory.push(obs, action, reward, next_obs, done)
                 loss = agent.train()
                 all_losses.append(loss)
 
             episode_reward += reward
-            state = next_state
+            obs = next_obs
 
             if done:
                 break
