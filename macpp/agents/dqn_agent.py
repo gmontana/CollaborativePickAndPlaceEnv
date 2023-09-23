@@ -49,19 +49,17 @@ class ExperienceReplay:
     def __len__(self):
         return len(self.buffer)
 
-
 class DQNNetwork(nn.Module):
-    def __init__(self, input_dim, output_dim):
+    def __init__(self, input_dim, n_agents, n_actions):
         super(DQNNetwork, self).__init__()
         self.fc1 = nn.Linear(input_dim, 128)
         self.fc2 = nn.Linear(128, 128)
-        self.fc3 = nn.Linear(128, output_dim)
+        self.fc3 = nn.Linear(128, n_agents * n_actions)
 
     def forward(self, x):
         x = nn.ReLU()(self.fc1(x))
         x = nn.ReLU()(self.fc2(x))
         return self.fc3(x)
-
 
 class DQNAgent:
     def __init__(self, env, exploration_strategy, learning_rate=0.001, gamma=0.99, buffer_size=10000, batch_size=64, tau=0.1):
@@ -71,8 +69,10 @@ class DQNAgent:
         self.action_size = np.prod(env.action_space.nvec)
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-        self.network = DQNNetwork(self.state_size, self.action_size).to(self.device)
-        self.target_network = DQNNetwork(self.state_size, self.action_size).to(self.device)
+        self.n_actions = 6 
+        self.network = DQNNetwork(self.state_size, self.env.n_agents, self.n_actions).to(self.device)
+        self.target_network = DQNNetwork(self.state_size, self.env.n_agents, self.n_actions).to(self.device)
+
         self.target_network.load_state_dict(self.network.state_dict())
         self.target_network.eval()
 
@@ -90,17 +90,17 @@ class DQNAgent:
         # Get Q-values from the network
         with torch.no_grad():
             q_values = self.network(state_tensor)
+        q_values = q_values.reshape(self.env.n_agents, -1)
 
         actions = []
-        for _ in range(self.env.n_agents):
+        for agent_idx in range(self.env.n_agents):
             if random.random() < self.exploration_strategy.epsilon:
-                action = random.randint(0, self.action_size - 1)
+                action = random.randint(0, self.n_actions - 1)
             else:
-                action = torch.argmax(q_values).item()
+                action = torch.argmax(q_values[agent_idx]).item()
             actions.append(action)
 
         return actions
-
 
     def train(self):
         if len(self.memory) < self.batch_size:
@@ -117,8 +117,7 @@ class DQNAgent:
         next_states = torch.FloatTensor(next_states).to(self.device)
         dones = torch.BoolTensor(dones).to(self.device)
 
-        # print(self.network(states).shape)
-        # print(actions.shape)
+        # print(f'Action shape for current_q_values: {actions.shape}')
 
         current_q_values = self.network(states).gather(1, actions)
 
@@ -212,6 +211,7 @@ if __name__ == "__main__":
 
     from macpp.core.environment import MACPPEnv
     from macpp.agents.exploration import EpsilonGreedy
+    from macpp.core.environment import Action
 
     # Set up the environment
     env = MACPPEnv(
