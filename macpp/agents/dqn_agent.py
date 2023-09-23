@@ -13,21 +13,21 @@ device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 Experience = namedtuple('Experience', ['state', 'action', 'reward', 'next_state', 'done'])
 
-
-def flatten_obs(obs_dict):
+def flatten_obs(obs_tuple):
     flattened_obs = []
-    for _, agent_obs in obs_dict.items():
-        agent_data = [
-            agent_obs['self']['position'][0], agent_obs['self']['position'][1],
-            agent_obs['self']['picker_status'], agent_obs['self']['carrying_object']
-        ]
-        for other_agent in agent_obs['agents']:
-            agent_data.extend([other_agent['position'][0], other_agent['position'][1], other_agent['picker_status'], other_agent['carrying_object']])
-        for obj in agent_obs['objects']:
-            agent_data.extend([obj['position'][0], obj['position'][1], obj['id']])
-        for goal in agent_obs['goals']:
-            agent_data.extend([goal[0], goal[1]])
-        flattened_obs.extend(agent_data)
+    for obs_dict in obs_tuple:
+        for agent_key, agent_obs in obs_dict.items():
+            agent_data = [
+                agent_obs['self']['position'][0], agent_obs['self']['position'][1],
+                agent_obs['self']['picker'], agent_obs['self']['carrying_object']
+            ]
+            for other_agent in agent_obs['agents']:
+                agent_data.extend([other_agent['position'][0], other_agent['position'][1], other_agent['picker'], other_agent['carrying_object']])
+            for obj in agent_obs['objects']:
+                agent_data.extend([obj['position'][0], obj['position'][1], obj['id']])
+            for goal in agent_obs['goals']:
+                agent_data.extend([goal[0], goal[1]])
+            flattened_obs.extend(agent_data)
     return flattened_obs
 
 
