@@ -8,26 +8,27 @@ import numpy as np
 from torch.optim.lr_scheduler import StepLR
 from torch.nn.utils.clip_grad import clip_grad_norm_
 from typing import Dict, Any
+from abc import ABC, abstractmethod
 
-device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 Experience = namedtuple('Experience', ['state', 'action', 'reward', 'next_state', 'done'])
 
-def flatten_obs(obs_tuple):
+def flatten_obs(obs):
+    # print(f'\nDEBUG: obs value: {obs}\n')
+    # print(type(obs))
     flattened_obs = []
-    for obs_dict in obs_tuple:
-        for agent_key, agent_obs in obs_dict.items():
-            agent_data = [
-                agent_obs['self']['position'][0], agent_obs['self']['position'][1],
-                agent_obs['self']['picker'], agent_obs['self']['carrying_object']
-            ]
-            for other_agent in agent_obs['agents']:
-                agent_data.extend([other_agent['position'][0], other_agent['position'][1], other_agent['picker'], other_agent['carrying_object']])
-            for obj in agent_obs['objects']:
-                agent_data.extend([obj['position'][0], obj['position'][1], obj['id']])
-            for goal in agent_obs['goals']:
-                agent_data.extend([goal[0], goal[1]])
-            flattened_obs.extend(agent_data)
+    for _, agent_obs in obs.items():
+        agent_data = [
+            agent_obs['self']['position'][0], agent_obs['self']['position'][1],
+            agent_obs['self']['picker'], agent_obs['self']['carrying_object'] if agent_obs['self']['carrying_object'] is not None else -1
+        ]
+        for other_agent in agent_obs['agents']:
+            agent_data.extend([other_agent['position'][0], other_agent['position'][1], other_agent['picker'], other_agent['carrying_object'] if other_agent['carrying_object'] is not None else -1])
+        for obj in agent_obs['objects']:
+            agent_data.extend([obj['position'][0], obj['position'][1], obj['id']])
+        for goal in agent_obs['goals']:
+            agent_data.extend([goal[0], goal[1]])
+        flattened_obs.extend(agent_data)
     return flattened_obs
 
 
@@ -70,8 +71,8 @@ class DQNAgent:
         self.action_size = np.prod(env.action_space.nvec)
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-        self.network = DQNNetwork(self.state_size, self.action_size).to(device)
-        self.target_network = DQNNetwork(self.state_size, self.action_size).to(device)
+        self.network = DQNNetwork(self.state_size, self.action_size).to(self.device)
+        self.target_network = DQNNetwork(self.state_size, self.action_size).to(self.device)
         self.target_network.load_state_dict(self.network.state_dict())
         self.target_network.eval()
 
@@ -84,14 +85,21 @@ class DQNAgent:
         self.tau = tau
         self.batch_size = batch_size
 
-    def select_action(self, state):
-        state_tensor = torch.FloatTensor(state).unsqueeze(0).to(self.device)
+    def select_action(self, obs):
+        state_tensor = torch.FloatTensor(obs).unsqueeze(0).to(self.device)
+        # Get Q-values from the network
         with torch.no_grad():
             q_values = self.network(state_tensor)
-        if self.exploration_strategy.select_action(self, state):
-            return [random.choice(range(n)) for n in self.env.action_space.nvec]
-        else:
-            return [torch.argmax(q_values[i]).item() for i in range(self.env.n_agents)]
+
+        actions = []
+        for _ in range(self.env.n_agents):
+            if random.random() < self.exploration_strategy.epsilon:
+                action = random.randint(0, self.action_size - 1)
+            else:
+                action = torch.argmax(q_values).item()
+            actions.append(action)
+
+        return actions
 
 
     def train(self):
@@ -107,9 +115,19 @@ class DQNAgent:
         next_states = torch.FloatTensor(next_states).to(self.device)
         dones = torch.BoolTensor(dones).to(self.device)
 
+        # print(f'state shape: {states.shape}')
+        # print(f'action shape: {actions.shape}')
+
+        actions = torch.LongTensor(actions).unsqueeze(1).to(self.device)
         current_q_values = self.network(states).gather(1, actions)
+
         next_q_values = self.target_network(next_states).max(1)[0].detach()
         target_q_values = rewards + (self.gamma * next_q_values * (~dones))
+
+        target_q_values = target_q_values.unsqueeze(1)
+
+        # print("current_q_values shape:", current_q_values.shape)
+        # print("target_q_values shape:", target_q_values.shape)
 
         loss = F.mse_loss(current_q_values, target_q_values.unsqueeze(1))
         self.optimizer.zero_grad()
@@ -122,7 +140,7 @@ class DQNAgent:
         self.target_network.load_state_dict(self.network.state_dict())
 
     def decay_epsilon(self):
-        self.exploration_strategy.decay_exploration_rate()
+        self.exploration_strategy.decay()
 
 
 def game_loop(env, agent, training=True, num_episodes=10000, max_steps_per_episode=300, render=False, model_file='dqn_model'):
@@ -130,19 +148,25 @@ def game_loop(env, agent, training=True, num_episodes=10000, max_steps_per_episo
     all_losses = []
     failure_count = 0
     for episode in range(num_episodes):
-        obs = env.reset()
-        obs = flatten_obs(obs)
+        obs, _ = env.reset()
+        # print(f'---- Obs after reset type: {type(obs)}')
+        # print(obs)
+        obs_flat = flatten_obs(obs)
         episode_reward = 0
         for step in range(max_steps_per_episode):
             if render:
                 env.render()
 
-            actions = agent.select_action(obs)
+            actions = agent.select_action(obs_flat)
+            # print(f'Actions: {actions}')
             next_obs, reward, done, _ = env.step(actions)
-            next_obs = flatten_obs(next_obs)
+
+            # print(f'---- Obs after step type: {type(next_obs)}')
+            # print(next_obs)
+            next_obs_flat = flatten_obs(next_obs)
 
             if training:
-                agent.memory.push(obs, actions, reward, next_obs, done)
+                agent.memory.push(obs_flat, actions, reward, next_obs_flat, done)
                 loss = agent.train()
                 all_losses.append(loss)
 
@@ -169,7 +193,8 @@ def game_loop(env, agent, training=True, num_episodes=10000, max_steps_per_episo
         if episode % 100 == 0:
             avg_reward = sum(total_rewards[-100:]) / 100
             success_rate = 1 - (failure_count / 100)
-            avg_loss = np.mean(all_losses[-100:])
+            valid_losses = [loss for loss in all_losses[-100:] if loss is not None]
+            avg_loss = np.mean(valid_losses)
             print(f"Episode {episode}/{num_episodes}: Avg Reward: {avg_reward:.2f}, Success rate: {success_rate:.2f}, Avg Loss: {avg_loss:.4f}, Epsilon: {agent.exploration_strategy.epsilon:.2f}")
 
         # Save the model periodically
@@ -189,11 +214,11 @@ if __name__ == "__main__":
 
     # Set up the environment
     env = MACPPEnv(
-        grid_size=(3, 3), n_agents=2, n_pickers=1, n_objects=1, cell_size=300, debug_mode=True
+        grid_size=(3, 3), n_agents=2, n_pickers=1, n_objects=1, cell_size=300, debug_mode=False
     )
 
     # Set up exploration strategy
-    epsilon_greedy_strategy = EpsilonGreedy(exploration_rate=1.0, min_exploration=0.02, exploration_decay=0.99)
+    epsilon_greedy_strategy = EpsilonGreedy(epsilon=1.0, min_epsilon=0.02, epsilon_decay=0.99)
 
     # Set up the agent
     agent = DQNAgent(env, epsilon_greedy_strategy,learning_rate=0.001, gamma=0.99, buffer_size=10000, batch_size=64, tau=0.1)
