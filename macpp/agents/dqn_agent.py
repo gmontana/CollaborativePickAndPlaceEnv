@@ -40,6 +40,8 @@ class DQNNetwork(nn.Module):
         self.fc1 = nn.Linear(input_dim, 128)
         self.fc2 = nn.Linear(128, 128)
         self.fc3 = nn.Linear(128, n_agents * n_actions)
+        self.n_agents = n_agents
+        self.n_actions = n_actions
 
     def forward(self, x):
         x = F.relu(self.fc1(x))
@@ -121,7 +123,7 @@ class DQNAgent:
         return np.array(flattened_observations).reshape(self.env.n_agents, -1)
 
     def select_action(self, state, training=True):
-        state_tensor = torch.FloatTensor(state).to(self.device).unsqueeze(0)  # Convert state to tensor and add batch dimension
+        state_tensor = torch.FloatTensor(state).to(self.device).unsqueeze(0)  
         q_values = self.network(state_tensor)
         
         if training and random.random() < self.exploration_strategy.epsilon:
