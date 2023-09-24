@@ -13,9 +13,6 @@ from abc import ABC, abstractmethod
 
 Experience = namedtuple('Experience', ['state', 'action', 'reward', 'next_state', 'done'])
 
-def flatten_obs(self, obs):
-    return np.array(obs).reshape(self.n_agents, -1)
-
 def check_nan(tensor, name):
     if torch.isnan(tensor).any():
         print(f"{name} contains NaN values!")
@@ -58,13 +55,13 @@ class DQNAgent:
     def __init__(self, env, exploration_strategy, learning_rate=0.001, gamma=0.99, buffer_size=10000, batch_size=64, tau=0.1):
         self.env = env
         agent_obs_len = 4 + (4 * (self.env.n_agents - 1)) + (3 * self.env.n_objects) + (2 * self.env.n_objects)
-        self.state_size = agent_obs_len * self.env.n_agents
+        self.obs_size = agent_obs_len * self.env.n_agents
         self.action_size = np.prod(env.action_space.nvec)
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
         self.n_actions = 6 
-        self.network = DQNNetwork(self.state_size, self.env.n_agents, self.n_actions).to(self.device)
-        self.target_network = DQNNetwork(self.state_size, self.env.n_agents, self.n_actions).to(self.device)
+        self.network = DQNNetwork(self.obs_size, self.env.n_agents, self.n_actions).to(self.device)
+        self.target_network = DQNNetwork(self.obs_size, self.env.n_agents, self.n_actions).to(self.device)
 
         self.target_network.load_state_dict(self.network.state_dict())
         self.target_network.eval()
@@ -78,18 +75,62 @@ class DQNAgent:
         self.tau = tau
         self.batch_size = batch_size
 
-    def select_action(self, state):
-        with torch.no_grad():
-            q_values = self.network(state)
-            action = q_values.argmax(dim=1)
-            joint_actions = self.decode_joint_action(action)
-            return joint_actions
+    def flatten_obs(self, obs):
+        # Extracting observations for each agent and flattening them
+        flattened_observations = []
+        for agent_key in sorted(obs.keys()):  # Ensure consistent order
+            agent_obs = obs[agent_key]
+            
+            # Extracting and flattening agent's own state
+            self_state = [
+                agent_obs['self']['position'][0],
+                agent_obs['self']['position'][1],
+                int(agent_obs['self']['picker']),
+                int(agent_obs['self']['carrying_object'] is not None)
+            ]
+            
+            # Extracting and flattening other agents' states
+            other_agents_state = []
+            for other_agent in agent_obs['agents']:
+                other_agents_state.extend([
+                    other_agent['position'][0],
+                    other_agent['position'][1],
+                    int(other_agent['picker']),
+                    int(other_agent['carrying_object'] is not None)
+                ])
+            
+            # Extracting and flattening objects' states
+            objects_state = []
+            for obj in agent_obs['objects']:
+                objects_state.extend([
+                    obj['position'][0],
+                    obj['position'][1]
+                ])
+            
+            # Extracting and flattening goals
+            goals_state = []
+            for goal in agent_obs['goals']:
+                goals_state.extend([
+                    goal[0],
+                    goal[1]
+                ])
+            
+            # Combining all flattened states for this agent
+            flattened_observations.extend(self_state + other_agents_state + objects_state + goals_state)
+        
+        return np.array(flattened_observations).reshape(self.env.n_agents, -1)
 
-    def decode_joint_action(self, joint_action):
-        actions = []
-        for _ in range(self.env.n_agents):
-            actions.append(joint_action % self.n_actions)
-            joint_action //= self.n_actions
+    def select_action(self, state, training=True):
+        state_tensor = torch.FloatTensor(state).to(self.device).unsqueeze(0)  # Convert state to tensor and add batch dimension
+        q_values = self.network(state_tensor)
+        
+        if training and random.random() < self.exploration_strategy.epsilon:
+            # Exploration: Randomly choose actions for each agent
+            actions = [random.choice(range(self.n_actions)) for _ in range(self.env.n_agents)]
+        else:
+            # Exploitation: Choose best actions based on Q-values
+            actions = q_values.argmax(dim=2).squeeze(0).tolist()
+        
         return actions
 
     def encode_joint_actions(self, actions):
@@ -160,9 +201,10 @@ def game_loop(env, agent, training=True, num_episodes=10000, max_steps_per_episo
     failure_count = 0
     for episode in range(num_episodes):
         obs, _ = env.reset()
-        # print(f'---- Obs after reset type: {type(obs)}')
-        # print(obs)
-        obs_flat = flatten_obs(obs)
+
+        print(f"Shape of obs: {np.shape(obs)}, Content: {obs}")
+        obs_flat = agent.flatten_obs(obs)
+
         episode_reward = 0
         for step in range(max_steps_per_episode):
             if render:
