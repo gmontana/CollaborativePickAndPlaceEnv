@@ -14,8 +14,6 @@ from abc import ABC, abstractmethod
 Experience = namedtuple('Experience', ['state', 'action', 'reward', 'next_state', 'done'])
 
 def flatten_obs(obs):
-    # print(f'\nDEBUG: obs value: {obs}\n')
-    # print(type(obs))
     flattened_obs = []
     for _, agent_obs in obs.items():
         agent_data = [
@@ -31,6 +29,10 @@ def flatten_obs(obs):
         flattened_obs.extend(agent_data)
     return flattened_obs
 
+
+def check_nan(tensor, name):
+    if torch.isnan(tensor).any():
+        print(f"{name} contains NaN values!")
 
 class ExperienceReplay:
     def __init__(self, capacity):
@@ -85,23 +87,25 @@ class DQNAgent:
         self.tau = tau
         self.batch_size = batch_size
 
-    def select_action(self, obs):
-        state_tensor = torch.FloatTensor(obs).unsqueeze(0).to(self.device)
-        # Get Q-values from the network
+    def select_action(self, state):
         with torch.no_grad():
-            q_values = self.network(state_tensor)
-        q_values = q_values.reshape(self.env.n_agents, -1)
-        # print("Shape of q_values in select_action:", q_values.shape)
+            q_values = self.network(state)
+            action = q_values.argmax(dim=1)
+            joint_actions = self.decode_joint_action(action)
+            return joint_actions
 
+    def decode_joint_action(self, joint_action):
         actions = []
-        for agent_idx in range(self.env.n_agents):
-            if random.random() < self.exploration_strategy.epsilon:
-                action = random.randint(0, self.n_actions - 1)
-            else:
-                action = torch.argmax(q_values[agent_idx]).item()
-            actions.append(action)
-
+        for _ in range(self.env.n_agents):
+            actions.append(joint_action % self.n_actions)
+            joint_action //= self.n_actions
         return actions
+
+    def encode_joint_actions(self, actions):
+        joint_actions = torch.zeros(actions.size(0), dtype=torch.long, device=self.device)
+        for agent_idx in range(self.env.n_agents):
+            joint_actions = joint_actions * self.n_actions + actions[:, agent_idx]
+        return joint_actions
 
     def train(self):
         if len(self.memory) < self.batch_size:
@@ -111,14 +115,23 @@ class DQNAgent:
         states, actions, rewards, next_states, dones = zip(*batch)
 
         states = torch.FloatTensor(states).to(self.device)
-        actions = torch.LongTensor(actions).reshape(-1, self.env.n_agents).to(self.device)
+
+        joint_actions = self.encode_joint_actions(actions)
 
         rewards = torch.FloatTensor(rewards).to(self.device)
         next_states = torch.FloatTensor(next_states).to(self.device)
         dones = torch.BoolTensor(dones).to(self.device)
 
-        current_q_values = self.network(states).gather(1, actions)
+        print("States Tensor Shape:", states.shape)
+        print("Actions Tensor Shape:", actions.shape)
+        print("Rewards Tensor Shape:", rewards.shape)
+        print("Next States Tensor Shape:", next_states.shape)
+        print("Dones Tensor Shape:", dones.shape)
+
+        current_q_values = self.network(states).gather(1, joint_actions.unsqueeze(1)).squeeze(1)
+
         # print("Shape of current_q_values:", current_q_values.shape)
+        check_nan(current_q_values, "current_q_values")
 
         next_q_values_all = self.target_network(next_states)
         next_q_values_all = next_q_values_all.view(-1, self.env.n_agents, self.n_actions)
@@ -131,11 +144,25 @@ class DQNAgent:
         expanded_dones = dones.int().unsqueeze(1).expand_as(next_q_values_max)
         target_q_values = (expanded_rewards + (1 - expanded_dones) * self.gamma * next_q_values_max).unsqueeze(2)
         target_q_values = target_q_values.squeeze(2)
+
+        print("Current Q-values Tensor Shape:", current_q_values.shape)
+        print("Next Q-values All Tensor Shape:", next_q_values_all.shape)
+
+        check_nan(target_q_values, "target_q_values")
         # print("Shape of target_q_values:", target_q_values.shape)
 
         loss = F.mse_loss(current_q_values, target_q_values)
+        # print("Loss:", loss.item())
+
+        print("Loss Tensor Shape:", loss.shape)
+
         self.optimizer.zero_grad()
         loss.backward()
+
+        for name, param in self.network.named_parameters():
+            if param.grad is not None:
+                print(f"Gradient shape for {name}:", param.grad.shape)
+
         torch.nn.utils.clip_grad.clip_grad_norm_(self.network.parameters(), max_norm=1.0)
         self.optimizer.step()
         self.scheduler.step()
@@ -201,8 +228,16 @@ def game_loop(env, agent, training=True, num_episodes=10000, max_steps_per_episo
             avg_reward = sum(total_rewards[-100:]) / 100
             success_rate = 1 - (failure_count / 100)
             valid_losses = [loss for loss in all_losses[-100:] if loss is not None]
-            avg_loss = np.mean(valid_losses)
-            print(f"Episode {episode}/{num_episodes}: Avg Reward: {avg_reward:.2f}, Success rate: {success_rate:.2f}, Avg Loss: {avg_loss:.4f}, Epsilon: {agent.exploration_strategy.epsilon:.2f}")
+            if valid_losses:
+                avg_loss = np.mean(valid_losses)
+            else:
+                avg_loss = "N/A" 
+
+            if isinstance(avg_loss, str):
+                print(f"Episode {episode}/{num_episodes}: Avg Reward: {avg_reward:.2f}, Success rate: {success_rate:.2f}, Avg Loss: {avg_loss}, Epsilon: {agent.exploration_strategy.epsilon:.2f}")
+            else:
+                print(f"Episode {episode}/{num_episodes}: Avg Reward: {avg_reward:.2f}, Success rate: {success_rate:.2f}, Avg Loss: {avg_loss:.4f}, Epsilon: {agent.exploration_strategy.epsilon:.2f}")
+
 
         # Save the model periodically
         if training and episode % 1000 == 0:
@@ -232,5 +267,5 @@ if __name__ == "__main__":
     agent = DQNAgent(env, epsilon_greedy_strategy,learning_rate=0.001, gamma=0.99, buffer_size=10000, batch_size=64, tau=0.1)
 
     # Train the agent
-    game_loop(env, agent, training=True, num_episodes=5000, max_steps_per_episode=500, render=False, model_file='dqn_model')
+    game_loop(env, agent, training=True, num_episodes=2, max_steps_per_episode=200, render=False, model_file='dqn_model')
 
