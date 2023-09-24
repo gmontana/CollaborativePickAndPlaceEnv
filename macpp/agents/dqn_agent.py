@@ -113,7 +113,7 @@ class DQNAgent:
 
         next_states = torch.FloatTensor(next_states).to(self.device)
 
-        dones = torch.tensor(dones).to(self.device).view(-1, self.env.n_agents)
+        dones = torch.BoolTensor([[self.env.done] * self.env.n_agents] * self.batch_size)
 
         print("States Tensor Shape:", states.shape)
         print("Actions Tensor Shape:", actions.shape)
@@ -122,11 +122,13 @@ class DQNAgent:
         print("Dones Tensor Shape:", dones.shape)
 
         # Current Q-values
-        state_action_values = self.policy_net(states).gather(2, actions.unsqueeze(-1)).squeeze(-1)
+        state_action_values = self.network(states).gather(2, joint_actions.unsqueeze(-1)).squeeze(-1)
 
         # Expected Q-values
-        next_state_values = torch.zeros(batch_size, self.env.n_agents).to(self.device)
-        next_state_values[non_final_mask] = self.target_net(non_final_next_states).max(2)[0].detach()
+        next_state_values = torch.zeros(self.batch_size, self.env.n_agents).to(self.device)
+        non_final_mask = ~dones.any(dim=1)
+        non_final_next_states = next_states[non_final_mask]
+        next_state_values[non_final_mask] = self.target_network(non_final_next_states).max(2)[0].detach()
         expected_state_action_values = (next_state_values * self.gamma) + rewards
 
         # Compute the loss
