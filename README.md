@@ -18,6 +18,7 @@
 - [Overview](#overview)
 - [Getting Started](#getting-started)
   - [Installation](#installation)
+  - [Interactive](#interactive)
 - [Usage](#usage)
   - [Action Space](#action-space)
   - [Observation Space](#observation-space)
@@ -29,13 +30,24 @@
 <!-- OVERVIEW -->
 # Overview
 
-In the Collaborative Pick and Place environment, multiple agents collaborate in a grid-based world to achieve a common objective. Their mission is to efficiently pick up and place objects (green circles) into designated goal positions (gray rectangles). Agents are divided into two categories:
+In the Collaborative Pick and Place environment, multiple agents collaborate in a grid-based world to achieve a common objective. 
+
+Their mission is to pick up and place all the objects (green circles) into designated goal positions (gray rectangles). 
+
+Agents are divided into two categories:
 
 - **Pickers**: These agents can automatically collect objects while traversing the grid but cannot place them in goal positions.
 
 - **Non-pickers**: In contrast, non-picker agents can deposit objects into goal positions upon reaching them but cannot pick up objects from the grid.
 
-Success in this task relies on the agents' ability to develop a collaborative strategy. Agents can perform movements in four cardinal directions (up, down, left, right) and have the option to wait in their current position. They can also engage in collaboration by using the 'PASS' action to transfer objects between adjacent agents. Successful object placement in goal positions results in rewards for the agents, and the task is considered complete when all objects are in their designated goal positions.
+
+Success in this task relies on the agents' ability to develop a collaborative strategy. 
+
+Agents can perform movements in four cardinal directions (UP, DOWN, LEFT, RIGHT) and have the option to WAIT in their current position. 
+
+A pair of agents can also engage in collaboration by using the PASS action to transfer objects between them. Successful object placement in goal positions results in rewards for the agents, and the task is considered complete when all objects are in their designated goal positions.
+
+To solve the task, there should always be at least one picker agent. 
 
 <!-- GETTING STARTED -->
 # Getting Started
@@ -54,6 +66,12 @@ git clone https://github.com/gmontana/collaborative_pick_and_place
 cd collaborative_pick_and_place
 pip install -e .
 ```
+
+<!-- INTERACTIVE -->
+
+## Interactive
+
+An interactive mode is available to manually control a two-agent game.
 
 <!-- USAGE EXAMPLES -->
 # Usage
