@@ -1,13 +1,14 @@
 # Collaborative Pick and Place Environment
 
-## Overview
+## Overview 
 
-In the Collaborative Pick and Place environment, multiple agents work together in a grid-based world to accomplish a common task. The goal is to 
-successfully pick up and place objects (green circles) into designated goal positions (gray rectangles). The agents populating this environment 
-can be of two types: **Pickers** have the ability to automatically pick up objects when moving over them, but are not able to drop them off;
-**Non-pickers** have the ability to automatically drop off objects they are carrying simply by reaching the goal positions, but they are not able to pick up objects from the grid. 
-In order to successfully move and drop objects on goal positions, the agents must learn a collaborative strategy. Any two ageent that are adejcent to each other in the grid can collaborate by transfering an object from one agent to each other. The task is completed when all the objects are placed on the goal locations.
+In the Collaborative Pick and Place environment, a cohort of agents collaborates within a grid-based realm to achieve a shared objective. Their mission entails the efficient collection and depositing of objects, represented as green circles, into designated goal positions, depicted as gray rectangles. The agents within this environment fall into two distinct categories:
 
+- **Pickers**: These agents possess the capability to autonomously collect objects as they traverse the grid. However, they lack the ability to deposit these items into goal positions.
+
+- **Non-pickers**: In contrast, non-picker agents can effortlessly deposit objects into goal positions when they reach them, but they do not possess the capacity to pick up objects from the grid.
+
+The successful execution of this task hinges on the agents' acquisition of a collaborative strategy. Adjacent agents within the grid can collaborate by transferring objects amongst themselves. The task is considered complete when all objects find their designated places on the goal positions.
 
 ## Action space
 The environment has defined an Action enum with the following actions: UP, DOWN, LEFT, RIGHT, PASS, and WAIT.
