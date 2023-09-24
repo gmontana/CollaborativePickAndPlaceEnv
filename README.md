@@ -2,13 +2,13 @@
 
 ## Overview 
 
-In the Collaborative Pick and Place environment, a cohort of agents collaborates within a grid-based realm to achieve a shared objective. Their mission entails the efficient collection and depositing of objects, represented as green circles, into designated goal positions, depicted as gray rectangles. The agents within this environment fall into two distinct categories:
+In the Collaborative Pick and Place environment, agents work together in a grid-based world to achieve a common goal. Their mission is to efficiently collect green circle objects and place them into gray rectangle goal positions. There are two types of agents in this environment:
 
-- **Pickers**: These agents possess the capability to autonomously collect objects as they traverse the grid. However, they lack the ability to deposit these items into goal positions.
+- **Pickers**: These agents can pick up objects as they move around the grid but can't place them in goal positions.
 
-- **Non-pickers**: In contrast, non-picker agents can effortlessly deposit objects into goal positions when they reach them, but they do not possess the capacity to pick up objects from the grid.
+- **Non-pickers**: These agents can place objects in goal positions but can't pick them up from the grid.
 
-The successful execution of this task hinges on the agents' acquisition of a collaborative strategy. Adjacent agents within the grid can collaborate by transferring objects amongst themselves. The task is considered complete when all objects find their designated places on the goal positions.
+To succeed, agents must collaborate. When two agents are next to each other on the grid, they can transfer objects between them. The task is completed when all objects are in their designated goal positions.
 
 ## Action space
 
