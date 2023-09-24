@@ -1,5 +1,5 @@
 <p align="center">
- <img width="350px" src="docs/img/logo.png" align="center" alt="Collaborative Pick and Place Environment" />
+ <img width="350px" src="logo.png" align="center" alt="Collaborative Pick and Place Environment" />
  <p align="center">A multi-agent reinforcement learning environment</p>
 </p>
 
