@@ -101,6 +101,8 @@ Where n-obs, n-rewards, n-done and n-info are LISTS of N items (where N is the n
 
 ## Observation Space
 
+To do
+
 ## Action space
 
 actions is a LIST of N INTEGERS (one of each agent) that should be executed in that step. The integers should correspond to the Enum below:
@@ -122,16 +124,15 @@ Also, ALL actions are valid. If an agent cannot move to a location or load, his 
 
 ## Rewards
 
-The rewards are calculated as follows. When one or more agents load a food, the food level is rewarded to the agents weighted with the level of each agent. Then the reward is normalised so that at the end, the sum of the rewards (if all foods have been picked-up) is one. 
-If you prefer code:
+The followsing rewards are assigned to the agents:
 
 ```python
-for a in adj_players: # the players that participated in loading the food
-    a.reward = float(a.level * food) # higher-leveled agents contribute more and are rewarded more. 
-    if self._normalize_reward:
-        a.reward = a.reward / float(
-            adj_player_level * self._food_spawned
-        )  # normalize reward so that the final sum of rewards is one.
+REWARD_STEP = -1
+REWARD_GOOD_PASS = 2
+REWARD_BAD_PASS = -2
+REWARD_DROP = 10
+REWARD_PICKUP = 5
+REWARD_COMPLETION = 20
 ```
 
 <!-- CITATION -->
