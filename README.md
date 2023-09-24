@@ -1,9 +1,12 @@
-<p align="center">
+<div style="text-align: center;">
 
- <p align="center">Collaborative Pick and Place</p>
- <img width="150px" src="logo.png" align="center" alt="Collaborative Pick and Place Environment" />
- <p align="center">A multi-agent reinforcement learning environment</p>
-</p>
+# Collaborative Pick and Place
+
+<img width="150px" src="logo.png" alt="Collaborative Pick and Place Environment" />
+
+A multi-agent reinforcement learning environment
+
+</div>
 
 <!-- TABLE OF CONTENTS -->
 <h1> Table of Contents </h1>
