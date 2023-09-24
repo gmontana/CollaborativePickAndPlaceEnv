@@ -1,48 +1,40 @@
-
 <p align="center">
- <img width="350px" src="docs/img/logo.png" align="center" alt="Level Based Foraging (LBF)" />
+ <img width="350px" src="docs/img/logo.png" align="center" alt="Collaborative Pick and Place Environment" />
  <p align="center">A multi-agent reinforcement learning environment</p>
 </p>
 
 <!-- TABLE OF CONTENTS -->
 <h1> Table of Contents </h1>
 
-- [About The Project](#about-the-project)
+- [Overview](#overview)
 - [Getting Started](#getting-started)
   - [Installation](#installation)
 - [Usage](#usage)
+  - [Action Space](#action-space)
   - [Observation Space](#observation-space)
-  - [Action space](#action-space)
   - [Rewards](#rewards)
 - [Please Cite](#please-cite)
 - [Contributing](#contributing)
 - [Contact](#contact)
 
+<!-- OVERVIEW -->
+# Overview
 
-<!-- ABOUT THE PROJECT -->
-# About The Project
+In the Collaborative Pick and Place environment, multiple agents collaborate in a grid-based world to achieve a common objective. Their mission is to efficiently pick up and place objects (green circles) into designated goal positions (gray rectangles). Agents are divided into two categories:
 
-This environment is a mixed cooperative-competitive game, which focuses on the coordination of the agents involved. Agents navigate a grid world and collect food by cooperating with other agents if needed.
+- **Pickers**: These agents can automatically collect objects while traversing the grid but cannot place them in goal positions.
 
-<p align="center">
- <img width="450px" src="docs/img/lbf.gif" align="center" alt="Level Based Foraging (LBF) illustration" />
-</p>
+- **Non-pickers**: In contrast, non-picker agents can deposit objects into goal positions upon reaching them but cannot pick up objects from the grid.
 
-More specifically, agents are placed in the grid world, and each is assigned a level. Food is also randomly scattered, each having a level on its own. Agents can navigate the environment and can attempt to collect food placed next to them. The collection of food is successful only if the sum of the levels of the agents involved in loading is equal to or higher than the level of the food. Finally, agents are awarded points equal to the level of the food they helped collect, divided by their contribution (their level). The figures below show two states of the game, one that requires cooperation, and one more competitive.
-
-
-While it may appear simple, this is a very challenging environment, requiring the cooperation of multiple agents while being competitive at the same time. In addition, the discount factor also necessitates speed for the maximisation of rewards. Each agent is only awarded points if it participates in the collection of food, and it has to balance between collecting low-levelled food on his own or cooperating in acquiring higher rewards. In situations with three or more agents, highly strategic decisions can be required, involving agents needing to choose with whom to cooperate. Another significant difficulty for RL algorithms is the sparsity of rewards, which causes slower learning.
-
-This is a Python simulator for level based foraging. It is based on OpenAI's RL framework, with modifications for the multi-agent domain. The efficient implementation allows for thousands of simulation steps per second on a single thread, while the rendering capabilities allows humans to visualise agent actions. Our implementation can support different grid sizes or agent/food count. Also, game variants are implemented, such as cooperative mode (agents always need to cooperate) and shared reward (all agents always get the same reward), which is attractive as a credit assignment problem.
-
-
+Success in this task relies on the agents' ability to develop a collaborative strategy. Agents can perform movements in four cardinal directions (up, down, left, right) and have the option to wait in their current position. They can also engage in collaboration by using the 'PASS' action to transfer objects between adjacent agents. Successful object placement in goal positions results in rewards for the agents, and the task is considered complete when all objects are in their designated goal positions.
 
 <!-- GETTING STARTED -->
 # Getting Started
 
 ## Installation
 
-Install using pip
+You can install the Collaborative Pick and Place environment using pip:
+
 ```sh
-pip install lbforaging
+pip install collaborative-pick-place
 
