@@ -10,13 +10,13 @@ class ExplorationStrategy(ABC):
 
 class EpsilonGreedy(ExplorationStrategy):
 
-    def __init__(self, exploration_rate=1.0, min_exploration=0.01, exploration_decay=0.995):
-        self.exploration_rate = exploration_rate
-        self.min_exploration = min_exploration
-        self.exploration_decay = exploration_decay
+    def __init__(self, epsilon=1.0, min_epsilon=0.01, epsilon_decay=0.995):
+        self.epsilon = epsilon
+        self.min_epsilon = min_epsilon
+        self.epsilon_decay = epsilon_decay
 
     def select_action(self, agent, obs_hash):
-        if random.random() < self.exploration_rate:
+        if random.random() < self.epsilon:
             return agent.env.action_space.sample().tolist()
         else:
             best = agent.q_table.best_actions(obs_hash)
@@ -25,7 +25,7 @@ class EpsilonGreedy(ExplorationStrategy):
             return best
 
     def decay(self):
-        self.exploration_rate = max(self.min_exploration, self.exploration_rate * self.exploration_decay)
+        self.epsilon = max(self.min_epsilon, self.epsilon * self.epsilon_decay)
 
 class UCB(ExplorationStrategy):
 
