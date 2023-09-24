@@ -47,15 +47,3 @@ You can install the Collaborative Pick and Place environment using pip:
 ```sh
 pip install collaborative-pick-place
 
-# Usage
-
-## Action space
-
-## Observation space
-
-## Rewards
-
-# Contributing
-
-# Contact
-
