@@ -1,4 +1,6 @@
 <p align="center">
+
+ <p align="center">Collaborative Pick and Place</p>
  <img width="150px" src="logo.png" align="center" alt="Collaborative Pick and Place Environment" />
  <p align="center">A multi-agent reinforcement learning environment</p>
 </p>
