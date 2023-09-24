@@ -13,22 +13,8 @@ from abc import ABC, abstractmethod
 
 Experience = namedtuple('Experience', ['state', 'action', 'reward', 'next_state', 'done'])
 
-def flatten_obs(obs):
-    flattened_obs = []
-    for _, agent_obs in obs.items():
-        agent_data = [
-            agent_obs['self']['position'][0], agent_obs['self']['position'][1],
-            agent_obs['self']['picker'], agent_obs['self']['carrying_object'] if agent_obs['self']['carrying_object'] is not None else -1
-        ]
-        for other_agent in agent_obs['agents']:
-            agent_data.extend([other_agent['position'][0], other_agent['position'][1], other_agent['picker'], other_agent['carrying_object'] if other_agent['carrying_object'] is not None else -1])
-        for obj in agent_obs['objects']:
-            agent_data.extend([obj['position'][0], obj['position'][1], obj['id']])
-        for goal in agent_obs['goals']:
-            agent_data.extend([goal[0], goal[1]])
-        flattened_obs.extend(agent_data)
-    return flattened_obs
-
+def flatten_obs(self, obs):
+    return np.array(obs).reshape(self.n_agents, -1)
 
 def check_nan(tensor, name):
     if torch.isnan(tensor).any():
@@ -59,11 +45,16 @@ class DQNNetwork(nn.Module):
         self.fc3 = nn.Linear(128, n_agents * n_actions)
 
     def forward(self, x):
-        x = nn.ReLU()(self.fc1(x))
-        x = nn.ReLU()(self.fc2(x))
-        return self.fc3(x)
+        x = F.relu(self.fc1(x))
+        x = F.relu(self.fc2(x))
+        x = self.fc3(x)
+        return x.view(x.size(0), self.n_agents, self.n_actions)
 
 class DQNAgent:
+    '''
+    This DQN implementation treats the multi-agent problem as a single-agent problem by flattening the observations and encoding the joint actions. 
+    The Q-value network outputs Q-values for all possible joint actions, and the action with the highest Q-value is selected.
+    '''
     def __init__(self, env, exploration_strategy, learning_rate=0.001, gamma=0.99, buffer_size=10000, batch_size=64, tau=0.1):
         self.env = env
         agent_obs_len = 4 + (4 * (self.env.n_agents - 1)) + (3 * self.env.n_objects) + (2 * self.env.n_objects)
@@ -118,9 +109,11 @@ class DQNAgent:
 
         joint_actions = self.encode_joint_actions(actions)
 
-        rewards = torch.FloatTensor(rewards).to(self.device)
+        rewards = torch.tensor(rewards).to(self.device).view(-1, self.env.n_agents)
+
         next_states = torch.FloatTensor(next_states).to(self.device)
-        dones = torch.BoolTensor(dones).to(self.device)
+
+        dones = torch.tensor(dones).to(self.device).view(-1, self.env.n_agents)
 
         print("States Tensor Shape:", states.shape)
         print("Actions Tensor Shape:", actions.shape)
@@ -128,31 +121,16 @@ class DQNAgent:
         print("Next States Tensor Shape:", next_states.shape)
         print("Dones Tensor Shape:", dones.shape)
 
-        current_q_values = self.network(states).gather(1, joint_actions.unsqueeze(1)).squeeze(1)
+        # Current Q-values
+        state_action_values = self.policy_net(states).gather(2, actions.unsqueeze(-1)).squeeze(-1)
 
-        # print("Shape of current_q_values:", current_q_values.shape)
-        check_nan(current_q_values, "current_q_values")
+        # Expected Q-values
+        next_state_values = torch.zeros(batch_size, self.env.n_agents).to(self.device)
+        next_state_values[non_final_mask] = self.target_net(non_final_next_states).max(2)[0].detach()
+        expected_state_action_values = (next_state_values * self.gamma) + rewards
 
-        next_q_values_all = self.target_network(next_states)
-        next_q_values_all = next_q_values_all.view(-1, self.env.n_agents, self.n_actions)
-        # print("Shape of next_q_values_all:", next_q_values_all.shape)
-
-        next_q_values_max = next_q_values_all.max(2)[0].detach()
-        # print("Shape of next_q_values_max:", next_q_values_max.shape)
-
-        expanded_rewards = rewards.unsqueeze(1).expand_as(next_q_values_max)
-        expanded_dones = dones.int().unsqueeze(1).expand_as(next_q_values_max)
-        target_q_values = (expanded_rewards + (1 - expanded_dones) * self.gamma * next_q_values_max).unsqueeze(2)
-        target_q_values = target_q_values.squeeze(2)
-
-        print("Current Q-values Tensor Shape:", current_q_values.shape)
-        print("Next Q-values All Tensor Shape:", next_q_values_all.shape)
-
-        check_nan(target_q_values, "target_q_values")
-        # print("Shape of target_q_values:", target_q_values.shape)
-
-        loss = F.mse_loss(current_q_values, target_q_values)
-        # print("Loss:", loss.item())
+        # Compute the loss
+        loss = F.smooth_l1_loss(state_action_values, expected_state_action_values)
 
         print("Loss Tensor Shape:", loss.shape)
 
