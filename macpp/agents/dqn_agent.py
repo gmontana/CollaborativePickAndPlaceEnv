@@ -130,10 +130,7 @@ class DQNAgent:
         expanded_rewards = rewards.unsqueeze(1).expand_as(next_q_values_max)
         expanded_dones = dones.int().unsqueeze(1).expand_as(next_q_values_max)
         target_q_values = (expanded_rewards + (1 - expanded_dones) * self.gamma * next_q_values_max).unsqueeze(2)
-
         target_q_values = target_q_values.squeeze(2)
-
-
         # print("Shape of target_q_values:", target_q_values.shape)
 
         loss = F.mse_loss(current_q_values, target_q_values)

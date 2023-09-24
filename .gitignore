@@ -1,2 +1,3 @@
-/wandb
 /__pycache__
+*.pyc
+/collaborative_pick_and_place.egg-info/*

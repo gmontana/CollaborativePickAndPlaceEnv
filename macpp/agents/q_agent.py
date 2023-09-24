@@ -158,7 +158,7 @@ class DoubleQLearning(BaseAgent):
         if random.random() < 0.5:
             max_next_q_value = self.q_table.get_max_q_value(next_state_hash)
             target = rewards + self.discount_factor * max_next_q_value if not done else rewards
-            current_q_value = self.q_table2.get_q_value(obs_hash, actions)
+    current_q_value = self.q_table2.get_q_value(obs_hash, actions)
             updated_value = current_q_value + self.learning_rate * (target - current_q_value)
             self.q_table2.set_q_value(obs_hash, actions, updated_value)
         else:
@@ -271,7 +271,7 @@ if __name__ == "__main__":
 
     # Set up the environment
     env = MACPPEnv(
-        grid_size=(3, 3), n_agents=2, n_pickers=1, n_objects=1, cell_size=300, debug_mode=False
+        grid_size=(3, 3), n_agents=2, n_pickers=1, n_objects=1, cell_size=300, debug_mode=True
     )
 
     # Set up exploration strategy
@@ -288,4 +288,4 @@ if __name__ == "__main__":
                       min_learning_rate=0.01)
 
     # Train the agent
-    game_loop(env, agent, training=True, num_episodes=5000, msx_steps_per_episode=500, render=False, qtable_file='qtable')
+    game_loop(env, agent, training=True, num_episodes=100, msx_steps_per_episode=300, render=False, qtable_file='qtable')

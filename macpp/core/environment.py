@@ -9,17 +9,13 @@ import time
 import sys
 import hashlib
 
-# sys.path.append("/home/gm13/Dropbox/mycode/envs/collaborative_pick_and_place/macpp/")
-# sys.path.append("/Users/giovannimontana/Dropbox/mycode/envs/collaborative_pick_and_place/macpp")
-
-
 # Environment's rewards
 REWARD_STEP = -1
-REWARD_GOOD_PASS = 1
-REWARD_BAD_PASS = -1
-REWARD_DROP = 2
-REWARD_PICKUP = 2
-REWARD_COMPLETION = 5
+REWARD_GOOD_PASS = 2
+REWARD_BAD_PASS = -2
+REWARD_DROP = 10
+REWARD_PICKUP = 5
+REWARD_COMPLETION = 20
 
 class Action(Enum):
     UP = 0
@@ -615,7 +611,7 @@ class MACPPEnv(gym.Env):
 
 def make_env(width: int, length: int, n_agents: int, n_pickers: int, n_objects: Optional[int] = None) -> Callable[[], MACPPEnv]:
     def _init():
-        return MACPPEnv(width, length, n_agents, n_pickers, n_objects)
+        return MACPPEnv((width, length), n_agents, n_pickers, n_objects)
     return _init
 
 

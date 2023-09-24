@@ -24,7 +24,7 @@ class Viewer:
 
         # Create the offscreen surface for rendering
         self.offscreen_surface = pygame.Surface(
-            (self.env.width * self.env.cell_size, self.env.length * self.env.cell_size)
+            (self.env.grid_width * self.env.cell_size, self.env.grid_length * self.env.cell_size)
         )
 
         # Load agent icons
@@ -39,7 +39,7 @@ class Viewer:
 
         # Create the screen for display
         self.screen = pygame.display.set_mode(
-            (self.env.width * self.env.cell_size, self.env.length * self.env.cell_size)
+            (self.env.grid_width * self.env.cell_size, self.env.grid_length * self.env.cell_size)
         )
         pygame.display.set_caption("Collaborative Multi-Agent Pick and Place")
 
@@ -55,19 +55,19 @@ class Viewer:
             return placeholder
 
     def _draw_grid(self):
-        for x in range(0, self.env.width * self.env.cell_size, self.env.cell_size):
+        for x in range(0, self.env.grid_width * self.env.cell_size, self.env.cell_size):
             pygame.draw.line(
                 self.offscreen_surface,
                 (0, 0, 0),
                 (x, 0),
-                (x, self.env.length * self.env.cell_size),
+                (x, self.env.grid_length * self.env.cell_size),
             )
-        for y in range(0, self.env.length * self.env.cell_size, self.env.cell_size):
+        for y in range(0, self.env.grid_length * self.env.cell_size, self.env.cell_size):
             pygame.draw.line(
                 self.offscreen_surface,
                 (0, 0, 0),
                 (0, y),
-                (self.env.width * self.env.cell_size, y),
+                (self.env.grid_width * self.env.cell_size, y),
             )
 
     def _draw_agents(self):
