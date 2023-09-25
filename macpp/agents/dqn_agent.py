@@ -118,6 +118,15 @@ class DQNAgent:
                 joint_action = self.decode_joint_action(joint_action_idx)
                 return joint_action
 
+    def encode_joint_action(self, joint_action):
+        """
+        Encode a joint action (list of individual actions) into a single joint action index.
+        """
+        joint_action_idx = 0
+        for i, action in enumerate(joint_action):
+            joint_action_idx += action * (6 ** i)
+        return joint_action_idx
+
     def decode_joint_action(self, joint_action_idx):
         joint_action = []
         for _ in range(self.env.n_agents):
@@ -125,7 +134,6 @@ class DQNAgent:
             joint_action.append(action)
             joint_action_idx //= 6
         return joint_action
-
 
     def train(self):
         if len(self.memory) < self.batch_size:
@@ -136,30 +144,26 @@ class DQNAgent:
         states, actions, rewards, next_states, dones = zip(*experiences)
 
         # Convert to tensors
-        states = np.array(states)
-        states = torch.FloatTensor(states).to(self.device)
-        actions = torch.tensor(actions, dtype=torch.long).to(self.device)
+        states = torch.FloatTensor(np.array(states)).to(self.device)
+        actions = torch.tensor(actions, dtype=torch.long).to(self.device).unsqueeze(-1)
         rewards = torch.FloatTensor(rewards).to(self.device)
-
-        next_states = np.array(next_states)
-        next_states = torch.FloatTensor(next_states).to(self.device)
-        print(f"Shape of next_states: {np.shape(next_states)}, Content: {next_states}")
+        next_states = torch.FloatTensor(np.array(next_states)).to(self.device)
         dones = torch.BoolTensor(dones).to(self.device)
 
+        # Expand the dimensions of the actions tensor
+        actions_expanded = actions.unsqueeze(-1)
+
         # Compute Q-values for the current states and actions
-        state_action_values = self.network(states).gather(1, actions).squeeze(-1)
+        state_action_values = q_values.gather(2, actions_expanded).squeeze(-1)
 
         # Compute the expected Q-values for the next states
         with torch.no_grad():
             non_final_mask = ~dones
-
-            print(f"Shape of non_final_mask: {np.shape(non_final_mask)}, Content: {non_final_mask}")
-            non_final_next_states = next_states[non_final_mask]
             next_state_values = torch.zeros(self.batch_size, device=self.device)
-            next_state_values[non_final_mask] = self.target_network(non_final_next_states).max(1)[0].detach()
+            next_state_values[non_final_mask] = self.target_network(next_states[non_final_mask]).max(1)[0].detach()
 
         # Compute the expected Q-values based on the Bellman equation
-        expected_state_action_values = rewards + (self.gamma * next_state_values)
+        expected_state_action_values = (rewards + (self.gamma * next_state_values)).unsqueeze(-1)
 
         # Compute the loss
         loss = F.smooth_l1_loss(state_action_values, expected_state_action_values)
@@ -175,13 +179,11 @@ class DQNAgent:
         return loss.item()
 
 
-
     def update_target_network(self):
         self.target_network.load_state_dict(self.network.state_dict())
 
     def decay_epsilon(self):
         self.exploration_strategy.decay()
-
 
 def game_loop(env, agent, training=True, num_episodes=10000, max_steps_per_episode=300, render=False, model_file='dqn_model'):
     total_rewards = []
@@ -189,50 +191,30 @@ def game_loop(env, agent, training=True, num_episodes=10000, max_steps_per_episo
     failure_count = 0
     for episode in range(num_episodes):
         obs, _ = env.reset()
-
         obs_flat = flatten_obs(obs)
-
         episode_reward = 0
         for step in range(max_steps_per_episode):
             if render:
                 env.render()
-
             actions = agent.select_action(obs_flat)
-
-            print("Length of actions in game_loop:", len(actions))
-            print("Actions in game_loop:", actions)
-
+            # print("Actions in game_loop:", actions)
             next_obs, reward, done, _ = env.step(actions)
-
-            # print(f'---- Obs after step type: {type(next_obs)}')
-            # print(next_obs)
             next_obs_flat = flatten_obs(next_obs)
-
             if training:
                 agent.memory.push(obs_flat, actions, reward, next_obs_flat, done)
                 loss = agent.train()
                 all_losses.append(loss)
-
             episode_reward += reward
             obs = next_obs
-
             if done:
                 break
-
             if step >= max_steps_per_episode:
                 failure_count +=1
-
         total_rewards.append(episode_reward)
-
-        # Decay epsilon for exploration-exploitation trade-off
         if training:
             agent.decay_epsilon()
-
-        # Periodically update the target network
         if training and episode % 100 == 0:
             agent.update_target_network()
-
-        # Logging
         if episode % 100 == 0:
             avg_reward = sum(total_rewards[-100:]) / 100
             success_rate = 1 - (failure_count / 100)
@@ -241,19 +223,9 @@ def game_loop(env, agent, training=True, num_episodes=10000, max_steps_per_episo
                 avg_loss = np.mean(valid_losses)
             else:
                 avg_loss = "N/A" 
-
-            if isinstance(avg_loss, str):
-                print(f"Episode {episode}/{num_episodes}: Avg Reward: {avg_reward:.2f}, Success rate: {success_rate:.2f}, Avg Loss: {avg_loss}, Epsilon: {agent.exploration_strategy.epsilon:.2f}")
-            else:
-                print(f"Episode {episode}/{num_episodes}: Avg Reward: {avg_reward:.2f}, Success rate: {success_rate:.2f}, Avg Loss: {avg_loss:.4f}, Epsilon: {agent.exploration_strategy.epsilon:.2f}")
-
-
-        # Save the model periodically
+            print(f"Episode {episode}/{num_episodes}: Avg Reward: {avg_reward:.2f}, Success rate: {success_rate:.2f}, Avg Loss: {avg_loss:.4f}, Epsilon: {agent.exploration_strategy.epsilon:.2f}")
         if training and episode % 1000 == 0:
             torch.save(agent.network.state_dict(), model_file + f"_{episode}.pth")
-
-    agent.exploration_strategy.decay()
-
     if training:
         torch.save(agent.network.state_dict(), model_file + "_final.pth")
 
