@@ -191,49 +191,47 @@ class DQNAgent:
     def decay_epsilon(self):
         self.exploration_strategy.decay()
 
-def game_loop(env, agent, training=True, num_episodes=1000, max_steps_per_episode=1000, render=False, model_file=None):
+def game_loop(env, agent, training=True, num_episodes=10000, max_steps_per_episode=300, render=False, model_file='dqn_model'):
     total_rewards = []
-    total_steps = []  
-    success_count = 0
-
+    all_losses = []
+    failure_count = 0
     for episode in range(num_episodes):
-        state = env.reset()
+        obs, _ = env.reset()
+        obs_flat = flatten_obs(obs)
         episode_reward = 0
-        steps = 0  # To count steps in the current episode
-
         for step in range(max_steps_per_episode):
-            action = agent.act(state)
-            next_state, reward, done, _ = env.step(action)
-            episode_reward += reward
-            steps += 1 
-
-            if training:
-                agent.remember(state, action, reward, next_state, done)
-                loss = agent.train()
-
-            state = next_state
-
             if render:
                 env.render()
-
+            actions = agent.select_action(obs_flat)
+            next_obs, reward, done, _ = env.step(actions)
+            next_obs_flat = flatten_obs(next_obs)
+            if training:
+                agent.memory.push(obs_flat, actions, reward, next_obs_flat, done)
+                loss = agent.train()
+                if loss is not None:
+                    all_losses.append(loss)
+            episode_reward += reward
+            obs = next_obs
             if done:
                 break
-
-        if steps < max_steps_per_episode:
-            success_count += 1
-
+            if step >= max_steps_per_episode:
+                failure_count +=1
         total_rewards.append(episode_reward)
-        total_steps.append(steps)  
-
+        if training:
+            agent.decay_epsilon()
+        if training and episode % 100 == 0:
+            agent.update_target_network()
         if episode % 100 == 0:
             avg_reward = sum(total_rewards[-100:]) / 100
-            success_rate = success_count / 100
-            avg_steps = sum(total_steps[-100:]) / 100  
-            print(f"Episode {episode}/{num_episodes}: Avg Reward: {avg_reward:.2f}, Success rate: {success_rate:.2f}, Avg Steps: {avg_steps:.2f}, Epsilon: {agent.exploration_strategy.epsilon:.2f}")
-            success_count = 0  
+            success_rate = 1 - (failure_count / 100)
+            valid_losses = [loss for loss in all_losses[-100:] if loss is not None]
+            avg_loss = sum(valid_losses) / len(valid_losses) if valid_losses else 0
+            if training and episode % 1000 == 0:
+                print(f"Episode {episode}/{num_episodes}: Avg Reward: {avg_reward:.2f}, Success rate: {success_rate:.2f}, Avg Loss: {avg_loss:.4f}, Epsilon: {agent.exploration_strategy.epsilon:.2f}")
+                torch.save(agent.network.state_dict(), model_file + f"_{episode}.pth")
+    if training:
+        torch.save(agent.network.state_dict(), model_file + "_final.pth")
 
-    if model_file:
-        agent.save(model_file)
 
 if __name__ == "__main__":
 
