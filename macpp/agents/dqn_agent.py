@@ -131,10 +131,14 @@ class DQNAgent:
         states, actions, rewards, next_states, dones = zip(*experiences)
 
         # Convert to tensors
+        states = np.array(states)
         states = torch.FloatTensor(states).to(self.device)
         actions = torch.tensor(actions, dtype=torch.long).to(self.device)
         rewards = torch.FloatTensor(rewards).to(self.device)
+
+        next_states = np.array(next_states)
         next_states = torch.FloatTensor(next_states).to(self.device)
+        print(f"Shape of next_states: {np.shape(next_states)}, Content: {next_states}")
         dones = torch.BoolTensor(dones).to(self.device)
 
         # Encode joint actions for multi-agent scenario
@@ -146,6 +150,8 @@ class DQNAgent:
         # Compute the expected Q-values for the next states
         with torch.no_grad():
             non_final_mask = ~dones
+
+            print(f"Shape of non_final_mask: {np.shape(non_final_mask)}, Content: {non_final_mask}")
             non_final_next_states = next_states[non_final_mask]
             next_state_values = torch.zeros(self.batch_size, device=self.device)
             next_state_values[non_final_mask] = self.target_network(non_final_next_states).max(1)[0].detach()
@@ -181,9 +187,7 @@ def game_loop(env, agent, training=True, num_episodes=10000, max_steps_per_episo
     for episode in range(num_episodes):
         obs, _ = env.reset()
 
-        print(f"Shape of obs: {np.shape(obs)}, Content: {obs}")
         obs_flat = flatten_obs(obs)
-        print(f"Shape of flattened obs: {np.shape(obs_flat)}, Content: {obs_flat}")
 
         episode_reward = 0
         for step in range(max_steps_per_episode):
