@@ -145,16 +145,24 @@ class DQNAgent:
 
         # Convert to tensors
         states = torch.FloatTensor(np.array(states)).to(self.device)
+        print(f"states type and values: {type(states)} {states}")
+
+        q_values = self.network(states)
+        print(f"q_values type and values: {type(q_values)} {q_values}")
+
         actions = torch.tensor(actions, dtype=torch.long).to(self.device).unsqueeze(-1)
         rewards = torch.FloatTensor(rewards).to(self.device)
         next_states = torch.FloatTensor(np.array(next_states)).to(self.device)
         dones = torch.BoolTensor(dones).to(self.device)
 
+        print(f"actions type and shape: {type(actions)} {len(actions)}")
+
         # Expand the dimensions of the actions tensor
         actions_expanded = actions.unsqueeze(-1)
+        print(f"action_expanded type and shape: {type(actions_expanded)} {len(actions_expanded)}")
 
         # Compute Q-values for the current states and actions
-        state_action_values = q_values.gather(2, actions_expanded).squeeze(-1)
+        state_action_values = q_values.gather(1, actions_expanded).squeeze(-1)
 
         # Compute the expected Q-values for the next states
         with torch.no_grad():
