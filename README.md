@@ -38,8 +38,7 @@ Agents are divided into two categories:
 
 - **Pickers**: These agents can automatically collect objects while traversing the grid but cannot place them in goal positions.
 
-- **Non-pickers**: In contrast, non-picker agents can deposit objects into goal positions upon reaching them but cannot pick up objects from the grid.
-
+- **Non-pickers**: In contrast, non-picker agents can drop off objects into goal positions upon reaching them but cannot pick up objects from the grid.
 
 Success in this task relies on the agents' ability to develop a collaborative strategy. 
 
@@ -47,7 +46,7 @@ Agents can perform movements in four cardinal directions (UP, DOWN, LEFT, RIGHT)
 
 A pair of agents can also engage in collaboration by using the PASS action to transfer objects between them. Successful object placement in goal positions results in rewards for the agents, and the task is considered complete when all objects are in their designated goal positions.
 
-To solve the task, there should always be at least one picker agent. 
+To solve the task, at least one picket agent is always required. 
 
 <!-- GETTING STARTED -->
 # Getting Started
@@ -84,19 +83,19 @@ import macpp
 
 Then create an environment:
 ```python
-env = gym.make("macpp-3x3-2-1-2-v0")
+env = gym.make("macpp-3x3-2a-1p-2o-v0")
 ```
 
 We offer a variety of environments using this template:
 ```
-macpp-{grid_size[0]}x{grid_size[1]}-{n_agents}-{n_pickers}-{n_objects}-v0
+macpp-{grid_size[0]}x{grid_size[1]}-{n_agents}a-{n_pickers}p-{n_objects}o-v0
 ```
 
 However you can register your own variation using different parameters:
 ```python
 from gym.envs.registration register
 
-env_name = f"macpp-{grid_size[0]}x{grid_size[1]}-{n_agents}-{n_pickers}-{n_objects}-v0"
+env_name = f"macpp-{grid_size[0]}x{grid_size[1]}-{n_agents}a-{n_pickers}p-{n_objects}o-v0"
     register(
         id=env_name,
         entry_point='macpp.core.environment:MACPPEnv',
