@@ -152,20 +152,16 @@ class DQNAgent:
         next_states = torch.FloatTensor(np.array(next_states)).to(self.device)
         dones = torch.BoolTensor(dones).to(self.device)
         
-        print("q_values shape:", q_values.shape)
+        # print("q_values shape:", q_values.shape)
 
-        # Flatten the actions tensor
         actions_flattened = actions.view(-1)
-        print("action_flattened shape:", actions_flattened.shape)
+        # print("action_flattened shape:", actions_flattened.shape)
 
-        # Index into the q_values tensor using the flattened actions tensor
         state_action_values_flattened = q_values.view(-1)[actions_flattened]
-        print("state_action_values_flattened shape:", state_action_values_flattened.shape)
+        # print("state_action_values_flattened shape:", state_action_values_flattened.shape)
 
-        # Reshape the resulting tensor
         state_action_values = state_action_values_flattened.view(64, 2)
-        print("state_action_values shape:", state_action_values.shape)
-
+        # print("state_action_values shape:", state_action_values.shape)
 
         # Compute the expected Q-values for the next states
         with torch.no_grad():
@@ -174,7 +170,7 @@ class DQNAgent:
             next_state_values[non_final_mask] = self.target_network(next_states[non_final_mask]).max(1)[0].detach()
 
         # Compute the expected Q-values based on the Bellman equation
-        expected_state_action_values = (rewards + (self.gamma * next_state_values)).unsqueeze(-1)
+        expected_state_action_values = (rewards + (self.gamma * next_state_values)).unsqueeze(-1).expand(-1, 2)
 
         # Compute the loss
         loss = F.smooth_l1_loss(state_action_values, expected_state_action_values)
@@ -189,53 +185,55 @@ class DQNAgent:
 
         return loss.item()
 
-
     def update_target_network(self):
         self.target_network.load_state_dict(self.network.state_dict())
 
     def decay_epsilon(self):
         self.exploration_strategy.decay()
 
-def game_loop(env, agent, training=True, num_episodes=10000, max_steps_per_episode=300, render=False, model_file='dqn_model'):
+def game_loop(env, agent, training=True, num_episodes=1000, max_steps_per_episode=1000, render=False, model_file=None):
     total_rewards = []
-    all_losses = []
-    failure_count = 0
+    total_steps = []  
+    success_count = 0
+
     for episode in range(num_episodes):
-        obs, _ = env.reset()
-        obs_flat = flatten_obs(obs)
+        state = env.reset()
         episode_reward = 0
+        steps = 0  # To count steps in the current episode
+
         for step in range(max_steps_per_episode):
+            action = agent.act(state)
+            next_state, reward, done, _ = env.step(action)
+            episode_reward += reward
+            steps += 1 
+
+            if training:
+                agent.remember(state, action, reward, next_state, done)
+                loss = agent.train()
+
+            state = next_state
+
             if render:
                 env.render()
-            actions = agent.select_action(obs_flat)
-            # print("Actions in game_loop:", actions)
-            next_obs, reward, done, _ = env.step(actions)
-            next_obs_flat = flatten_obs(next_obs)
-            if training:
-                agent.memory.push(obs_flat, actions, reward, next_obs_flat, done)
-                loss = agent.train()
-                all_losses.append(loss)
-            episode_reward += reward
-            obs = next_obs
+
             if done:
                 break
-            if step >= max_steps_per_episode:
-                failure_count +=1
+
+        if steps < max_steps_per_episode:
+            success_count += 1
+
         total_rewards.append(episode_reward)
-        if training:
-            agent.decay_epsilon()
-        if training and episode % 100 == 0:
-            agent.update_target_network()
+        total_steps.append(steps)  
+
         if episode % 100 == 0:
             avg_reward = sum(total_rewards[-100:]) / 100
-            success_rate = 1 - (failure_count / 100)
-            valid_losses = [loss for loss in all_losses[-100:] if loss is not None]
-        if training and episode % 1000 == 0:
-            print(f"Episode {episode}/{num_episodes}: Avg Reward: {avg_reward:.2f}, Success rate: {success_rate:.2f}, Avg Loss: {avg_loss:.4f}, Epsilon: {agent.exploration_strategy.epsilon:.2f}")
-            torch.save(agent.network.state_dict(), model_file + f"_{episode}.pth")
-    if training:
-        torch.save(agent.network.state_dict(), model_file + "_final.pth")
+            success_rate = success_count / 100
+            avg_steps = sum(total_steps[-100:]) / 100  
+            print(f"Episode {episode}/{num_episodes}: Avg Reward: {avg_reward:.2f}, Success rate: {success_rate:.2f}, Avg Steps: {avg_steps:.2f}, Epsilon: {agent.exploration_strategy.epsilon:.2f}")
+            success_count = 0  
 
+    if model_file:
+        agent.save(model_file)
 
 if __name__ == "__main__":
 
@@ -255,5 +253,5 @@ if __name__ == "__main__":
     agent = DQNAgent(env, epsilon_greedy_strategy,learning_rate=0.001, gamma=0.99, buffer_size=10000, batch_size=64, tau=0.1)
 
     # Train the agent
-    game_loop(env, agent, training=True, num_episodes=2, max_steps_per_episode=200, render=False, model_file='dqn_model')
+    game_loop(env, agent, training=True, num_episodes=500, max_steps_per_episode=300, render=False, model_file='dqn_model')
 
