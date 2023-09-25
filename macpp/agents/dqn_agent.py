@@ -145,24 +145,27 @@ class DQNAgent:
 
         # Convert to tensors
         states = torch.FloatTensor(np.array(states)).to(self.device)
-        print(f"states type and values: {type(states)} {states}")
-
         q_values = self.network(states)
-        print(f"q_values type and values: {type(q_values)} {q_values}")
 
         actions = torch.tensor(actions, dtype=torch.long).to(self.device).unsqueeze(-1)
         rewards = torch.FloatTensor(rewards).to(self.device)
         next_states = torch.FloatTensor(np.array(next_states)).to(self.device)
         dones = torch.BoolTensor(dones).to(self.device)
+        
+        print("q_values shape:", q_values.shape)
 
-        print(f"actions type and shape: {type(actions)} {len(actions)}")
+        # Flatten the actions tensor
+        actions_flattened = actions.view(-1)
+        print("action_flattened shape:", actions_flattened.shape)
 
-        # Expand the dimensions of the actions tensor
-        actions_expanded = actions.unsqueeze(-1)
-        print(f"action_expanded type and shape: {type(actions_expanded)} {len(actions_expanded)}")
+        # Index into the q_values tensor using the flattened actions tensor
+        state_action_values_flattened = q_values.view(-1)[actions_flattened]
+        print("state_action_values_flattened shape:", state_action_values_flattened.shape)
 
-        # Compute Q-values for the current states and actions
-        state_action_values = q_values.gather(1, actions_expanded).squeeze(-1)
+        # Reshape the resulting tensor
+        state_action_values = state_action_values_flattened.view(64, 2)
+        print("state_action_values shape:", state_action_values.shape)
+
 
         # Compute the expected Q-values for the next states
         with torch.no_grad():
@@ -227,12 +230,8 @@ def game_loop(env, agent, training=True, num_episodes=10000, max_steps_per_episo
             avg_reward = sum(total_rewards[-100:]) / 100
             success_rate = 1 - (failure_count / 100)
             valid_losses = [loss for loss in all_losses[-100:] if loss is not None]
-            if valid_losses:
-                avg_loss = np.mean(valid_losses)
-            else:
-                avg_loss = "N/A" 
-            print(f"Episode {episode}/{num_episodes}: Avg Reward: {avg_reward:.2f}, Success rate: {success_rate:.2f}, Avg Loss: {avg_loss:.4f}, Epsilon: {agent.exploration_strategy.epsilon:.2f}")
         if training and episode % 1000 == 0:
+            print(f"Episode {episode}/{num_episodes}: Avg Reward: {avg_reward:.2f}, Success rate: {success_rate:.2f}, Avg Loss: {avg_loss:.4f}, Epsilon: {agent.exploration_strategy.epsilon:.2f}")
             torch.save(agent.network.state_dict(), model_file + f"_{episode}.pth")
     if training:
         torch.save(agent.network.state_dict(), model_file + "_final.pth")
