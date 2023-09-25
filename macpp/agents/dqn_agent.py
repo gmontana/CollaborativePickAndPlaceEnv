@@ -104,18 +104,16 @@ class DQNAgent:
         self.tau = tau
         self.batch_size = batch_size
 
-
-    def select_action(self, state, training=True):
-        state_tensor = torch.FloatTensor(state).to(self.device).unsqueeze(0)  
-        q_values = self.network(state_tensor)
-        
+    def select_action(self, obs_flat, training=True):
+        '''
+        Input: flattened observation 
+        Output: a list of integers, one for each agent
+        '''
+        q_values = self.network(torch.FloatTensor(obs_flat).to(self.device))
         if training and random.random() < self.exploration_strategy.epsilon:
-            # Exploration: Randomly choose actions for each agent
-            actions = [random.choice(range(self.n_actions)) for _ in range(self.env.n_agents)]
+            actions = [random.choice(range(self.action_size)) for _ in range(self.env.n_agents)]
         else:
-            # Exploitation: Choose best actions based on Q-values
-            actions = q_values.argmax(dim=2).squeeze(0).tolist()
-        
+            actions = q_values.argmax(dim=1).tolist()
         return actions
 
     def encode_joint_actions(self, actions):
@@ -134,13 +132,16 @@ class DQNAgent:
 
         # Convert to tensors
         states = torch.FloatTensor(states).to(self.device)
-        actions = torch.tensor(actions, dtype=torch.long).to(self.device).unsqueeze(-1)
+        actions = torch.tensor(actions, dtype=torch.long).to(self.device)
         rewards = torch.FloatTensor(rewards).to(self.device)
         next_states = torch.FloatTensor(next_states).to(self.device)
         dones = torch.BoolTensor(dones).to(self.device)
 
+        # Encode joint actions for multi-agent scenario
+        joint_actions = self.encode_joint_actions(actions).unsqueeze(-1)
+
         # Compute Q-values for the current states and actions
-        state_action_values = self.network(states).gather(1, actions).squeeze(-1)
+        state_action_values = self.network(states).gather(1, joint_actions).squeeze(-1)
 
         # Compute the expected Q-values for the next states
         with torch.no_grad():
@@ -191,8 +192,8 @@ def game_loop(env, agent, training=True, num_episodes=10000, max_steps_per_episo
 
             actions = agent.select_action(obs_flat)
 
-            # print("Length of actions in game_loop:", len(actions))
-            # print("Actions in game_loop:", actions)
+            print("Length of actions in game_loop:", len(actions))
+            print("Actions in game_loop:", actions)
 
             next_obs, reward, done, _ = env.step(actions)
 
