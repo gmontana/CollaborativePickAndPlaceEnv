@@ -126,52 +126,45 @@ class DQNAgent:
 
     def train(self):
         if len(self.memory) < self.batch_size:
-            return
+            return None
 
-        batch = self.memory.sample(self.batch_size)
-        states, actions, rewards, next_states, dones = zip(*batch)
+        # Sample a batch from the replay buffer
+        experiences = self.memory.sample(self.batch_size)
+        states, actions, rewards, next_states, dones = zip(*experiences)
 
+        # Convert to tensors
         states = torch.FloatTensor(states).to(self.device)
-
-        joint_actions = torch.zeros(len(actions), dtype=torch.long, device=self.device)
-
-        rewards = torch.tensor(rewards).to(self.device).view(-1, self.env.n_agents)
-
+        actions = torch.tensor(actions, dtype=torch.long).to(self.device).unsqueeze(-1)
+        rewards = torch.FloatTensor(rewards).to(self.device)
         next_states = torch.FloatTensor(next_states).to(self.device)
+        dones = torch.BoolTensor(dones).to(self.device)
 
-        dones = torch.BoolTensor([[self.env.done] * self.env.n_agents] * self.batch_size)
+        # Compute Q-values for the current states and actions
+        state_action_values = self.network(states).gather(1, actions).squeeze(-1)
 
-        print("States Tensor Shape:", states.shape)
-        # print("Actions Tensor Shape:", actions.shape)
-        print("Rewards Tensor Shape:", rewards.shape)
-        print("Next States Tensor Shape:", next_states.shape)
-        print("Dones Tensor Shape:", dones.shape)
+        # Compute the expected Q-values for the next states
+        with torch.no_grad():
+            non_final_mask = ~dones
+            non_final_next_states = next_states[non_final_mask]
+            next_state_values = torch.zeros(self.batch_size, device=self.device)
+            next_state_values[non_final_mask] = self.target_network(non_final_next_states).max(1)[0].detach()
 
-        # Current Q-values
-        state_action_values = self.network(states).gather(2, joint_actions.unsqueeze(-1)).squeeze(-1)
-
-        # Expected Q-values
-        next_state_values = torch.zeros(self.batch_size, self.env.n_agents).to(self.device)
-        non_final_mask = ~dones.any(dim=1)
-        non_final_next_states = next_states[non_final_mask]
-        next_state_values[non_final_mask] = self.target_network(non_final_next_states).max(2)[0].detach()
-        expected_state_action_values = (next_state_values * self.gamma) + rewards
+        # Compute the expected Q-values based on the Bellman equation
+        expected_state_action_values = rewards + (self.gamma * next_state_values)
 
         # Compute the loss
         loss = F.smooth_l1_loss(state_action_values, expected_state_action_values)
 
-        print("Loss Tensor Shape:", loss.shape)
-
+        # Optimize the model
         self.optimizer.zero_grad()
         loss.backward()
-
-        for name, param in self.network.named_parameters():
+        for param in self.network.parameters():
             if param.grad is not None:
-                print(f"Gradient shape for {name}:", param.grad.shape)
-
-        torch.nn.utils.clip_grad.clip_grad_norm_(self.network.parameters(), max_norm=1.0)
+                param.grad.data.clamp_(-1, 1)
         self.optimizer.step()
-        self.scheduler.step()
+
+        return loss.item()
+
 
     def update_target_network(self):
         self.target_network.load_state_dict(self.network.state_dict())
