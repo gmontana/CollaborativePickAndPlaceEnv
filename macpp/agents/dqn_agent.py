@@ -104,23 +104,28 @@ class DQNAgent:
         self.tau = tau
         self.batch_size = batch_size
 
-    def select_action(self, obs_flat, training=True):
-        '''
-        Input: flattened observation 
-        Output: a list of integers, one for each agent
-        '''
-        q_values = self.network(torch.FloatTensor(obs_flat).to(self.device))
-        if training and random.random() < self.exploration_strategy.epsilon:
-            actions = [random.choice(range(self.action_size)) for _ in range(self.env.n_agents)]
+    def select_action(self, state):
+        sample = random.random()
+        if sample < self.exploration_strategy.epsilon:
+            # Exploration: Randomly select a joint action
+            return [random.randrange(6) for _ in range(self.env.n_agents)]
         else:
-            actions = q_values.argmax(dim=1).tolist()
-        return actions
+            # Exploitation: Use the Q-network to select the best joint action
+            with torch.no_grad():
+                state = torch.FloatTensor(state).to(self.device).unsqueeze(0)
+                q_values = self.network(state)
+                joint_action_idx = q_values.argmax().item()
+                joint_action = self.decode_joint_action(joint_action_idx)
+                return joint_action
 
-    def encode_joint_actions(self, actions):
-        joint_actions = torch.zeros(actions.size(0), dtype=torch.long, device=self.device)
-        for agent_idx in range(self.env.n_agents):
-            joint_actions = joint_actions * self.n_actions + actions[:, agent_idx]
-        return joint_actions
+    def decode_joint_action(self, joint_action_idx):
+        joint_action = []
+        for _ in range(self.env.n_agents):
+            action = joint_action_idx % 6
+            joint_action.append(action)
+            joint_action_idx //= 6
+        return joint_action
+
 
     def train(self):
         if len(self.memory) < self.batch_size:
@@ -141,11 +146,8 @@ class DQNAgent:
         print(f"Shape of next_states: {np.shape(next_states)}, Content: {next_states}")
         dones = torch.BoolTensor(dones).to(self.device)
 
-        # Encode joint actions for multi-agent scenario
-        joint_actions = self.encode_joint_actions(actions).unsqueeze(-1)
-
         # Compute Q-values for the current states and actions
-        state_action_values = self.network(states).gather(1, joint_actions).squeeze(-1)
+        state_action_values = self.network(states).gather(1, actions).squeeze(-1)
 
         # Compute the expected Q-values for the next states
         with torch.no_grad():
@@ -171,6 +173,7 @@ class DQNAgent:
         self.optimizer.step()
 
         return loss.item()
+
 
 
     def update_target_network(self):
