@@ -133,7 +133,7 @@ class DQNAgent:
 
         states = torch.FloatTensor(states).to(self.device)
 
-        joint_actions = self.encode_joint_actions(actions)
+        joint_actions = torch.zeros(len(actions), dtype=torch.long, device=self.device)
 
         rewards = torch.tensor(rewards).to(self.device).view(-1, self.env.n_agents)
 
@@ -142,7 +142,7 @@ class DQNAgent:
         dones = torch.BoolTensor([[self.env.done] * self.env.n_agents] * self.batch_size)
 
         print("States Tensor Shape:", states.shape)
-        print("Actions Tensor Shape:", actions.shape)
+        # print("Actions Tensor Shape:", actions.shape)
         print("Rewards Tensor Shape:", rewards.shape)
         print("Next States Tensor Shape:", next_states.shape)
         print("Dones Tensor Shape:", dones.shape)
