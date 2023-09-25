@@ -13,6 +13,36 @@ from abc import ABC, abstractmethod
 
 Experience = namedtuple('Experience', ['state', 'action', 'reward', 'next_state', 'done'])
 
+def flatten_obs(obs):
+    flattened = []
+    for agent, agent_obs in obs.items():
+        # Agent's own position
+        flattened.extend(agent_obs['self']['position'])
+        # Picker status (1 if True, 0 if False)
+        flattened.append(1 if agent_obs['self']['picker'] else 0)
+        # Carrying object status (1 if carrying, 0 if not)
+        flattened.append(1 if agent_obs['self']['carrying_object'] else 0)
+        
+        # Other agents' information
+        for other_agent in agent_obs['agents']:
+            flattened.extend(other_agent['position'])
+            flattened.append(1 if other_agent['picker'] else 0)
+            flattened.append(1 if other_agent['carrying_object'] else 0)
+        
+        # Objects' information
+        for obj in agent_obs['objects']:
+            flattened.extend(obj['position'])
+            flattened.append(obj['id'])
+        
+        # Goals' information
+        for goal in agent_obs['goals']:
+            flattened.extend(goal)
+
+        # Concatene the agent's obs along the 1D vector
+        flattened_obs = np.array(flattened)
+    
+    return flattened_obs
+
 def check_nan(tensor, name):
     if torch.isnan(tensor).any():
         print(f"{name} contains NaN values!")
@@ -35,19 +65,16 @@ class ExperienceReplay:
         return len(self.buffer)
 
 class DQNNetwork(nn.Module):
-    def __init__(self, input_dim, n_agents, n_actions):
+    def __init__(self, input_dim, output_dim):
         super(DQNNetwork, self).__init__()
         self.fc1 = nn.Linear(input_dim, 128)
         self.fc2 = nn.Linear(128, 128)
-        self.fc3 = nn.Linear(128, n_agents * n_actions)
-        self.n_agents = n_agents
-        self.n_actions = n_actions
+        self.fc3 = nn.Linear(128, output_dim)
 
     def forward(self, x):
         x = F.relu(self.fc1(x))
         x = F.relu(self.fc2(x))
-        x = self.fc3(x)
-        return x.view(x.size(0), self.n_agents, self.n_actions)
+        return self.fc3(x)
 
 class DQNAgent:
     '''
@@ -62,8 +89,8 @@ class DQNAgent:
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
         self.n_actions = 6 
-        self.network = DQNNetwork(self.obs_size, self.env.n_agents, self.n_actions).to(self.device)
-        self.target_network = DQNNetwork(self.obs_size, self.env.n_agents, self.n_actions).to(self.device)
+        self.network = DQNNetwork(self.obs_size, self.action_size).to(self.device)
+        self.target_network = DQNNetwork(self.obs_size, self.action_size).to(self.device)
 
         self.target_network.load_state_dict(self.network.state_dict())
         self.target_network.eval()
@@ -77,50 +104,6 @@ class DQNAgent:
         self.tau = tau
         self.batch_size = batch_size
 
-    def flatten_obs(self, obs):
-        # Extracting observations for each agent and flattening them
-        flattened_observations = []
-        for agent_key in sorted(obs.keys()):  # Ensure consistent order
-            agent_obs = obs[agent_key]
-            
-            # Extracting and flattening agent's own state
-            self_state = [
-                agent_obs['self']['position'][0],
-                agent_obs['self']['position'][1],
-                int(agent_obs['self']['picker']),
-                int(agent_obs['self']['carrying_object'] is not None)
-            ]
-            
-            # Extracting and flattening other agents' states
-            other_agents_state = []
-            for other_agent in agent_obs['agents']:
-                other_agents_state.extend([
-                    other_agent['position'][0],
-                    other_agent['position'][1],
-                    int(other_agent['picker']),
-                    int(other_agent['carrying_object'] is not None)
-                ])
-            
-            # Extracting and flattening objects' states
-            objects_state = []
-            for obj in agent_obs['objects']:
-                objects_state.extend([
-                    obj['position'][0],
-                    obj['position'][1]
-                ])
-            
-            # Extracting and flattening goals
-            goals_state = []
-            for goal in agent_obs['goals']:
-                goals_state.extend([
-                    goal[0],
-                    goal[1]
-                ])
-            
-            # Combining all flattened states for this agent
-            flattened_observations.extend(self_state + other_agents_state + objects_state + goals_state)
-        
-        return np.array(flattened_observations).reshape(self.env.n_agents, -1)
 
     def select_action(self, state, training=True):
         state_tensor = torch.FloatTensor(state).to(self.device).unsqueeze(0)  
@@ -205,7 +188,8 @@ def game_loop(env, agent, training=True, num_episodes=10000, max_steps_per_episo
         obs, _ = env.reset()
 
         print(f"Shape of obs: {np.shape(obs)}, Content: {obs}")
-        obs_flat = agent.flatten_obs(obs)
+        obs_flat = flatten_obs(obs)
+        print(f"Shape of flattened obs: {np.shape(obs_flat)}, Content: {obs_flat}")
 
         episode_reward = 0
         for step in range(max_steps_per_episode):
