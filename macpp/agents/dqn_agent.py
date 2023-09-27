@@ -15,37 +15,26 @@ Experience = namedtuple('Experience', ['state', 'action', 'reward', 'next_state'
 
 def flatten_obs(obs):
     flattened = []
-    for agent, agent_obs in obs.items():
-        # Agent's own position
+    for _, agent_obs in obs.items():
         flattened.extend(agent_obs['self']['position'])
-        # Picker status (1 if True, 0 if False)
         flattened.append(1 if agent_obs['self']['picker'] else 0)
-        # Carrying object status (1 if carrying, 0 if not)
         flattened.append(1 if agent_obs['self']['carrying_object'] else 0)
         
-        # Other agents' information
         for other_agent in agent_obs['agents']:
             flattened.extend(other_agent['position'])
             flattened.append(1 if other_agent['picker'] else 0)
             flattened.append(1 if other_agent['carrying_object'] else 0)
         
-        # Objects' information
         for obj in agent_obs['objects']:
             flattened.extend(obj['position'])
             flattened.append(obj['id'])
         
-        # Goals' information
         for goal in agent_obs['goals']:
             flattened.extend(goal)
 
-        # Concatene the agent's obs along the 1D vector
         flattened_obs = np.array(flattened)
     
     return flattened_obs
-
-def check_nan(tensor, name):
-    if torch.isnan(tensor).any():
-        print(f"{name} contains NaN values!")
 
 class ExperienceReplay:
     def __init__(self, capacity):
@@ -81,10 +70,11 @@ class DQNAgent:
     This DQN implementation treats the multi-agent problem as a single-agent problem by flattening the observations and encoding the joint actions. 
     The Q-value network outputs Q-values for all possible joint actions, and the action with the highest Q-value is selected.
     '''
-    def __init__(self, env, exploration_strategy, learning_rate=0.001, gamma=0.99, buffer_size=10000, batch_size=64, tau=0.1):
+    def __init__(self, env, epsilon=0.05, learning_rate=0.001, gamma=0.99, buffer_size=10000, batch_size=64, tau=0.1):
         self.env = env
         agent_obs_len = 4 + (4 * (self.env.n_agents - 1)) + (3 * self.env.n_objects) + (2 * self.env.n_objects)
-        self.obs_size = agent_obs_len * self.env.n_agents
+        self.obs_size = agent_obs_len * self.env.n_agents  # e.g. =26 with 2 agents and 1 object
+
         self.action_size = np.prod(env.action_space.nvec)
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -98,7 +88,7 @@ class DQNAgent:
         self.optimizer = torch.optim.Adam(self.network.parameters(), lr=learning_rate)
         self.scheduler = StepLR(self.optimizer, step_size=1000, gamma=0.9)
         self.memory = ExperienceReplay(buffer_size)
-        self.exploration_strategy = exploration_strategy
+        self.epsilon = epsilon
 
         self.gamma = gamma
         self.tau = tau
@@ -106,7 +96,7 @@ class DQNAgent:
 
     def select_action(self, state):
         sample = random.random()
-        if sample < self.exploration_strategy.epsilon:
+        if sample < self.epsilon:
             # Exploration: Randomly select a joint action
             return [random.randrange(6) for _ in range(self.env.n_agents)]
         else:
@@ -119,9 +109,6 @@ class DQNAgent:
                 return joint_action
 
     def encode_joint_action(self, joint_action):
-        """
-        Encode a joint action (list of individual actions) into a single joint action index.
-        """
         joint_action_idx = 0
         for i, action in enumerate(joint_action):
             joint_action_idx += action * (6 ** i)
@@ -145,23 +132,28 @@ class DQNAgent:
 
         # Convert to tensors
         states = torch.FloatTensor(np.array(states)).to(self.device)
+        # print("states:", states.shape)
+
         q_values = self.network(states)
+        # print("q_values:", q_values.shape)
 
         actions = torch.tensor(actions, dtype=torch.long).to(self.device).unsqueeze(-1)
+        # print("action:", actions.shape)
+
         rewards = torch.FloatTensor(rewards).to(self.device)
+        # print("rewards:", rewards.shape)
+
         next_states = torch.FloatTensor(np.array(next_states)).to(self.device)
+        # print("next states:", next_states.shape)
+
         dones = torch.BoolTensor(dones).to(self.device)
-        
-        # print("q_values shape:", q_values.shape)
+        # print("dones:", dones.shape)
 
-        actions_flattened = actions.view(-1)
-        # print("action_flattened shape:", actions_flattened.shape)
+        actions = actions.squeeze(-1)  # Shape: [64, 2]
+        # print("actions:", actions.shape)
 
-        state_action_values_flattened = q_values.view(-1)[actions_flattened]
-        # print("state_action_values_flattened shape:", state_action_values_flattened.shape)
-
-        state_action_values = state_action_values_flattened.view(64, 2)
-        # print("state_action_values shape:", state_action_values.shape)
+        state_action_values = torch.gather(q_values, 1, actions)
+        # print("state_action_values:", state_action_values.shape)
 
         # Compute the expected Q-values for the next states
         with torch.no_grad():
@@ -171,9 +163,11 @@ class DQNAgent:
 
         # Compute the expected Q-values based on the Bellman equation
         expected_state_action_values = (rewards + (self.gamma * next_state_values)).unsqueeze(-1).expand(-1, 2)
+        # print("expected_state_action_values:", expected_state_action_values.shape)
 
         # Compute the loss
         loss = F.smooth_l1_loss(state_action_values, expected_state_action_values)
+        # print("loss:", loss)
 
         # Optimize the model
         self.optimizer.zero_grad()
@@ -187,9 +181,6 @@ class DQNAgent:
 
     def update_target_network(self):
         self.target_network.load_state_dict(self.network.state_dict())
-
-    def decay_epsilon(self):
-        self.exploration_strategy.decay()
 
 def game_loop(env, agent, training=True, num_episodes=10000, max_steps_per_episode=300, render=False, model_file='dqn_model'):
     total_rewards = []
@@ -205,6 +196,9 @@ def game_loop(env, agent, training=True, num_episodes=10000, max_steps_per_episo
             actions = agent.select_action(obs_flat)
             next_obs, reward, done, _ = env.step(actions)
             next_obs_flat = flatten_obs(next_obs)
+            # print("Actions:", actions)
+            # print("Original obs:", len(next_obs), next_obs)
+            # print("Flattened obs:", next_obs_flat.shape, next_obs_flat)
             if training:
                 agent.memory.push(obs_flat, actions, reward, next_obs_flat, done)
                 loss = agent.train()
@@ -217,8 +211,8 @@ def game_loop(env, agent, training=True, num_episodes=10000, max_steps_per_episo
             if step >= max_steps_per_episode:
                 failure_count +=1
         total_rewards.append(episode_reward)
-        if training:
-            agent.decay_epsilon()
+        # if training:
+        #     agent.decay_epsilon()
         if training and episode % 100 == 0:
             agent.update_target_network()
         if episode % 100 == 0:
@@ -227,29 +221,15 @@ def game_loop(env, agent, training=True, num_episodes=10000, max_steps_per_episo
             valid_losses = [loss for loss in all_losses[-100:] if loss is not None]
             avg_loss = sum(valid_losses) / len(valid_losses) if valid_losses else 0
             if training and episode % 1000 == 0:
-                print(f"Episode {episode}/{num_episodes}: Avg Reward: {avg_reward:.2f}, Success rate: {success_rate:.2f}, Avg Loss: {avg_loss:.4f}, Epsilon: {agent.exploration_strategy.epsilon:.2f}")
+                print(f"Episode {episode}/{num_episodes}: Avg Reward: {avg_reward:.2f}, Success rate: {success_rate:.2f}, Avg Loss: {avg_loss:.4f}, Epsilon: {agent.epsilon:.2f}")
                 torch.save(agent.network.state_dict(), model_file + f"_{episode}.pth")
     if training:
         torch.save(agent.network.state_dict(), model_file + "_final.pth")
 
-
 if __name__ == "__main__":
 
     from macpp.core.environment import MACPPEnv
-    from macpp.agents.exploration import EpsilonGreedy
-    from macpp.core.environment import Action
 
-    # Set up the environment
-    env = MACPPEnv(
-        grid_size=(3, 3), n_agents=2, n_pickers=1, n_objects=1, cell_size=300, debug_mode=False
-    )
-
-    # Set up exploration strategy
-    epsilon_greedy_strategy = EpsilonGreedy(epsilon=1.0, min_epsilon=0.02, epsilon_decay=0.99)
-
-    # Set up the agent
-    agent = DQNAgent(env, epsilon_greedy_strategy,learning_rate=0.001, gamma=0.99, buffer_size=10000, batch_size=64, tau=0.1)
-
-    # Train the agent
-    game_loop(env, agent, training=True, num_episodes=500, max_steps_per_episode=300, render=False, model_file='dqn_model')
-
+    env = MACPPEnv(grid_size=(3, 3), n_agents=2, n_pickers=1, n_objects=1, cell_size=300, debug_mode=False)
+    agent = DQNAgent(env, epsilon=0.05, learning_rate=0.001, gamma=0.99, buffer_size=10000, batch_size=64, tau=0.1)
+    game_loop(env, agent, training=True, num_episodes=2000, max_steps_per_episode=250, render=False, model_file='dqn_model')
