@@ -1,4 +1,5 @@
 import torch
+import time
 import torch.nn as nn
 # import torch.optim as optim
 import torch.nn.functional as F
@@ -81,8 +82,8 @@ class DQNAgent:
         agent_obs_len = 4 + (4 * (self.env.n_agents - 1)) + \
             (3 * self.env.n_objects) + (2 * self.env.n_objects)
         self.obs_size = agent_obs_len * self.env.n_agents
-
         self.action_size = np.prod(env.action_space.nvec)
+
         self.device = torch.device(
             "cuda" if torch.cuda.is_available() else "cpu")
 
@@ -199,13 +200,17 @@ def game_loop(env, agent, training=True, num_episodes=10000, max_steps_per_episo
     total_rewards = []
     all_losses = []
     failure_count = 0
+    episode_steps = []
     for episode in range(num_episodes):
         obs, _ = env.reset()
         obs_flat = flatten_obs(obs)
         episode_reward = 0
-        for step in range(max_steps_per_episode):
+        step = 0
+        done = False
+        while not done and step < max_steps_per_episode:
             if render:
                 env.render()
+                time.sleep(0.05)
             actions = agent.select_action(obs_flat)
             next_obs, reward, done, _ = env.step(actions)
             next_obs_flat = flatten_obs(next_obs)
@@ -222,9 +227,11 @@ def game_loop(env, agent, training=True, num_episodes=10000, max_steps_per_episo
             obs = next_obs
             if done:
                 break
-            if step >= max_steps_per_episode:
-                failure_count += 1
+            step += 1
+        if step >= max_steps_per_episode:
+            failure_count += 1
         total_rewards.append(episode_reward)
+        episode_steps.append(step)
 
         if training:
             agent.decay_epsilon()
@@ -236,8 +243,9 @@ def game_loop(env, agent, training=True, num_episodes=10000, max_steps_per_episo
                     loss for loss in all_losses[-100:] if loss is not None]
                 avg_loss = sum(valid_losses) / \
                     len(valid_losses) if valid_losses else 0
+                avg_steps = sum(episode_steps[-100:]) / 100
                 print(
-                    f"Episode {episode}/{num_episodes}: Avg Reward: {avg_reward:.2f}, Success rate: {success_rate:.2f}, Avg Loss: {avg_loss:.4f}, Epsilon: {agent.epsilon:.2f}, Alpha: {agent.alpha:.2f}")
+                    f"Episode {episode}/{num_episodes}: Avg Reward: {avg_reward:.2f}, Avg Steps: {avg_steps}, Success rate: {success_rate:.2f}, Avg Loss: {avg_loss:.4f}, Epsilon: {agent.epsilon:.2f}, Alpha: {agent.alpha:.2f}")
                 torch.save(agent.network.state_dict(),
                            model_file + f"_{episode}.pth")
 
