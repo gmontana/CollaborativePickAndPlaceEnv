@@ -1,14 +1,14 @@
 import torch
 import torch.nn as nn
-import torch.optim as optim
+# import torch.optim as optim
 import torch.nn.functional as F
 from collections import namedtuple, deque
 import random
 import numpy as np
 from torch.optim.lr_scheduler import StepLR
-from torch.nn.utils.clip_grad import clip_grad_norm_
-from typing import Dict, Any
-from abc import ABC, abstractmethod
+# from torch.nn.utils.clip_grad import clip_grad_norm_
+# from typing import Dict, Any
+# from abc import ABC, abstractmethod
 
 
 Experience = namedtuple(
@@ -76,11 +76,10 @@ class DQNAgent:
     The Q-value network outputs Q-values for all possible joint actions, and the action with the highest Q-value is selected.
     '''
 
-    def __init__(self, env, epsilon=0.05, learning_rate=0.001, gamma=0.99, buffer_size=10000, batch_size=64, tau=0.1):
+    def __init__(self, env, epsilon=1.0, min_epsilon=0.05, epsilon_decay=0.995, alpha=0.0005, gamma=0.99, buffer_size=10000, batch_size=64, tau=0.1):
         self.env = env
         agent_obs_len = 4 + (4 * (self.env.n_agents - 1)) + \
             (3 * self.env.n_objects) + (2 * self.env.n_objects)
-        # e.g. =26 with 2 agents and 1 object
         self.obs_size = agent_obs_len * self.env.n_agents
 
         self.action_size = np.prod(env.action_space.nvec)
@@ -97,18 +96,19 @@ class DQNAgent:
         self.target_network.eval()
 
         self.optimizer = torch.optim.Adam(
-            self.network.parameters(), lr=learning_rate)
+            self.network.parameters(), lr=alpha)
         self.scheduler = StepLR(self.optimizer, step_size=1000, gamma=0.9)
         self.memory = ExperienceReplay(buffer_size)
         self.epsilon = epsilon
-
+        self.min_epsilon = min_epsilon
+        self.epsilon_decay = epsilon_decay
+        self.alpha = alpha
         self.gamma = gamma
         self.tau = tau
         self.batch_size = batch_size
 
     def select_action(self, state):
-        sample = random.random()
-        if sample < self.epsilon:
+        if random.random() < self.epsilon:
             # Exploration: Randomly select a joint action
             return [random.randrange(6) for _ in range(self.env.n_agents)]
         else:
@@ -120,12 +120,6 @@ class DQNAgent:
                 joint_action = self.decode_joint_action(joint_action_idx)
                 return joint_action
 
-    def encode_joint_action(self, joint_action):
-        joint_action_idx = 0
-        for i, action in enumerate(joint_action):
-            joint_action_idx += action * (6 ** i)
-        return joint_action_idx
-
     def decode_joint_action(self, joint_action_idx):
         joint_action = []
         for _ in range(self.env.n_agents):
@@ -133,6 +127,9 @@ class DQNAgent:
             joint_action.append(action)
             joint_action_idx //= 6
         return joint_action
+
+    def decay_epsilon(self):
+        self.epsilon = max(self.min_epsilon, self.epsilon * self.epsilon_decay)
 
     def train(self):
         if len(self.memory) < self.batch_size:
@@ -169,8 +166,8 @@ class DQNAgent:
                 next_states[non_final_mask]).max(1)[0].detach()
 
         # Compute the expected Q-values based on the Bellman equation
-        expected_state_action_values = rewards + \
-            (self.gamma * next_state_values)
+        expected_state_action_values = (
+            next_state_values * self.gamma) + rewards
 
         # print("states:", states.shape)
         # print("q_values:", q_values.shape)
@@ -228,23 +225,21 @@ def game_loop(env, agent, training=True, num_episodes=10000, max_steps_per_episo
             if step >= max_steps_per_episode:
                 failure_count += 1
         total_rewards.append(episode_reward)
-        # if training:
-        #     agent.decay_epsilon()
-        if training and episode % 100 == 0:
-            agent.update_target_network()
-        if episode % 100 == 0:
-            avg_reward = sum(total_rewards[-100:]) / 100
-            success_rate = 1 - (failure_count / 100)
-            valid_losses = [
-                loss for loss in all_losses[-100:] if loss is not None]
-            avg_loss = sum(valid_losses) / \
-                len(valid_losses) if valid_losses else 0
-            print(
-                f"Episode {episode}/{num_episodes}: Avg Reward: {avg_reward:.2f}, Success rate: {success_rate:.2f}, Avg Loss: {avg_loss:.4f}, Epsilon: {agent.epsilon:.2f}")
-            torch.save(agent.network.state_dict(),
-                       model_file + f"_{episode}.pth")
-    if training:
-        torch.save(agent.network.state_dict(), model_file + "_final.pth")
+
+        if training:
+            agent.decay_epsilon()
+            if episode % 100 == 0:
+                agent.update_target_network()
+                avg_reward = sum(total_rewards[-100:]) / 100
+                success_rate = 1 - (failure_count / 100)
+                valid_losses = [
+                    loss for loss in all_losses[-100:] if loss is not None]
+                avg_loss = sum(valid_losses) / \
+                    len(valid_losses) if valid_losses else 0
+                print(
+                    f"Episode {episode}/{num_episodes}: Avg Reward: {avg_reward:.2f}, Success rate: {success_rate:.2f}, Avg Loss: {avg_loss:.4f}, Epsilon: {agent.epsilon:.2f}, Alpha: {agent.alpha:.2f}")
+                torch.save(agent.network.state_dict(),
+                           model_file + f"_{episode}.pth")
 
 
 if __name__ == "__main__":
@@ -253,7 +248,7 @@ if __name__ == "__main__":
 
     env = MACPPEnv(grid_size=(3, 3), n_agents=2, n_pickers=1,
                    n_objects=1, cell_size=300, debug_mode=False)
-    agent = DQNAgent(env, epsilon=0.05, learning_rate=0.001,
+    agent = DQNAgent(env, epsilon=1.0, alpha=0.0005,
                      gamma=0.99, buffer_size=10000, batch_size=64, tau=0.1)
     game_loop(env, agent, training=True, num_episodes=1000,
               max_steps_per_episode=250, render=False, model_file='dqn_model')
