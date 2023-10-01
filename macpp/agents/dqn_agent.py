@@ -144,28 +144,21 @@ class DQNAgent:
 
         # Convert to tensors
         states = torch.FloatTensor(np.array(states)).to(self.device)
-        # print("states:", states.shape)
-
         q_values = self.network(states)
-        # print("q_values:", q_values.shape)
 
-        actions = torch.tensor(actions, dtype=torch.long).to(self.device)
-        print("action:", actions.shape)
+        # Convert actions to joint action indices
+        actions_tensor = torch.tensor(actions, dtype=torch.long).to(
+            self.device)  # Convert actions to tensor
+        joint_action_indices = actions_tensor[:,
+                                              0] * self.n_actions + actions_tensor[:, 1]
 
         rewards = torch.FloatTensor(rewards).to(self.device)
-        # print("rewards:", rewards.shape)
-
         next_states = torch.FloatTensor(np.array(next_states)).to(self.device)
-        print("next states:", next_states.shape)
-
         dones = torch.BoolTensor(dones).to(self.device)
-        # print("dones:", dones.shape)
 
-        actions = actions.squeeze(-1)  # Shape: [64, 2]
-        print("actions:", actions.shape)
-
-        state_action_values = q_values.gather(1, actions.unsqueeze(-1))
-        print("state_action_values:", state_action_values.shape)
+        # Gather Q-values based on joint actions taken
+        state_action_values = q_values.gather(
+            1, joint_action_indices.unsqueeze(-1)).squeeze(-1)
 
         # Compute the expected Q-values for the next states
         with torch.no_grad():
@@ -176,9 +169,15 @@ class DQNAgent:
                 next_states[non_final_mask]).max(1)[0].detach()
 
         # Compute the expected Q-values based on the Bellman equation
-        expected_state_action_values = (
-            rewards + (self.gamma * next_state_values)).unsqueeze(-1).expand(-1, 2)
-        # print("expected_state_action_values:", expected_state_action_values.shape)
+        expected_state_action_values = rewards + \
+            (self.gamma * next_state_values)
+
+        # print("states:", states.shape)
+        # print("q_values:", q_values.shape)
+        # print("action:", actions_tensor.shape)
+        # print("rewards:", rewards.shape)
+        # print("next states:", next_states.shape)
+        # print("dones:", dones.shape)
 
         # Compute the loss
         loss = F.smooth_l1_loss(state_action_values,
@@ -240,11 +239,10 @@ def game_loop(env, agent, training=True, num_episodes=10000, max_steps_per_episo
                 loss for loss in all_losses[-100:] if loss is not None]
             avg_loss = sum(valid_losses) / \
                 len(valid_losses) if valid_losses else 0
-            if training and episode % 1000 == 0:
-                print(
-                    f"Episode {episode}/{num_episodes}: Avg Reward: {avg_reward:.2f}, Success rate: {success_rate:.2f}, Avg Loss: {avg_loss:.4f}, Epsilon: {agent.epsilon:.2f}")
-                torch.save(agent.network.state_dict(),
-                           model_file + f"_{episode}.pth")
+            print(
+                f"Episode {episode}/{num_episodes}: Avg Reward: {avg_reward:.2f}, Success rate: {success_rate:.2f}, Avg Loss: {avg_loss:.4f}, Epsilon: {agent.epsilon:.2f}")
+            torch.save(agent.network.state_dict(),
+                       model_file + f"_{episode}.pth")
     if training:
         torch.save(agent.network.state_dict(), model_file + "_final.pth")
 
@@ -257,5 +255,5 @@ if __name__ == "__main__":
                    n_objects=1, cell_size=300, debug_mode=False)
     agent = DQNAgent(env, epsilon=0.05, learning_rate=0.001,
                      gamma=0.99, buffer_size=10000, batch_size=64, tau=0.1)
-    game_loop(env, agent, training=True, num_episodes=2000,
+    game_loop(env, agent, training=True, num_episodes=1000,
               max_steps_per_episode=250, render=False, model_file='dqn_model')
