@@ -18,26 +18,58 @@ Experience = namedtuple(
 
 def flatten_obs(obs):
     flattened = []
-    for _, agent_obs in obs.items():
+    for agent_key, agent_obs in obs.items():
+        # Agent's own state
         flattened.extend(agent_obs['self']['position'])
-        flattened.append(1 if agent_obs['self']['picker'] else 0)
-        flattened.append(1 if agent_obs['self']['carrying_object'] else 0)
+        flattened.append(1 if agent_obs['self']
+                         ['carrying_object'] is not None else 0)
 
+        # Relative positions and distances to other agents
         for other_agent in agent_obs['agents']:
-            flattened.extend(other_agent['position'])
-            flattened.append(1 if other_agent['picker'] else 0)
-            flattened.append(1 if other_agent['carrying_object'] else 0)
+            dx = other_agent['position'][0] - agent_obs['self']['position'][0]
+            dy = other_agent['position'][1] - agent_obs['self']['position'][1]
+            flattened.extend([dx, dy])
+            flattened.append(abs(dx) + abs(dy))
 
+        # Relative positions and distances to objects
         for obj in agent_obs['objects']:
-            flattened.extend(obj['position'])
-            flattened.append(obj['id'])
+            dx = obj['position'][0] - agent_obs['self']['position'][0]
+            dy = obj['position'][1] - agent_obs['self']['position'][1]
+            flattened.extend([dx, dy])
+            flattened.append(abs(dx) + abs(dy))
 
+        # Relative positions and distances to goals
         for goal in agent_obs['goals']:
-            flattened.extend(goal)
+            dx = goal[0] - agent_obs['self']['position'][0]
+            dy = goal[1] - agent_obs['self']['position'][1]
+            flattened.extend([dx, dy])
+            flattened.append(abs(dx) + abs(dy))
 
-        flattened_obs = np.array(flattened)
+    return np.array(flattened)
 
-    return flattened_obs
+#
+# def flatten_obs(obs):
+#     flattened = []
+#     for _, agent_obs in obs.items():
+#         flattened.extend(agent_obs['self']['position'])
+#         flattened.append(1 if agent_obs['self']['picker'] else 0)
+#         flattened.append(1 if agent_obs['self']['carrying_object'] else 0)
+#
+#         for other_agent in agent_obs['agents']:
+#             flattened.extend(other_agent['position'])
+#             flattened.append(1 if other_agent['picker'] else 0)
+#             flattened.append(1 if other_agent['carrying_object'] else 0)
+#
+#         for obj in agent_obs['objects']:
+#             flattened.extend(obj['position'])
+#             flattened.append(obj['id'])
+#
+#         for goal in agent_obs['goals']:
+#             flattened.extend(goal)
+#
+#         flattened_obs = np.array(flattened)
+#
+#     return flattened_obs
 
 
 class ExperienceReplay:
@@ -77,7 +109,7 @@ class DQNAgent:
     The Q-value network outputs Q-values for all possible joint actions, and the action with the highest Q-value is selected.
     '''
 
-    def __init__(self, env, epsilon=1.0, min_epsilon=0.05, epsilon_decay=0.995, alpha=0.0005, gamma=0.99, buffer_size=10000, batch_size=64, tau=0.1):
+    def __init__(self, env, epsilon=1.0, min_epsilon=0.05, epsilon_decay=0.995, lr=0.0005, lr_decay=0.0005, gamma=0.99, buffer_size=10000, batch_size=64):
         self.env = env
         agent_obs_len = 4 + (4 * (self.env.n_agents - 1)) + \
             (3 * self.env.n_objects) + (2 * self.env.n_objects)
@@ -96,16 +128,18 @@ class DQNAgent:
         self.target_network.load_state_dict(self.network.state_dict())
         self.target_network.eval()
 
+        self.gamma = gamma
+        self.alpha = lr
+        self.lr_decay = lr_decay
+
         self.optimizer = torch.optim.Adam(
-            self.network.parameters(), lr=alpha)
-        self.scheduler = StepLR(self.optimizer, step_size=1000, gamma=0.9)
+            self.network.parameters(), lr=self.alpha)
+        self.scheduler = StepLR(
+            self.optimizer, step_size=1000, gamma=self.lr_decay)
         self.memory = ExperienceReplay(buffer_size)
         self.epsilon = epsilon
         self.min_epsilon = min_epsilon
         self.epsilon_decay = epsilon_decay
-        self.alpha = alpha
-        self.gamma = gamma
-        self.tau = tau
         self.batch_size = batch_size
 
     def select_action(self, state):
@@ -214,9 +248,9 @@ def game_loop(env, agent, training=True, num_episodes=10000, max_steps_per_episo
             actions = agent.select_action(obs_flat)
             next_obs, reward, done, _ = env.step(actions)
             next_obs_flat = flatten_obs(next_obs)
-            # print("Actions:", actions)
-            # print("Original obs:", len(next_obs), next_obs)
-            # print("Flattened obs:", next_obs_flat.shape, next_obs_flat)
+            print("Actions:", actions)
+            print("Original obs:", len(next_obs), next_obs)
+            print("Flattened obs:", next_obs_flat.shape, next_obs_flat)
             if training:
                 agent.memory.push(obs_flat, actions, reward,
                                   next_obs_flat, done)
@@ -236,6 +270,7 @@ def game_loop(env, agent, training=True, num_episodes=10000, max_steps_per_episo
         if training:
             agent.decay_epsilon()
             if episode % 100 == 0:
+                failure_count = 0
                 agent.update_target_network()
                 avg_reward = sum(total_rewards[-100:]) / 100
                 success_rate = 1 - (failure_count / 100)
@@ -256,7 +291,7 @@ if __name__ == "__main__":
 
     env = MACPPEnv(grid_size=(3, 3), n_agents=2, n_pickers=1,
                    n_objects=1, cell_size=300, debug_mode=False)
-    agent = DQNAgent(env, epsilon=1.0, alpha=0.0005,
-                     gamma=0.99, buffer_size=10000, batch_size=64, tau=0.1)
-    game_loop(env, agent, training=True, num_episodes=1000,
+    agent = DQNAgent(env, epsilon=1.0, lr=0.0005,
+                     gamma=0.99, buffer_size=10000, batch_size=64)
+    game_loop(env, agent, training=True, num_episodes=1,
               max_steps_per_episode=250, render=False, model_file='dqn_model')
