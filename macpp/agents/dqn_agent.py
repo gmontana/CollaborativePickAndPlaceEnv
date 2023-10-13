@@ -36,36 +36,36 @@ FC2_DIMS = 512
 DEVICE = torch.device("mps" if torch.cuda.is_available() else "cpu")
 
 
-def flatten_obs(obs):
-    flattened = []
-    for agent_key, agent_obs in obs.items():
-        # Agent's own state
-        flattened.extend(agent_obs['self']['position'])
-        flattened.append(1 if agent_obs['self']
-                         ['carrying_object'] is not None else 0)
-
-        # Relative positions and distances to other agents
-        for other_agent in agent_obs['agents']:
-            dx = other_agent['position'][0] - agent_obs['self']['position'][0]
-            dy = other_agent['position'][1] - agent_obs['self']['position'][1]
-            flattened.extend([dx, dy])
-            flattened.append(abs(dx) + abs(dy))
-
-        # Relative positions and distances to objects
-        for obj in agent_obs['objects']:
-            dx = obj['position'][0] - agent_obs['self']['position'][0]
-            dy = obj['position'][1] - agent_obs['self']['position'][1]
-            flattened.extend([dx, dy])
-            flattened.append(abs(dx) + abs(dy))
-
-        # Relative positions and distances to goals
-        for goal in agent_obs['goals']:
-            dx = goal[0] - agent_obs['self']['position'][0]
-            dy = goal[1] - agent_obs['self']['position'][1]
-            flattened.extend([dx, dy])
-            flattened.append(abs(dx) + abs(dy))
-
-    return np.array(flattened)
+# def flatten_obs(obs):
+#     flattened = []
+#     for agent_key, agent_obs in obs.items():
+#         # Agent's own state
+#         flattened.extend(agent_obs['self']['position'])
+#         flattened.append(1 if agent_obs['self']
+#                          ['carrying_object'] is not None else 0)
+#
+#         # Relative positions and distances to other agents
+#         for other_agent in agent_obs['agents']:
+#             dx = other_agent['position'][0] - agent_obs['self']['position'][0]
+#             dy = other_agent['position'][1] - agent_obs['self']['position'][1]
+#             flattened.extend([dx, dy])
+#             flattened.append(abs(dx) + abs(dy))
+#
+#         # Relative positions and distances to objects
+#         for obj in agent_obs['objects']:
+#             dx = obj['position'][0] - agent_obs['self']['position'][0]
+#             dy = obj['position'][1] - agent_obs['self']['position'][1]
+#             flattened.extend([dx, dy])
+#             flattened.append(abs(dx) + abs(dy))
+#
+#         # Relative positions and distances to goals
+#         for goal in agent_obs['goals']:
+#             dx = goal[0] - agent_obs['self']['position'][0]
+#             dy = goal[1] - agent_obs['self']['position'][1]
+#             flattened.extend([dx, dy])
+#             flattened.append(abs(dx) + abs(dy))
+#
+#     return np.array(flattened)
 
 
 class Network(nn.Module):
@@ -273,7 +273,9 @@ class DQNAgent:
 
 if __name__ == "__main__":
 
-    wandb.init(project='cart_pole', name='test_run', config={
+    from macpp.core.environment import MACPPEnv
+
+    wandb.init(project='cpp', name='test_run', config={
         "learning_rate": LEARNING_RATE,
         "batch_size": BATCH_SIZE,
         "architecture": "DQN",
@@ -286,7 +288,6 @@ if __name__ == "__main__":
     np.random.seed(SEED)
     torch.manual_seed(SEED)
 
-    env = gym.make('CartPole-v1')
     # env.seed(SEED)
 
     torch.backends.cudnn.deterministic = True
