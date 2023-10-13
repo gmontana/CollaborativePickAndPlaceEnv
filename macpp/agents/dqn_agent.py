@@ -36,36 +36,36 @@ FC2_DIMS = 512
 DEVICE = torch.device("mps" if torch.cuda.is_available() else "cpu")
 
 
-# def flatten_obs(obs):
-#     flattened = []
-#     for agent_key, agent_obs in obs.items():
-#         # Agent's own state
-#         flattened.extend(agent_obs['self']['position'])
-#         flattened.append(1 if agent_obs['self']
-#                          ['carrying_object'] is not None else 0)
-#
-#         # Relative positions and distances to other agents
-#         for other_agent in agent_obs['agents']:
-#             dx = other_agent['position'][0] - agent_obs['self']['position'][0]
-#             dy = other_agent['position'][1] - agent_obs['self']['position'][1]
-#             flattened.extend([dx, dy])
-#             flattened.append(abs(dx) + abs(dy))
-#
-#         # Relative positions and distances to objects
-#         for obj in agent_obs['objects']:
-#             dx = obj['position'][0] - agent_obs['self']['position'][0]
-#             dy = obj['position'][1] - agent_obs['self']['position'][1]
-#             flattened.extend([dx, dy])
-#             flattened.append(abs(dx) + abs(dy))
-#
-#         # Relative positions and distances to goals
-#         for goal in agent_obs['goals']:
-#             dx = goal[0] - agent_obs['self']['position'][0]
-#             dy = goal[1] - agent_obs['self']['position'][1]
-#             flattened.extend([dx, dy])
-#             flattened.append(abs(dx) + abs(dy))
-#
-#     return np.array(flattened)
+def flatten_obs(obs):
+    flattened = []
+    for agent_key, agent_obs in obs.items():
+        # Agent's own state
+        flattened.extend(agent_obs['self']['position'])
+        flattened.append(1 if agent_obs['self']
+                         ['carrying_object'] is not None else 0)
+
+        # Relative positions and distances to other agents
+        for other_agent in agent_obs['agents']:
+            dx = other_agent['position'][0] - agent_obs['self']['position'][0]
+            dy = other_agent['position'][1] - agent_obs['self']['position'][1]
+            flattened.extend([dx, dy])
+            flattened.append(abs(dx) + abs(dy))
+
+        # Relative positions and distances to objects
+        for obj in agent_obs['objects']:
+            dx = obj['position'][0] - agent_obs['self']['position'][0]
+            dy = obj['position'][1] - agent_obs['self']['position'][1]
+            flattened.extend([dx, dy])
+            flattened.append(abs(dx) + abs(dy))
+
+        # Relative positions and distances to goals
+        for goal in agent_obs['goals']:
+            dx = goal[0] - agent_obs['self']['position'][0]
+            dy = goal[1] - agent_obs['self']['position'][1]
+            flattened.extend([dx, dy])
+            flattened.append(abs(dx) + abs(dy))
+
+    return np.array(flattened)
 
 
 class Network(nn.Module):
@@ -186,13 +186,13 @@ class DQNAgent:
         self.exploration = EXPLORATION
 
         self.replay_buffer = ReplayBuffer(
-            env.observation_space.shape, env.action_space.n, capacity=MEM_SIZE, alpha=ALPHA, prioritized=True)
+            env.observation_space.shape, env.action_space_n, capacity=MEM_SIZE, alpha=ALPHA, prioritized=True)
 
         self.policy_net = Network(
-            env.observation_space.shape, env.action_space.n, LEARNING_RATE, DEVICE)
+            env.observation_space.shape, env.action_space_n, LEARNING_RATE, DEVICE)
 
         self.target_net = Network(
-            env.observation_space.shape, env.action_space.n, LEARNING_RATE, DEVICE)
+            env.observation_space.shape, env.action_space_n, LEARNING_RATE, DEVICE)
 
         self.optimizer = optim.Adam(self.policy_net.parameters(
         ), lr=LEARNING_RATE)
@@ -228,11 +228,17 @@ class DQNAgent:
             BATCH_SIZE, beta=0.4)
 
         # Convert to PyTorch tensors and send to device
-        states = torch.tensor(states, dtype=torch.float).to(DEVICE)
+        # states = torch.tensor(states, dtype=torch.float).to(DEVICE)
+        states = torch.tensor([flatten_obs(s) for s in states], dtype=torch.float).to(
+            DEVICE)
+
         actions = torch.tensor(actions, dtype=torch.long).to(
             DEVICE)
         rewards = torch.tensor(rewards, dtype=torch.float).to(DEVICE)
-        next_states = torch.tensor(next_states, dtype=torch.float).to(DEVICE)
+        # next_states = torch.tensor(next_states, dtype=torch.float).to(DEVICE)
+        next_states = torch.tensor([flatten_obs(s) for s in next_states], dtype=torch.float).to(
+            DEVICE)
+
         dones = torch.tensor(dones, dtype=torch.float).to(DEVICE)
         weights = torch.tensor(weights, dtype=torch.float).to(DEVICE)
 
@@ -288,14 +294,15 @@ if __name__ == "__main__":
     np.random.seed(SEED)
     torch.manual_seed(SEED)
 
+    env = MACPPEnv(grid_size=(3, 3), n_agents=2, n_pickers=1,
+                   n_objects=1, cell_size=300, debug_mode=True)
     # env.seed(SEED)
 
     torch.backends.cudnn.deterministic = True
     torch.backends.cudnn.benchmark = False
 
     observation_space = env.observation_space
-
-    action_space = env.action_space.n
+    action_space = env.action_space_n
 
     agent = DQNAgent(env)
 
@@ -305,8 +312,9 @@ if __name__ == "__main__":
     best_reward = 0
 
     for episode in tqdm(range(1, EPISODES + 1), desc="Training Progress"):
-        state_tuple = env.reset()
-        state = np.array([state_tuple[0]])
+        state = env.reset()
+        # state = np.array([state_tuple[0]])
+        state_flat = flatten_obs(state)
         episode_return = 0
         loss_sum = 0
         num_updates = 0
@@ -319,11 +327,14 @@ if __name__ == "__main__":
             # Assuming adaptation in get_action()
             action = agent.get_action(state)
 
-            next_state_tuple, reward, done, _, _ = env.step(action)
-            next_state = np.array([next_state_tuple])
+            next_state, reward, done, _, _ = env.step(action)
+
+            # next_state = np.array([next_state_tuple])
+            next_state_flat = flatten_obs(next_state)
 
             # Store transition in the replay buffer
-            agent.replay_buffer.add(state, action, reward, next_state, done)
+            agent.replay_buffer.add(
+                state_flat, action, reward, next_state_flat, done)
 
             # Train the agent
             loss = agent.learn()
@@ -333,6 +344,7 @@ if __name__ == "__main__":
                 loss_sum += loss
             num_updates += 1
             state = next_state
+            state_flat = next_state_flat
             episode_return += reward
 
             if done:
