@@ -1,19 +1,39 @@
+import wandb
+# import logging
 import torch
-import time
+from tqdm import tqdm
 import torch.nn as nn
-# import torch.optim as optim
 import torch.nn.functional as F
-from collections import namedtuple, deque
+from torch.nn.utils import clip_grad_norm_
+# import torch.optim as optim
+import gym
 import random
 import numpy as np
-from torch.optim.lr_scheduler import StepLR
-# from torch.nn.utils.clip_grad import clip_grad_norm_
-# from typing import Dict, Any
-# from abc import ABC, abstractmethod
+# import matplotlib.pyplot as plt
+import torch.optim as optim
+# from torch.optim.lr_scheduler import StepLR
+# from torch.utils.tensorboard import SummaryWriter
+import warnings
+warnings.filterwarnings('ignore', category=DeprecationWarning, module='gym')
 
+SEED = 42
+EPISODES = 2000
+LEARNING_RATE = 0.0001
+MEM_SIZE = 10000
+BATCH_SIZE = 64
+GAMMA = 0.95
+EXPLORATION = 1.0
+EXPLORATION_MAX = 1.0
+EXPLORATION_DECAY = 0.999
+EXPLORATION_MIN = 0.001
+UPDATE_EVERY = 100
+LOG_EVERY = 10
+ALPHA = 0.4
+#
+FC1_DIMS = 1024
+FC2_DIMS = 512
 
-Experience = namedtuple(
-    'Experience', ['state', 'action', 'reward', 'next_state', 'done'])
+DEVICE = torch.device("mps" if torch.cuda.is_available() else "cpu")
 
 
 def flatten_obs(obs):
@@ -47,251 +67,298 @@ def flatten_obs(obs):
 
     return np.array(flattened)
 
-#
-# def flatten_obs(obs):
-#     flattened = []
-#     for _, agent_obs in obs.items():
-#         flattened.extend(agent_obs['self']['position'])
-#         flattened.append(1 if agent_obs['self']['picker'] else 0)
-#         flattened.append(1 if agent_obs['self']['carrying_object'] else 0)
-#
-#         for other_agent in agent_obs['agents']:
-#             flattened.extend(other_agent['position'])
-#             flattened.append(1 if other_agent['picker'] else 0)
-#             flattened.append(1 if other_agent['carrying_object'] else 0)
-#
-#         for obj in agent_obs['objects']:
-#             flattened.extend(obj['position'])
-#             flattened.append(obj['id'])
-#
-#         for goal in agent_obs['goals']:
-#             flattened.extend(goal)
-#
-#         flattened_obs = np.array(flattened)
-#
-#     return flattened_obs
 
+class Network(nn.Module):
+    def __init__(self, input_shape, num_actions, learning_rate, device):
+        super(Network, self).__init__()
+        self.input_shape = input_shape
+        self.num_actions = num_actions
 
-class ExperienceReplay:
-    def __init__(self, capacity):
-        self.buffer = deque(maxlen=capacity)
+        self.fc1 = nn.Linear(self.input_shape[0], 256)
+        self.ln1 = nn.LayerNorm(256, elementwise_affine=False)
+        self.fc2 = nn.Linear(256, 128)
+        self.ln2 = nn.LayerNorm(128, elementwise_affine=False)
+        self.fc3 = nn.Linear(128, self.num_actions)
 
-    def push(self, state, action, reward, next_state, done):
-        experience = Experience(state, action, reward, next_state, done)
-        self.buffer.append(experience)
+        self.optimizer = torch.optim.Adam(self.parameters(), lr=learning_rate)
+        self.loss = nn.MSELoss()
+        self.to(device)
 
-    def sample(self, batch_size):
-        return random.sample(self.buffer, batch_size)
+        self._initialize_weights()
 
-    def can_sample(self, batch_size):
-        return len(self.buffer) >= batch_size
-
-    def __len__(self):
-        return len(self.buffer)
-
-
-class DQNNetwork(nn.Module):
-    def __init__(self, input_dim, output_dim_per_agent):
-        super(DQNNetwork, self).__init__()
-        self.fc1 = nn.Linear(input_dim, 128)
-        self.fc2 = nn.Linear(128, 128)
-        self.fc3 = nn.Linear(128, output_dim_per_agent)
+    def _initialize_weights(self):
+        for m in self.modules():
+            if isinstance(m, nn.Linear):
+                nn.init.kaiming_uniform_(m.weight, nonlinearity='relu')
+                nn.init.constant_(m.bias, 0.01)
 
     def forward(self, x):
-        x = F.relu(self.fc1(x))
-        x = F.relu(self.fc2(x))
-        return self.fc3(x)
+        x = F.relu(self.ln1(self.fc1(x)))
+        x = F.relu(self.ln2(self.fc2(x)))
+        x = self.fc3(x)
+        return x
+
+    def update_target(self, target_net):
+        target_net.load_state_dict(self.state_dict())
+
+
+class ReplayBuffer:
+
+    def __init__(self, state_shape, action_space, capacity=MEM_SIZE, alpha=0.6, prioritized=False):
+
+        self.capacity = capacity
+        self.prioritized = prioritized
+        self.mem_count = 0
+
+        self.states = np.zeros((capacity, *state_shape), dtype=np.float32)
+        self.next_states = np.zeros((capacity, *state_shape), dtype=np.float32)
+        self.actions = np.zeros(capacity, dtype=np.int64)
+        self.rewards = np.zeros(capacity, dtype=np.float32)
+        self.dones = np.zeros(capacity, dtype=np.bool_)
+        self.alpha = alpha
+
+        if self.prioritized:
+            self.priorities = np.ones(capacity)
+            self.max_priority = 1.0
+
+    def __len__(self):
+        return min(self.mem_count, self.capacity)
+
+    def add(self, state, action, reward, next_state, done):
+
+        index = self.mem_count % self.capacity
+
+        self.states[index] = state
+        self.actions[index] = action
+        self.rewards[index] = reward
+        self.next_states[index] = next_state
+        self.dones[index] = done
+
+        if self.prioritized:
+            self.priorities[index] = self.max_priority
+
+        self.mem_count += 1
+
+    def sample(self, batch_size, beta=0.4):
+
+        if self.__len__() < batch_size:
+            raise ValueError("Not enough experiences available for sampling.")
+
+        # Using prioritised sampling
+        if self.prioritized:
+
+            probs = self.priorities[:self.__len__()]**self.alpha
+            probs /= probs.sum()
+
+            indices = np.random.choice(
+                self.__len__(), batch_size, p=probs)
+
+            weights = (len(probs) * probs[indices]) ** (-beta)
+            weights /= weights.max()
+
+        else:
+            indices = np.random.choice(
+                self.__len__(), batch_size)
+            weights = np.ones(batch_size)
+
+        return (
+            self.states[indices],
+            self.actions[indices],
+            self.rewards[indices],
+            self.next_states[indices],
+            self.dones[indices],
+            indices,
+            weights
+        )
+
+    def update_priorities(self, indices, priorities):
+        if self.prioritized:
+            for idx, priority in zip(indices, priorities):
+                self.priorities[idx] = priority ** self.alpha
+                self.max_priority = max(self.max_priority, priority)
 
 
 class DQNAgent:
-    '''
-    This DQN implementation treats the multi-agent problem as a single-agent problem by flattening the observations and encoding the joint actions. 
-    The Q-value network outputs Q-values for all possible joint actions, and the action with the highest Q-value is selected.
-    '''
 
-    def __init__(self, env, epsilon=1.0, min_epsilon=0.05, epsilon_decay=0.995, lr=0.0005, lr_decay=0.0005, gamma=0.99, buffer_size=10000, batch_size=64):
+    def __init__(self, env):
         self.env = env
-        agent_obs_len = 4 + (4 * (self.env.n_agents - 1)) + \
-            (3 * self.env.n_objects) + (2 * self.env.n_objects)
-        self.obs_size = agent_obs_len * self.env.n_agents
-        self.action_size = np.prod(env.action_space.nvec)
 
-        self.device = torch.device(
-            "cuda" if torch.cuda.is_available() else "cpu")
+        self.exploration = EXPLORATION
 
-        self.n_actions = 6
-        self.network = DQNNetwork(
-            self.obs_size, self.action_size).to(self.device)
-        self.target_network = DQNNetwork(
-            self.obs_size, self.action_size).to(self.device)
+        self.replay_buffer = ReplayBuffer(
+            env.observation_space.shape, env.action_space.n, capacity=MEM_SIZE, alpha=ALPHA, prioritized=True)
 
-        self.target_network.load_state_dict(self.network.state_dict())
-        self.target_network.eval()
+        self.policy_net = Network(
+            env.observation_space.shape, env.action_space.n, LEARNING_RATE, DEVICE)
 
-        self.gamma = gamma
-        self.alpha = lr
-        self.lr_decay = lr_decay
+        self.target_net = Network(
+            env.observation_space.shape, env.action_space.n, LEARNING_RATE, DEVICE)
 
-        self.optimizer = torch.optim.Adam(
-            self.network.parameters(), lr=self.alpha)
-        self.scheduler = StepLR(
-            self.optimizer, step_size=1000, gamma=self.lr_decay)
-        self.memory = ExperienceReplay(buffer_size)
-        self.epsilon = epsilon
-        self.min_epsilon = min_epsilon
-        self.epsilon_decay = epsilon_decay
-        self.batch_size = batch_size
+        self.optimizer = optim.Adam(self.policy_net.parameters(
+        ), lr=LEARNING_RATE)
 
-    def select_action(self, state):
-        if random.random() < self.epsilon:
-            # Exploration: Randomly select a joint action
-            return [random.randrange(6) for _ in range(self.env.n_agents)]
+    def get_action(self, state):
+        if random.random() < self.exploration:  # Use instance variable, not constant
+            return self.env.action_space.sample()
         else:
-            # Exploitation: Use the Q-network to select the best joint action
-            with torch.no_grad():
-                state = torch.FloatTensor(state).to(self.device).unsqueeze(0)
-                q_values = self.network(state)
-                joint_action_idx = q_values.argmax().item()
-                joint_action = self.decode_joint_action(joint_action_idx)
-                return joint_action
+            return self.get_policy_action(state)
 
-    def decode_joint_action(self, joint_action_idx):
-        joint_action = []
-        for _ in range(self.env.n_agents):
-            action = joint_action_idx % 6
-            joint_action.append(action)
-            joint_action_idx //= 6
-        return joint_action
+    def get_policy_action(self, state):
+        q_values = self.policy_net(torch.from_numpy(state).float().to(DEVICE))
+        return torch.argmax(q_values).item()
 
-    def decay_epsilon(self):
-        self.epsilon = max(self.min_epsilon, self.epsilon * self.epsilon_decay)
+    def update_target_net(self):
+        self.target_net.load_state_dict(self.policy_net.state_dict())
 
-    def train(self):
-        if len(self.memory) < self.batch_size:
-            return None
+    def decay_exploration(self, episode):
+        self.exploration = max(
+            EXPLORATION_MIN, EXPLORATION_MAX * (EXPLORATION_DECAY ** episode))
 
-        # Sample a batch from the replay buffer
-        experiences = self.memory.sample(self.batch_size)
-        states, actions, rewards, next_states, dones = zip(*experiences)
+    def save_model(self, path):
+        torch.save(self.policy_net.state_dict(), path)
 
-        # Convert to tensors
-        states = torch.FloatTensor(np.array(states)).to(self.device)
-        q_values = self.network(states)
+    def returning_epsilon(self):
+        return self.exploration
 
-        # Convert actions to joint action indices
-        actions_tensor = torch.tensor(actions, dtype=torch.long).to(
-            self.device)  # Convert actions to tensor
-        joint_action_indices = actions_tensor[:,
-                                              0] * self.n_actions + actions_tensor[:, 1]
+    def learn(self):
+        if len(self.replay_buffer) < BATCH_SIZE:
+            return
 
-        rewards = torch.FloatTensor(rewards).to(self.device)
-        next_states = torch.FloatTensor(np.array(next_states)).to(self.device)
-        dones = torch.BoolTensor(dones).to(self.device)
+        states, actions, rewards, next_states, dones, indices, weights = self.replay_buffer.sample(
+            BATCH_SIZE, beta=0.4)
 
-        # Gather Q-values based on joint actions taken
-        state_action_values = q_values.gather(
-            1, joint_action_indices.unsqueeze(-1)).squeeze(-1)
+        # Convert to PyTorch tensors and send to device
+        states = torch.tensor(states, dtype=torch.float).to(DEVICE)
+        actions = torch.tensor(actions, dtype=torch.long).to(
+            DEVICE)
+        rewards = torch.tensor(rewards, dtype=torch.float).to(DEVICE)
+        next_states = torch.tensor(next_states, dtype=torch.float).to(DEVICE)
+        dones = torch.tensor(dones, dtype=torch.float).to(DEVICE)
+        weights = torch.tensor(weights, dtype=torch.float).to(DEVICE)
 
-        # Compute the expected Q-values for the next states
-        with torch.no_grad():
-            non_final_mask = ~dones
-            next_state_values = torch.zeros(
-                self.batch_size, device=self.device)
-            next_state_values[non_final_mask] = self.target_network(
-                next_states[non_final_mask]).max(1)[0].detach()
+        # Calculate Q-values and next Q-values
+        q_values = self.policy_net(states)
+        next_q_values = self.target_net(next_states)
 
-        # Compute the expected Q-values based on the Bellman equation
-        expected_state_action_values = (
-            next_state_values * self.gamma) + rewards
+        # Calculate Q-targets
+        q_targets = rewards + \
+            (GAMMA * torch.max(next_q_values, dim=1)[0] * (1 - dones))
 
-        # print("states:", states.shape)
-        # print("q_values:", q_values.shape)
-        # print("action:", actions_tensor.shape)
-        # print("rewards:", rewards.shape)
-        # print("next states:", next_states.shape)
-        # print("dones:", dones.shape)
+        # Extract the Q-values of the taken actions
+        current_q_values = q_values.gather(
+            1, actions.unsqueeze(-1)).squeeze(-1)
 
-        # Compute the loss
-        loss = F.smooth_l1_loss(state_action_values,
-                                expected_state_action_values)
-        # print("loss:", loss)
+        # Compute TD errors for PER
+        td_errors = q_targets.detach() - current_q_values
 
-        # Optimize the model
+        # Compute loss, considering possible priority weights
+        loss = (F.mse_loss(current_q_values, q_targets,
+                reduction='none') * weights).mean()
+
+        # Optimize model
         self.optimizer.zero_grad()
         loss.backward()
-        for param in self.network.parameters():
-            if param.grad is not None:
-                param.grad.data.clamp_(-1, 1)
+        torch.nn.utils.clip_grad_norm_(
+            self.policy_net.parameters(), max_norm=1.0)
         self.optimizer.step()
 
+        # Update priorities in the replay buffer
+        self.replay_buffer.update_priorities(
+            indices,
+            td_errors.abs().cpu().detach().numpy()
+        )
+
         return loss.item()
-
-    def update_target_network(self):
-        self.target_network.load_state_dict(self.network.state_dict())
-
-
-def game_loop(env, agent, training=True, num_episodes=10000, max_steps_per_episode=300, render=False, model_file='dqn_model'):
-    total_rewards = []
-    all_losses = []
-    failure_count = 0
-    episode_steps = []
-    for episode in range(num_episodes):
-        obs, _ = env.reset()
-        obs_flat = flatten_obs(obs)
-        episode_reward = 0
-        step = 0
-        done = False
-        while not done and step < max_steps_per_episode:
-            if render:
-                env.render()
-                time.sleep(0.05)
-            actions = agent.select_action(obs_flat)
-            next_obs, reward, done, _ = env.step(actions)
-            next_obs_flat = flatten_obs(next_obs)
-            print("Actions:", actions)
-            print("Original obs:", len(next_obs), next_obs)
-            print("Flattened obs:", next_obs_flat.shape, next_obs_flat)
-            if training:
-                agent.memory.push(obs_flat, actions, reward,
-                                  next_obs_flat, done)
-                loss = agent.train()
-                if loss is not None:
-                    all_losses.append(loss)
-            episode_reward += reward
-            obs = next_obs
-            if done:
-                break
-            step += 1
-        if step >= max_steps_per_episode:
-            failure_count += 1
-        total_rewards.append(episode_reward)
-        episode_steps.append(step)
-
-        if training:
-            agent.decay_epsilon()
-            if episode % 100 == 0:
-                failure_count = 0
-                agent.update_target_network()
-                avg_reward = sum(total_rewards[-100:]) / 100
-                success_rate = 1 - (failure_count / 100)
-                valid_losses = [
-                    loss for loss in all_losses[-100:] if loss is not None]
-                avg_loss = sum(valid_losses) / \
-                    len(valid_losses) if valid_losses else 0
-                avg_steps = sum(episode_steps[-100:]) / 100
-                print(
-                    f"Episode {episode}/{num_episodes}: Avg Reward: {avg_reward:.2f}, Avg Steps: {avg_steps}, Success rate: {success_rate:.2f}, Avg Loss: {avg_loss:.4f}, Epsilon: {agent.epsilon:.2f}, Alpha: {agent.alpha:.2f}")
-                torch.save(agent.network.state_dict(),
-                           model_file + f"_{episode}.pth")
 
 
 if __name__ == "__main__":
 
-    from macpp.core.environment import MACPPEnv
+    wandb.init(project='cart_pole', name='test_run', config={
+        "learning_rate": LEARNING_RATE,
+        "batch_size": BATCH_SIZE,
+        "architecture": "DQN",
+        "fc1_dims": FC1_DIMS,
+        "fc2_dims": FC2_DIMS,
+        "epsilon_decay": EXPLORATION_DECAY,
+    })
 
-    env = MACPPEnv(grid_size=(3, 3), n_agents=2, n_pickers=1,
-                   n_objects=1, cell_size=300, debug_mode=False)
-    agent = DQNAgent(env, epsilon=1.0, lr=0.0005,
-                     gamma=0.99, buffer_size=10000, batch_size=64)
-    game_loop(env, agent, training=True, num_episodes=1,
-              max_steps_per_episode=250, render=False, model_file='dqn_model')
+    random.seed(SEED)
+    np.random.seed(SEED)
+    torch.manual_seed(SEED)
+
+    env = gym.make('CartPole-v1')
+    # env.seed(SEED)
+
+    torch.backends.cudnn.deterministic = True
+    torch.backends.cudnn.benchmark = False
+
+    observation_space = env.observation_space
+
+    action_space = env.action_space.n
+
+    agent = DQNAgent(env)
+
+    losses = []
+    rewards = []
+    average_reward = 0
+    best_reward = 0
+
+    for episode in tqdm(range(1, EPISODES + 1), desc="Training Progress"):
+        state_tuple = env.reset()
+        state = np.array([state_tuple[0]])
+        episode_return = 0
+        loss_sum = 0
+        num_updates = 0
+
+        if episode % UPDATE_EVERY == 0:
+            agent.update_target_net()
+
+        while True:
+
+            # Assuming adaptation in get_action()
+            action = agent.get_action(state)
+
+            next_state_tuple, reward, done, _, _ = env.step(action)
+            next_state = np.array([next_state_tuple])
+
+            # Store transition in the replay buffer
+            agent.replay_buffer.add(state, action, reward, next_state, done)
+
+            # Train the agent
+            loss = agent.learn()
+
+            if loss is not None:
+                losses.append(loss)
+                loss_sum += loss
+            num_updates += 1
+            state = next_state
+            episode_return += reward
+
+            if done:
+                if episode_return > best_reward:
+                    best_reward = episode_return
+                    agent.save_model("best_model.pth")
+                average_reward += episode_return
+                rewards.append(episode_return)
+                break
+
+        # Decay exploration rate after each episode
+        agent.decay_exploration(episode)
+
+        average_loss = loss_sum / num_updates if num_updates != 0 else 0
+        average_reward = np.mean(rewards)
+
+        # Log episodic metrics
+        wandb.log({
+            "episode_return": episode_return,
+            "episode_avg_loss": average_loss,
+            "episode_avg_reward": average_reward
+        })
+
+        if episode % LOG_EVERY == 0:
+            tqdm.write(f"Episode: {episode}, "
+                       f"Avg Reward: {np.mean(rewards[-LOG_EVERY:]):.2f}, "
+                       f"Avg Loss: {average_loss:.2f}, "
+                       f"Epsilon: {agent.returning_epsilon():.2f}")
+
+    wandb.finish()
