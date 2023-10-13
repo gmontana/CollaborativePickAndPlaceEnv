@@ -180,19 +180,21 @@ class ReplayBuffer:
 
 class DQNAgent:
 
-    def __init__(self, env):
+    def __init__(self, env, obs_size):
         self.env = env
 
         self.exploration = EXPLORATION
 
         self.replay_buffer = ReplayBuffer(
-            env.observation_space.shape, env.action_space_n, capacity=MEM_SIZE, alpha=ALPHA, prioritized=True)
+            obs_size, env.action_space_n, capacity=MEM_SIZE, alpha=ALPHA, prioritized=True)
+
+        self.replay_buffer = None
 
         self.policy_net = Network(
-            env.observation_space.shape, env.action_space_n, LEARNING_RATE, DEVICE)
+            obs_size, env.action_space_n, LEARNING_RATE, DEVICE)
 
         self.target_net = Network(
-            env.observation_space.shape, env.action_space_n, LEARNING_RATE, DEVICE)
+            obs_size, env.action_space_n, LEARNING_RATE, DEVICE)
 
         self.optimizer = optim.Adam(self.policy_net.parameters(
         ), lr=LEARNING_RATE)
@@ -226,6 +228,10 @@ class DQNAgent:
 
         states, actions, rewards, next_states, dones, indices, weights = self.replay_buffer.sample(
             BATCH_SIZE, beta=0.4)
+
+        if self.replay_buffer is None:
+            self.replay_buffer = ReplayBuffer(
+                state_flat.shape, self.env.action_space_n, capacity=MEM_SIZE, alpha=ALPHA, prioritized=True)
 
         # Convert to PyTorch tensors and send to device
         # states = torch.tensor(states, dtype=torch.float).to(DEVICE)
@@ -296,7 +302,6 @@ if __name__ == "__main__":
 
     env = MACPPEnv(grid_size=(3, 3), n_agents=2, n_pickers=1,
                    n_objects=1, cell_size=300, debug_mode=True)
-    # env.seed(SEED)
 
     torch.backends.cudnn.deterministic = True
     torch.backends.cudnn.benchmark = False
@@ -304,7 +309,10 @@ if __name__ == "__main__":
     observation_space = env.observation_space
     action_space = env.action_space_n
 
-    agent = DQNAgent(env)
+    sample_obs = env.reset()
+    flattened_obs_size = len(flatten_obs(sample_obs))
+
+    agent = DQNAgent(env, flattened_obs_size)
 
     losses = []
     rewards = []
