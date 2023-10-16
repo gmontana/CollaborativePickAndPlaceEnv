@@ -112,7 +112,8 @@ class ReplayBuffer:
 
         self.states = np.zeros((capacity, *state_shape), dtype=np.float32)
         self.next_states = np.zeros((capacity, *state_shape), dtype=np.float32)
-        self.actions = np.zeros(capacity, dtype=np.int64)
+        # self.actions = np.zeros(capacity, dtype=np.int64)
+        self.actions = np.empty(capacity, dtype=object)
         self.rewards = np.zeros(capacity, dtype=np.float32)
         self.dones = np.zeros(capacity, dtype=np.bool_)
         self.alpha = alpha
@@ -181,6 +182,9 @@ class ReplayBuffer:
 class DQNAgent:
 
     def __init__(self, env, state_shape):
+
+        self.device = DEVICE 
+
         self.env = env
 
         self.exploration = EXPLORATION
@@ -189,10 +193,10 @@ class DQNAgent:
             state_shape, capacity=MEM_SIZE, alpha=ALPHA, prioritized=True)
 
         self.policy_net = Network(
-            state_shape, env.action_space_n, LEARNING_RATE, DEVICE)
+            state_shape, env.action_space_n, LEARNING_RATE, self.device)
 
         self.target_net = Network(
-            state_shape, env.action_space_n, LEARNING_RATE, DEVICE)
+            state_shape, env.action_space_n, LEARNING_RATE, self.device)
 
         self.optimizer = optim.Adam(self.policy_net.parameters(
         ), lr=LEARNING_RATE)
@@ -204,7 +208,7 @@ class DQNAgent:
             return self.get_policy_action(state)
 
     def get_policy_action(self, state):
-        q_values = self.policy_net(torch.from_numpy(state).float().to(DEVICE))
+        q_values = self.policy_net(torch.from_numpy(state).float().to(self.device))
         return torch.argmax(q_values).item()
 
     def update_target_net(self):
@@ -224,23 +228,22 @@ class DQNAgent:
         if len(self.replay_buffer) < BATCH_SIZE:
             return
 
+        # sample from the buffer
         states, actions, rewards, next_states, dones, indices, weights = self.replay_buffer.sample(
             BATCH_SIZE, beta=0.4)
 
-        # Convert to PyTorch tensors and send to device
-        # states = torch.tensor(states, dtype=torch.float).to(DEVICE)
-        states = torch.tensor([flatten_obs(s) for s in states], dtype=torch.float).to(
-            DEVICE)
+        # convert the states to tensors
+        states = torch.tensor(states, dtype=torch.float).to(self.device)
+        next_states = torch.tensor(next_states, dtype=torch.float).to(self.device)
 
-        actions = torch.tensor(actions, dtype=torch.long).to(
-            DEVICE)
-        rewards = torch.tensor(rewards, dtype=torch.float).to(DEVICE)
-        # next_states = torch.tensor(next_states, dtype=torch.float).to(DEVICE)
-        next_states = torch.tensor([flatten_obs(s) for s in next_states], dtype=torch.float).to(
-            DEVICE)
+        # convert actions to tensor and reshape
+        actions = torch.tensor(np.stack(actions), dtype=torch.long).to(self.device)
 
-        dones = torch.tensor(dones, dtype=torch.float).to(DEVICE)
-        weights = torch.tensor(weights, dtype=torch.float).to(DEVICE)
+        # convert rewards
+        rewards = torch.tensor(rewards, dtype=torch.float).to(self.device)
+
+        dones = torch.tensor(dones, dtype=torch.float).to(self.device)
+        weights = torch.tensor(weights, dtype=torch.float).to(self.device)
 
         # Calculate Q-values and next Q-values
         q_values = self.policy_net(states)
