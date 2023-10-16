@@ -303,10 +303,12 @@ if __name__ == "__main__":
     observation_space = env.observation_space
     action_space = env.action_space_n
 
-    sample_obs = env.reset()
-    # print(sample_obs)
-    flattened_obs_shape = flatten_obs(sample_obs).shape
-    agent = DQNAgent(env, flattened_obs_shape)
+    sample_obs, _ = env.reset()
+    print(f"Sample obs: {sample_obs}")
+    flattened_obs = flatten_obs(sample_obs)
+
+    print(f"Flattened obs: {flattened_obs}")
+    agent = DQNAgent(env, flattened_obs.shape)
 
     losses = []
     rewards = []
@@ -314,8 +316,7 @@ if __name__ == "__main__":
     best_reward = 0
 
     for episode in tqdm(range(1, EPISODES + 1), desc="Training Progress"):
-        state = env.reset()
-        # state = np.array([state_tuple[0]])
+        state, _ = env.reset()
         state_flat = flatten_obs(state)
         episode_return = 0
         loss_sum = 0
@@ -326,10 +327,13 @@ if __name__ == "__main__":
 
         while True:
 
-            # Assuming adaptation in get_action()
             action = agent.get_action(state)
 
+            print(f"Action: {action}")
+
             next_state, reward, done, _ = env.step(action)
+
+            print(f"Next state: {next_state}")
 
             # next_state = np.array([next_state_tuple])
             next_state_flat = flatten_obs(next_state)
@@ -345,6 +349,7 @@ if __name__ == "__main__":
                 losses.append(loss)
                 loss_sum += loss
             num_updates += 1
+
             state = next_state
             state_flat = next_state_flat
             episode_return += reward
