@@ -42,12 +42,15 @@ def flatten_obs(obs):
     for _, agent_observations in obs.items():
         # Agent's own state
         flattened.extend(agent_observations['self']['position'])
-        flattened.append(1 if agent_observations['self']['carrying_object'] is not None else 0)
+        flattened.append(
+            1 if agent_observations['self']['carrying_object'] is not None else 0)
 
         # Relative positions and distances to other agents
         for other_agent in agent_observations['agents']:
-            dx = other_agent['position'][0] - agent_observations['self']['position'][0]
-            dy = other_agent['position'][1] - agent_observations['self']['position'][1]
+            dx = other_agent['position'][0] - \
+                agent_observations['self']['position'][0]
+            dy = other_agent['position'][1] - \
+                agent_observations['self']['position'][1]
             flattened.extend([dx, dy])
             flattened.append(abs(dx) + abs(dy))
 
@@ -112,7 +115,6 @@ class ReplayBuffer:
 
         self.states = np.zeros((capacity, *state_shape), dtype=np.float32)
         self.next_states = np.zeros((capacity, *state_shape), dtype=np.float32)
-        # self.actions = np.zeros(capacity, dtype=np.int64)
         self.actions = np.empty(capacity, dtype=object)
         self.rewards = np.zeros(capacity, dtype=np.float32)
         self.dones = np.zeros(capacity, dtype=np.bool_)
@@ -130,7 +132,7 @@ class ReplayBuffer:
         index = self.mem_count % self.capacity
 
         self.states[index] = state
-        self.actions[index] = action
+        self.actions[index] = list(action)
         self.rewards[index] = reward
         self.next_states[index] = next_state
         self.dones[index] = done
@@ -183,7 +185,7 @@ class DQNAgent:
 
     def __init__(self, env, state_shape):
 
-        self.device = DEVICE 
+        self.device = DEVICE
 
         self.env = env
 
@@ -202,14 +204,16 @@ class DQNAgent:
         ), lr=LEARNING_RATE)
 
     def get_action(self, state):
-        if random.random() < self.exploration:  # Use instance variable, not constant
+        if random.random() < self.exploration:
             return self.env.action_space.sample()
         else:
             return self.get_policy_action(state)
 
     def get_policy_action(self, state):
-        q_values = self.policy_net(torch.from_numpy(state).float().to(self.device))
-        return torch.argmax(q_values).item()
+        q_values = self.policy_net(
+            torch.from_numpy(state).float().to(self.device))
+        actions = torch.argmax(q_values.view(len(self.env.agents), -1), dim=1)
+        return actions.tolist()
 
     def update_target_net(self):
         self.target_net.load_state_dict(self.policy_net.state_dict())
@@ -234,14 +238,15 @@ class DQNAgent:
 
         # convert the states to tensors
         states = torch.tensor(states, dtype=torch.float).to(self.device)
-        next_states = torch.tensor(next_states, dtype=torch.float).to(self.device)
+        next_states = torch.tensor(
+            next_states, dtype=torch.float).to(self.device)
 
-        # convert actions to tensor and reshape
-        actions = torch.tensor(np.stack(actions), dtype=torch.long).to(self.device)
+        # reshape and convert actions to tensors
+        actions = torch.tensor(
+            np.stack(actions), dtype=torch.long).to(self.device)
 
-        # convert rewards
+        # convert other quantities
         rewards = torch.tensor(rewards, dtype=torch.float).to(self.device)
-
         dones = torch.tensor(dones, dtype=torch.float).to(self.device)
         weights = torch.tensor(weights, dtype=torch.float).to(self.device)
 
@@ -254,14 +259,20 @@ class DQNAgent:
             (GAMMA * torch.max(next_q_values, dim=1)[0] * (1 - dones))
 
         # Extract the Q-values of the taken actions
-        current_q_values = q_values.gather(
-            1, actions.unsqueeze(-1)).squeeze(-1)
+        num_agents = actions.size(1)
+        q_values_selected = torch.zeros(actions.size(0)).to(self.device)
+        for i in range(num_agents):
+            q_values_selected += q_values[torch.arange(
+                actions.size(0)), actions[:, i]]
+
+        # current_q_values = q_values.gather(
+        #     1, actions.unsqueeze(-1)).squeeze(-1)
 
         # Compute TD errors for PER
-        td_errors = q_targets.detach() - current_q_values
+        td_errors = q_targets.detach() - q_values_selected
 
         # Compute loss, considering possible priority weights
-        loss = (F.mse_loss(current_q_values, q_targets,
+        loss = (F.mse_loss(q_values_selected, q_targets,
                 reduction='none') * weights).mean()
 
         # Optimize model
@@ -298,7 +309,7 @@ if __name__ == "__main__":
     torch.manual_seed(SEED)
 
     env = MACPPEnv(grid_size=(3, 3), n_agents=2, n_pickers=1,
-                   n_objects=1, cell_size=300, debug_mode=True)
+                   n_objects=1, cell_size=300, debug_mode=False)
 
     torch.backends.cudnn.deterministic = True
     torch.backends.cudnn.benchmark = False
@@ -307,10 +318,10 @@ if __name__ == "__main__":
     action_space = env.action_space_n
 
     sample_obs, _ = env.reset()
-    print(f"Sample obs: {sample_obs}")
+    # print(f"Sample obs: {sample_obs}")
     flattened_obs = flatten_obs(sample_obs)
 
-    print(f"Flattened obs: {flattened_obs}")
+    # print(f"Flattened obs: {flattened_obs}")
     agent = DQNAgent(env, flattened_obs.shape)
 
     losses = []
@@ -330,13 +341,12 @@ if __name__ == "__main__":
 
         while True:
 
-            action = agent.get_action(state)
-
-            print(f"Action: {action}")
+            action = agent.get_action(state_flat)
+            # print(f"Action: {action}")
 
             next_state, reward, done, _ = env.step(action)
 
-            print(f"Next state: {next_state}")
+            # print(f"Next state: {next_state}")
 
             # next_state = np.array([next_state_tuple])
             next_state_flat = flatten_obs(next_state)
@@ -384,4 +394,12 @@ if __name__ == "__main__":
                        f"Avg Loss: {average_loss:.2f}, "
                        f"Epsilon: {agent.returning_epsilon():.2f}")
 
+    wandb.finish()
+    if episode % LOG_EVERY == 0:
+        tqdm.write(f"Episode: {episode}, "
+                   f"Avg Reward: {np.mean(rewards[-LOG_EVERY:]):.2f}, "
+                   f"Avg Loss: {average_loss:.2f}, "
+                   f"Epsilon: {agent.returning_epsilon():.2f}")
+
+    wandb.finish()
     wandb.finish()
