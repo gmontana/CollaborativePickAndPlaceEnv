@@ -33,35 +33,35 @@ ALPHA = 0.4
 FC1_DIMS = 1024
 FC2_DIMS = 512
 
-DEVICE = torch.device("mps" if torch.cuda.is_available() else "cpu")
+# DEVICE = torch.device("mps" if torch.cuda.is_available() else "cpu")
+DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 
 def flatten_obs(obs):
     flattened = []
-    for agent_key, agent_obs in obs.items():
+    for _, agent_observations in obs.items():
         # Agent's own state
-        flattened.extend(agent_obs['self']['position'])
-        flattened.append(1 if agent_obs['self']
-                         ['carrying_object'] is not None else 0)
+        flattened.extend(agent_observations['self']['position'])
+        flattened.append(1 if agent_observations['self']['carrying_object'] is not None else 0)
 
         # Relative positions and distances to other agents
-        for other_agent in agent_obs['agents']:
-            dx = other_agent['position'][0] - agent_obs['self']['position'][0]
-            dy = other_agent['position'][1] - agent_obs['self']['position'][1]
+        for other_agent in agent_observations['agents']:
+            dx = other_agent['position'][0] - agent_observations['self']['position'][0]
+            dy = other_agent['position'][1] - agent_observations['self']['position'][1]
             flattened.extend([dx, dy])
             flattened.append(abs(dx) + abs(dy))
 
         # Relative positions and distances to objects
-        for obj in agent_obs['objects']:
-            dx = obj['position'][0] - agent_obs['self']['position'][0]
-            dy = obj['position'][1] - agent_obs['self']['position'][1]
+        for obj in agent_observations['objects']:
+            dx = obj['position'][0] - agent_observations['self']['position'][0]
+            dy = obj['position'][1] - agent_observations['self']['position'][1]
             flattened.extend([dx, dy])
             flattened.append(abs(dx) + abs(dy))
 
         # Relative positions and distances to goals
-        for goal in agent_obs['goals']:
-            dx = goal[0] - agent_obs['self']['position'][0]
-            dy = goal[1] - agent_obs['self']['position'][1]
+        for goal in agent_observations['goals']:
+            dx = goal[0] - agent_observations['self']['position'][0]
+            dy = goal[1] - agent_observations['self']['position'][1]
             flattened.extend([dx, dy])
             flattened.append(abs(dx) + abs(dy))
 
@@ -104,7 +104,7 @@ class Network(nn.Module):
 
 class ReplayBuffer:
 
-    def __init__(self, state_shape, action_space, capacity=MEM_SIZE, alpha=0.6, prioritized=False):
+    def __init__(self, state_shape, capacity=MEM_SIZE, alpha=0.6, prioritized=False):
 
         self.capacity = capacity
         self.prioritized = prioritized
@@ -180,21 +180,19 @@ class ReplayBuffer:
 
 class DQNAgent:
 
-    def __init__(self, env, obs_size):
+    def __init__(self, env, state_shape):
         self.env = env
 
         self.exploration = EXPLORATION
 
         self.replay_buffer = ReplayBuffer(
-            obs_size, env.action_space_n, capacity=MEM_SIZE, alpha=ALPHA, prioritized=True)
-
-        self.replay_buffer = None
+            state_shape, capacity=MEM_SIZE, alpha=ALPHA, prioritized=True)
 
         self.policy_net = Network(
-            obs_size, env.action_space_n, LEARNING_RATE, DEVICE)
+            state_shape, env.action_space_n, LEARNING_RATE, DEVICE)
 
         self.target_net = Network(
-            obs_size, env.action_space_n, LEARNING_RATE, DEVICE)
+            state_shape, env.action_space_n, LEARNING_RATE, DEVICE)
 
         self.optimizer = optim.Adam(self.policy_net.parameters(
         ), lr=LEARNING_RATE)
@@ -228,10 +226,6 @@ class DQNAgent:
 
         states, actions, rewards, next_states, dones, indices, weights = self.replay_buffer.sample(
             BATCH_SIZE, beta=0.4)
-
-        if self.replay_buffer is None:
-            self.replay_buffer = ReplayBuffer(
-                state_flat.shape, self.env.action_space_n, capacity=MEM_SIZE, alpha=ALPHA, prioritized=True)
 
         # Convert to PyTorch tensors and send to device
         # states = torch.tensor(states, dtype=torch.float).to(DEVICE)
@@ -310,9 +304,9 @@ if __name__ == "__main__":
     action_space = env.action_space_n
 
     sample_obs = env.reset()
-    flattened_obs_size = len(flatten_obs(sample_obs))
-
-    agent = DQNAgent(env, flattened_obs_size)
+    # print(sample_obs)
+    flattened_obs_shape = flatten_obs(sample_obs).shape
+    agent = DQNAgent(env, flattened_obs_shape)
 
     losses = []
     rewards = []
@@ -335,7 +329,7 @@ if __name__ == "__main__":
             # Assuming adaptation in get_action()
             action = agent.get_action(state)
 
-            next_state, reward, done, _, _ = env.step(action)
+            next_state, reward, done, _ = env.step(action)
 
             # next_state = np.array([next_state_tuple])
             next_state_flat = flatten_obs(next_state)
