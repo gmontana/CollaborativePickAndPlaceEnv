@@ -17,6 +17,7 @@ REWARD_DROP = 10
 REWARD_PICKUP = 5
 REWARD_COMPLETION = 20
 
+
 class Action(Enum):
     UP = 0
     DOWN = 1
@@ -35,7 +36,7 @@ class Agent:
                  position: Tuple[int, int],
                  picker: bool,
                  carrying_object: Optional[int] = None,
-                 reward: Optional[int] =0) -> None:
+                 reward: Optional[int] = 0) -> None:
         self.position = position
         self.picker = picker
         self.carrying_object = carrying_object
@@ -60,6 +61,7 @@ class Agent:
             'picker': self.picker,
             'carrying_object': self.carrying_object
         }
+
 
 class Object:
     def __init__(self,
@@ -132,7 +134,8 @@ class MACPPEnv(gym.Env):
         agent_space = spaces.Dict(
             {
                 "position": spaces.Tuple(
-                    (spaces.Discrete(self.grid_width), spaces.Discrete(self.grid_length))
+                    (spaces.Discrete(self.grid_width),
+                     spaces.Discrete(self.grid_length))
                 ),
                 "picker": spaces.Discrete(2),  # 0 or 1
                 "carrying_object": spaces.Discrete(
@@ -145,7 +148,8 @@ class MACPPEnv(gym.Env):
         object_space = spaces.Dict(
             {
                 "position": spaces.Tuple(
-                    (spaces.Discrete(self.grid_width), spaces.Discrete(self.grid_length))
+                    (spaces.Discrete(self.grid_width),
+                     spaces.Discrete(self.grid_length))
                 ),
                 "id": spaces.Discrete(self.n_objects),
             }
@@ -192,9 +196,14 @@ class MACPPEnv(gym.Env):
         # If a video is required, create frames
         if self.create_video:
             self.offscreen_surface = pygame.Surface(
-                (self.grid_width * self.cell_size, self.grid_length * self.cell_size)
+                (self.grid_width * self.cell_size,
+                 self.grid_length * self.cell_size)
             )
             self.frames = []
+
+    @property
+    def action_space_n(self):
+        return np.prod(self.action_space.nvec)
 
     def _validate_actions(self, actions: List[int]) -> None:
         for action in actions:
@@ -205,11 +214,11 @@ class MACPPEnv(gym.Env):
     def get_obs(self) -> Dict[str, Dict[str, Any]]:
         observations = {}
         for idx, agent in enumerate(self.agents):
-            observations[f"agent_{idx}"] = agent.get_agent_obs(self.agents, self.objects, self.goals)
+            observations[f"agent_{idx}"] = agent.get_agent_obs(
+                self.agents, self.objects, self.goals)
         return observations
 
     def reset(self, seed: Optional[int] = None, options: Optional[Any] = None) -> Tuple[Dict[str, Dict[str, Any]], Dict[str, Any]]:
-
         """
         Reset the environment to either a random state or an predefined initial state
         """
@@ -223,35 +232,7 @@ class MACPPEnv(gym.Env):
 
         return obs, {}
 
-    # def obs_to_hash(self, obs: Dict[str, Dict[str, Any]]) -> str:
-    #     def position_to_number(pos, length):
-    #         return pos[0] * length + pos[1]
-    #
-    #     encoded_obs = []
-    #
-    #     for agent_id in sorted(obs.keys()):
-    #         agent_data = obs[agent_id]
-    #         # Encode agent's own observation
-    #         encoded_obs.append(position_to_number(agent_data['self']['position'], self.grid_length))
-    #         encoded_obs.append(1 if agent_data['self']['picker'] else 0)
-    #         encoded_obs.append(agent_data['self']['carrying_object'] if agent_data['self']['carrying_object'] is not None else -1)
-    #         # Encode other agents' observations
-    #         for other_agent in agent_data['agents']:
-    #             encoded_obs.append(position_to_number(other_agent['position'], self.grid_length))
-    #             encoded_obs.append(1 if other_agent['picker'] else 0)
-    #             encoded_obs.append(other_agent['carrying_object'] if other_agent['carrying_object'] is not None else -1)
-    #         # Encode objects' observations
-    #         for obj in agent_data['objects']:
-    #             encoded_obs.append(position_to_number(obj['position'], self.grid_length))
-    #             encoded_obs.append(obj['id'])
-    #         # Encode goals
-    #         for goal in agent_data['goals']:
-    #             encoded_obs.append(position_to_number(goal, self.grid_length))
-    #
-    #     # Convert the list of numbers to a single string and hash it
-    #     concatenated_obs = ''.join(map(str, encoded_obs))
-    #     return hashlib.md5(concatenated_obs.encode()).hexdigest()
-
+    '''
     def obs_to_hash(self, obs: Dict[str, Dict[str, Any]]) -> str:
         def position_to_number(pos, length):
             return pos[0] * length + pos[1]
@@ -264,20 +245,56 @@ class MACPPEnv(gym.Env):
             encoded_obs.append(position_to_number(agent_data['self']['position'], self.grid_length))
             encoded_obs.append(1 if agent_data['self']['picker'] else 0)
             encoded_obs.append(agent_data['self']['carrying_object'] if agent_data['self']['carrying_object'] is not None else -1)
+            # Encode other agents' observations
+            for other_agent in agent_data['agents']:
+                encoded_obs.append(position_to_number(other_agent['position'], self.grid_length))
+                encoded_obs.append(1 if other_agent['picker'] else 0)
+                encoded_obs.append(other_agent['carrying_object'] if other_agent['carrying_object'] is not None else -1)
+            # Encode objects' observations
+            for obj in agent_data['objects']:
+                encoded_obs.append(position_to_number(obj['position'], self.grid_length))
+                encoded_obs.append(obj['id'])
+            # Encode goals
+            for goal in agent_data['goals']:
+                encoded_obs.append(position_to_number(goal, self.grid_length))
+
+        # Convert the list of numbers to a single string and hash it
+        concatenated_obs = ''.join(map(str, encoded_obs))
+        return hashlib.md5(concatenated_obs.encode()).hexdigest()
+    '''
+
+    '''
+    def obs_to_hash(self, obs: Dict[str, Dict[str, Any]]) -> str:
+        def position_to_number(pos, length):
+            return pos[0] * length + pos[1]
+
+        encoded_obs = []
+
+        for agent_id in sorted(obs.keys()):
+            agent_data = obs[agent_id]
+            # Encode agent's own observation
+            encoded_obs.append(position_to_number(
+                agent_data['self']['position'], self.grid_length))
+            encoded_obs.append(1 if agent_data['self']['picker'] else 0)
+            encoded_obs.append(agent_data['self']['carrying_object']
+                               if agent_data['self']['carrying_object'] is not None else -1)
 
         # Encode objects' observations
-        for obj in obs['agent_0']['objects']:  # We can use 'agent_0' as a reference since all agents see the same objects
-            encoded_obs.append(position_to_number(obj['position'], self.grid_length))
+        # We can use 'agent_0' as a reference since all agents see the same objects
+        for obj in obs['agent_0']['objects']:
+            encoded_obs.append(position_to_number(
+                obj['position'], self.grid_length))
             encoded_obs.append(obj['id'])
 
         # Encode goals
-        for goal in obs['agent_0']['goals']:  # We can use 'agent_0' as a reference since all agents see the same goals
+        # We can use 'agent_0' as a reference since all agents see the same goals
+        for goal in obs['agent_0']['goals']:
             encoded_obs.append(position_to_number(goal, self.grid_length))
 
         # Convert the list of numbers to a single string and hash it
         concatenated_obs = ''.join(map(str, encoded_obs))
         return hashlib.md5(concatenated_obs.encode()).hexdigest()
-
+    '''
 
     def random_reset(self, seed: Optional[int] = None) -> None:
         """
@@ -331,7 +348,6 @@ class MACPPEnv(gym.Env):
         # Assign goals
         self.goals = goal_positions
 
-
     def reset_from_obs(self, obs: Dict[str, Dict[str, Any]]) -> None:
         """
         Reset the environment to a predefined initial state.
@@ -366,7 +382,6 @@ class MACPPEnv(gym.Env):
 
         # Reset goals
         self.goals = [tuple(goal) for goal in goal_states]
-
 
     def _print_state(self):
         print("-" * 30)
@@ -545,12 +560,14 @@ class MACPPEnv(gym.Env):
                             agent.reward += REWARD_GOOD_PASS
                             adj_agent.reward += REWARD_GOOD_PASS
                             if self.debug_mode:
-                                print(f'Rewarded for good pass: {REWARD_GOOD_PASS}')
+                                print(
+                                    f'Rewarded for good pass: {REWARD_GOOD_PASS}')
                         elif not agent.picker and adj_agent.picker:
                             agent.reward += REWARD_BAD_PASS
                             adj_agent.reward += REWARD_BAD_PASS
                             if self.debug_mode:
-                                print(f'Rewarded for bad pass: {REWARD_BAD_PASS}')
+                                print(
+                                    f'Rewarded for bad pass: {REWARD_BAD_PASS}')
 
                         break
 
@@ -574,7 +591,6 @@ class MACPPEnv(gym.Env):
             return True
         return False
 
-
     def _init_render(self) -> None:
         from macpp.core.rendering import Viewer
         self.renderer = Viewer(self)
@@ -596,7 +612,8 @@ class MACPPEnv(gym.Env):
             pass
 
     def _get_state_space_size(self) -> int:
-        agent_space_size = self.grid_width * self.grid_length * 2 * (self.n_objects + 1)
+        agent_space_size = self.grid_width * \
+            self.grid_length * 2 * (self.n_objects + 1)
         object_space_size = self.grid_width * self.grid_length * self.n_objects
         goal_space_size = self.grid_width * self.grid_length
         state_space_size = (agent_space_size ** self.n_agents) * (
@@ -641,4 +658,3 @@ def game_loop(env, render):
 
     env.close()
     print("Episode finished.")
-
