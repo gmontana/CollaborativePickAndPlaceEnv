@@ -118,7 +118,57 @@ Where n-obs, n-rewards, n-done and n-info are LISTS of N items (where N is the n
 
 ## Observation Space
 
-To do
+The observation space for the environment is structured as a dictionary where each agent in the environment has its own observation. Each agent's observation is itself a dictionary with the following keys:
+
+`self`: this key maps to a dictionary that describes the observing agent's own state:
+- `position`: a tuple representing the 2D position on the grid
+- `picker`: a boolean value indicating if the agent is a picker (can pick up objects) or not
+- `carryin_object`: either an integer ID representing the object the agent is currently carrying or `None` if the agent isn't carrying any object
+
+`agents`: this key maps to a list of dictionaries. Each dictionary in this list represents the state of another agent in the environment (excluding the observing agent itself). Each dictionary contains the same fields, i.e. `position`, `picker`, and `carryin_object`.
+
+`objects`: this key maps to a list of dictionaries. Each dictionary in this list represents an object in the environment. Each dictionary contains:
+- `id`: an integer representing the unique ID of the object
+- `position`: a tuple representing the object's position on the grid
+
+`goals`: This key maps to a list of tuples. Each tuple in this list represents the 2D position of a goal on the grid
+
+Here is a representation of this structure:
+
+```python
+{
+    'agent_0': {
+        'self': {
+            'position': (x, y),
+            'picker': True/False,
+            'carrying_object': ID/None
+        },
+        'agents': [
+            {
+                'position': (x, y),
+                'picker': True/False,
+                'carrying_object': ID/None
+            },
+            ... (other agents)
+        ],
+        'objects': [
+            {
+                'id': ID,
+                'position': (x, y)
+            },
+            ... (other objects)
+        ],
+        'goals': [
+            (x, y),
+            ... (other goals)
+        ]
+    },
+    'agent_1': { ... },
+    ... (other agents)
+}
+
+```
+
 
 ## Action space
 
