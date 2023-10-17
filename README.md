@@ -204,7 +204,7 @@ REWARD_COMPLETION = 20
 
 <!-- CITATION -->
 # Please Cite
-The paper that first uses this implementation of Level-based Foraging (LBF) and achieves state-of-the-art results:
+The paper that first uses this implementation of the CPP anvironment:
 ```
 paper_here
 ```
