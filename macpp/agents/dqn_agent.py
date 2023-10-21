@@ -37,7 +37,10 @@ FC2_DIMS = 512
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 
-def flatten_obs(obs):
+def flatten_obs_dist(obs):
+    '''
+    Flatten the original observation.
+    '''
 
     flat_obs = []
     for _, agent_observations in obs.items():
@@ -73,32 +76,30 @@ def flatten_obs(obs):
 
 
 def obs_to_grid(obs, grid_size):
-    grid_state = np.zeros((grid_size[0], grid_size[1], 3), dtype=int)
+    '''
+    Represents agents, objects and goals as non-zero elements in a grid.
+    '''
+    grid_width, grid_length = grid_size
+    # We have 3 channels: agents, objects, and goals
+    grid = np.zeros((grid_width, grid_length, 3))
 
-    # Extract agents, objects, and goals from the original state
-    agents = obs['agents']
-    objects = obs['objects']
-    goals = obs['goals']
+    for _, agent_data in obs.items():
+        x, y = agent_data['self']['position']
+        grid[x, y, 0] = 1
 
-    # Place agents on the grid
-    for agent in agents:
-        x, y = map(int, agent['position'])
-        if 0 <= x < grid_size[0] and 0 <= y < grid_size[1]:
-            grid_state[x, y, 0] = 1
+        for other_agent in agent_data['agents']:
+            x, y = other_agent['position']
+            grid[x, y, 0] = 1
 
-    # Place objects on the grid
-    for obj in objects:
-        x, y = map(int, obj['position'])
-        if 0 <= x < grid_size[0] and 0 <= y < grid_size[1]:
-            grid_state[x, y, 1] = 1
+        for obj in agent_data['objects']:
+            x, y = obj['position']
+            grid[x, y, 1] = 1
 
-    # Place goals on the grid
-    for goal in goals:
-        x, y = map(int, goal['position'])
-        if 0 <= x < grid_size[0] and 0 <= y < grid_size[1]:
-            grid_state[x, y, 2] = 1
+        for goal in agent_data['goals']:
+            x, y = goal
+            grid[x, y, 2] = 1
 
-    return grid_state
+    return grid
 
 
 class Network(nn.Module):
@@ -349,13 +350,11 @@ if __name__ == "__main__":
     grid_width, grid_length = env.grid_width, env.grid_length
 
     sample_obs, _ = env.reset()
-    print(f"Sample obs: {sample_obs}")
-    flattened_obs = flatten_obs(sample_obs)
-    print(f"Flattened obs: {flattened_obs}")
-    grid_obs = obs_to_grid(sample_obs, (grid_width, grid_length))
-    print(f"Grid obs: {grid_obs}")
-
-    exit()
+    # print(f"Sample obs: {sample_obs}")
+    flattened_obs = flatten_obs_dist(sample_obs)
+    # print(f"Flattened obs: {flattened_obs}")
+    # grid_obs = obs_to_grid(sample_obs, (grid_width, grid_length))
+    # print(f"Grid obs: {grid_obs}")
 
     agent = DQNAgent(env, (len(flattened_obs),))
 
@@ -366,7 +365,7 @@ if __name__ == "__main__":
 
     for episode in tqdm(range(1, EPISODES + 1), desc="Training Progress"):
         state, _ = env.reset()
-        state_flat = flatten_obs(state)
+        state_flat = flatten_obs_dist(state)
         episode_return = 0
         loss_sum = 0
         num_updates = 0
@@ -384,7 +383,7 @@ if __name__ == "__main__":
             # print(f"Next state: {next_state}")
 
             # next_state = np.array([next_state_tuple])
-            next_state_flat = flatten_obs(next_state)
+            next_state_flat = flatten_obs_dist(next_state)
 
             # Store transition in the replay buffer
             agent.replay_buffer.add(
