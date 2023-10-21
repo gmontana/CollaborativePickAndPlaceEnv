@@ -418,6 +418,10 @@ class MACPPEnv(gym.Env):
             self._validate_actions(actions)
             print(f"\nExecuting actions: {actions}\n")
 
+        # reset the rewards
+        for agent in self.agents:
+            agent.reward = 0
+
         # Negative reward given at every step
         for agent in self.agents:
             agent.reward += REWARD_STEP
@@ -450,6 +454,8 @@ class MACPPEnv(gym.Env):
         total_reward = sum(self._get_rewards())
         if self.debug_mode:
             print(f'Total reward: {total_reward}')
+            for idx, agent in enumerate(self.agents):
+                print(f"Agent {idx} Reward: {agent.reward}")
 
         obs = self.get_obs()
 
