@@ -38,11 +38,12 @@ DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 
 def flatten_obs(obs):
-    flattened = []
+
+    flat_obs = []
     for _, agent_observations in obs.items():
         # Agent's own state
-        flattened.extend(agent_observations['self']['position'])
-        flattened.append(
+        flat_obs.extend(agent_observations['self']['position'])
+        flat_obs.append(
             1 if agent_observations['self']['carrying_object'] is not None else 0)
 
         # Relative positions and distances to other agents
@@ -51,24 +52,53 @@ def flatten_obs(obs):
                 agent_observations['self']['position'][0]
             dy = other_agent['position'][1] - \
                 agent_observations['self']['position'][1]
-            flattened.extend([dx, dy])
-            flattened.append(abs(dx) + abs(dy))
+            flat_obs.extend([dx, dy])
+            flat_obs.append(abs(dx) + abs(dy))
 
         # Relative positions and distances to objects
         for obj in agent_observations['objects']:
             dx = obj['position'][0] - agent_observations['self']['position'][0]
             dy = obj['position'][1] - agent_observations['self']['position'][1]
-            flattened.extend([dx, dy])
-            flattened.append(abs(dx) + abs(dy))
+            flat_obs.extend([dx, dy])
+            flat_obs.append(abs(dx) + abs(dy))
 
         # Relative positions and distances to goals
         for goal in agent_observations['goals']:
             dx = goal[0] - agent_observations['self']['position'][0]
             dy = goal[1] - agent_observations['self']['position'][1]
-            flattened.extend([dx, dy])
-            flattened.append(abs(dx) + abs(dy))
+            flat_obs.extend([dx, dy])
+            flat_obs.append(abs(dx) + abs(dy))
 
-    return np.array(flattened)
+    return np.array(flat_obs)
+
+
+def obs_to_grid(obs, grid_size):
+    grid_state = np.zeros((grid_size[0], grid_size[1], 3), dtype=int)
+
+    # Extract agents, objects, and goals from the original state
+    agents = obs['agents']
+    objects = obs['objects']
+    goals = obs['goals']
+
+    # Place agents on the grid
+    for agent in agents:
+        x, y = map(int, agent['position'])
+        if 0 <= x < grid_size[0] and 0 <= y < grid_size[1]:
+            grid_state[x, y, 0] = 1
+
+    # Place objects on the grid
+    for obj in objects:
+        x, y = map(int, obj['position'])
+        if 0 <= x < grid_size[0] and 0 <= y < grid_size[1]:
+            grid_state[x, y, 1] = 1
+
+    # Place goals on the grid
+    for goal in goals:
+        x, y = map(int, goal['position'])
+        if 0 <= x < grid_size[0] and 0 <= y < grid_size[1]:
+            grid_state[x, y, 2] = 1
+
+    return grid_state
 
 
 class Network(nn.Module):
@@ -316,13 +346,18 @@ if __name__ == "__main__":
 
     observation_space = env.observation_space
     action_space = env.action_space_n
+    grid_width, grid_length = env.grid_width, env.grid_length
 
     sample_obs, _ = env.reset()
-    # print(f"Sample obs: {sample_obs}")
+    print(f"Sample obs: {sample_obs}")
     flattened_obs = flatten_obs(sample_obs)
+    print(f"Flattened obs: {flattened_obs}")
+    grid_obs = obs_to_grid(sample_obs, (grid_width, grid_length))
+    print(f"Grid obs: {grid_obs}")
 
-    # print(f"Flattened obs: {flattened_obs}")
-    agent = DQNAgent(env, flattened_obs.shape)
+    exit()
+
+    agent = DQNAgent(env, (len(flattened_obs),))
 
     losses = []
     rewards = []
