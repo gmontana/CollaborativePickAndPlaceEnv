@@ -9,13 +9,12 @@ import time
 import sys
 import hashlib
 
-# Environment's rewards
 REWARD_STEP = -1
-REWARD_GOOD_PASS = 2
-REWARD_BAD_PASS = -2
-REWARD_DROP = 10
-REWARD_PICKUP = 5
-REWARD_COMPLETION = 20
+REWARD_GOOD_PASS = 100
+REWARD_BAD_PASS = -10
+REWARD_DROP = 100
+REWARD_PICKUP = 100
+REWARD_COMPLETION = 500
 
 
 class Action(Enum):
