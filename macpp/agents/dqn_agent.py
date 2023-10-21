@@ -1,41 +1,34 @@
 import wandb
-# import logging
 import torch
-# from tqdm import tqdm
 from collections import deque
 import torch.nn as nn
 import torch.nn.functional as F
 from torch.nn.utils import clip_grad_norm_
-# import torch.optim as optim
-# import gym
 import random
 import numpy as np
-# import matplotlib.pyplot as plt
 import torch.optim as optim
-# from torch.optim.lr_scheduler import StepLR
-# from torch.utils.tensorboard import SummaryWriter
-import warnings
 import platform
-warnings.filterwarnings('ignore', category=DeprecationWarning, module='gym')
+# import warnings
+# warnings.filterwarnings('ignore', category=DeprecationWarning, module='gym')
 
 SEED = 42
 EPISODES = 2000
-LEARNING_RATE = 0.001
+LEARNING_RATE = 0.0001
 MEM_SIZE = 10000
 BATCH_SIZE = 64
 GAMMA = 0.98
-EXPLORATION_MAX = 1.0
-EXPLORATION_MIN = 0.001
+EXPLORATION_MAX = 1.5
+EXPLORATION_MIN = 0.05
 EXPLORATION_DECAY = 0.999
-UPDATE_EVERY = 100  # how often to update the target network
-ALPHA = 0.4
+UPDATE_EVERY = 150  # how often to update the target network
+ALPHA = 0.5
 
 # Q network layer sizes
-L1_DIM = 256
-L2_DIM = 128
+L1_DIM = 128
+L2_DIM = 64
 
 LOG_EVERY = 10  # how often to log the performance metrics
-MAX_STEPS = 300  # max number of steps per episode
+MAX_STEPS = 500  # max number of steps per episode
 
 current_os = platform.system()
 if current_os == "Darwin":  # macOS
@@ -398,8 +391,8 @@ class DQNAgent:
         # Optimize model
         self.optimizer.zero_grad()
         loss.backward()
-        torch.nn.utils.clip_grad_norm_(
-            self.policy_net.parameters(), max_norm=1.0)
+        # torch.nn.utils.clip_grad_norm_(
+        #     self.policy_net.parameters(), max_norm=1.0)
         self.optimizer.step()
 
         # Update priorities in the replay buffer
@@ -491,11 +484,6 @@ if __name__ == "__main__":
             total_steps += 1
 
             if done:
-                # if episode_return > best_reward:
-                #     best_reward = episode_return
-                #     agent.save_model("best_model.pth")
-                # average_reward += episode_return
-                # rewards.append(episode_return)
                 break
 
         if episode_steps == MAX_STEPS:
@@ -514,16 +502,16 @@ if __name__ == "__main__":
             failure_rate = failed_episodes / LOG_EVERY
             avg_steps = total_steps / LOG_EVERY
 
-            print(f"Episode: {episode}, "
-                  f"Avg Reward: {avg_reward:.2f}, "
-                  f"Avg Loss: {avg_loss:.2f}, "
-                  f"Epsilon: {agent.returning_epsilon():.2f}, "
-                  f"Failure Rate: {failure_rate:.2f}, "
-                  f"Avg Steps: {avg_steps:.2f}")
+            print(f"Episode: {episode:06}, "
+                  f"Avg Reward: {avg_reward:06.2f}, "
+                  f"Avg Loss: {avg_loss:06.2f}, "
+                  f"Epsilon: {agent.returning_epsilon():03.2f}, "
+                  f"Failure Rate: {failure_rate:03.2f}, "
+                  f"Avg Steps: {avg_steps:03.2f}")
 
             wandb.log({"Average Reward": avg_reward,
                        "Average Loss": avg_loss,
-                       # "Epsilon": agent.returning_epsilon(),
+                       "Epsilon": agent.returning_epsilon(),
                        "Failure Rate": failure_rate,
                        "Average Steps": avg_steps})
 
