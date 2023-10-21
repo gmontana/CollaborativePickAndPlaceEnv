@@ -1,12 +1,13 @@
 import wandb
 # import logging
 import torch
-from tqdm import tqdm
+# from tqdm import tqdm
+from collections import deque
 import torch.nn as nn
 import torch.nn.functional as F
 from torch.nn.utils import clip_grad_norm_
 # import torch.optim as optim
-import gym
+# import gym
 import random
 import numpy as np
 # import matplotlib.pyplot as plt
@@ -400,8 +401,7 @@ if __name__ == "__main__":
 
     losses = []
     rewards = []
-    average_reward = 0
-    best_reward = 0
+    rewards_deque = deque(maxlen=LOG_EVERY)
     total_steps = 0
     failed_episodes = 0
 
@@ -422,10 +422,7 @@ if __name__ == "__main__":
             # print(f"Action: {action}")
 
             next_state, reward, done, _ = env.step(action)
-
             # print(f"Next state: {next_state}")
-
-            # next_state = np.array([next_state_tuple])
             next_state_flat = flatten_obs_dist(next_state)
 
             # Store transition in the replay buffer
@@ -443,10 +440,9 @@ if __name__ == "__main__":
             state = next_state
             state_flat = next_state_flat
 
-            episode_steps += 1
             episode_reward += reward
-            total_steps += 1
             episode_steps += 1
+            total_steps += 1
 
             if done:
                 # if episode_return > best_reward:
@@ -462,20 +458,26 @@ if __name__ == "__main__":
         # Decay exploration rate after each episode
         agent.decay_exploration(episode)
 
-        # Update average loss and reward
-        average_loss = loss_sum / num_updates if num_updates != 0 else 0
-        average_reward = np.mean(rewards)
-
-        # Log episodic metrics
-        wandb.log({
-            "episode_avg_loss": average_loss,
-            "episode_avg_reward": average_reward
-        })
-
+        # Log performance metrics
         if episode % LOG_EVERY == 0:
+            avg_reward = np.mean(rewards[-LOG_EVERY:])
+            avg_loss = loss_sum / num_updates if num_updates != 0 else 0
+            failure_rate = failed_episodes / LOG_EVERY
+            avg_steps = total_steps / LOG_EVERY
             print(f"Episode: {episode}, "
-                  f"Avg Reward: {np.mean(rewards[-LOG_EVERY:]):.2f}, "
-                  f"Avg Loss: {average_loss:.2f}, "
-                  f"Epsilon: {agent.returning_epsilon():.2f}")
+                  f"Avg Reward: {avg_reward:.2f}, "
+                  f"Avg Loss: {avg_loss:.2f}, "
+                  f"Epsilon: {agent.returning_epsilon():.2f}, "
+                  f"Failure Rate: {failure_rate:.2f}, "
+                  f"Avg Steps: {avg_steps:.2f}")
+
+            wandb.log({"Average Reward": avg_reward,
+                       "Average Loss": avg_loss,
+                       "Epsilon": agent.returning_epsilon(),
+                       "Failure Rate": failure_rate,
+                       "Average Steps": avg_steps})
+
+            failed_episodes = 0
+            total_steps = 0
 
     wandb.finish()
