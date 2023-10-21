@@ -11,16 +11,16 @@ import platform
 # import warnings
 # warnings.filterwarnings('ignore', category=DeprecationWarning, module='gym')
 
-SEED = 42
-EPISODES = 2000
+SEED = 1
+EPISODES = 10000
 LEARNING_RATE = 0.0001
-MEM_SIZE = 10000
-BATCH_SIZE = 64
-GAMMA = 0.98
+MEM_SIZE = 5000
+BATCH_SIZE = 128
+GAMMA = 0.95
 EXPLORATION_MAX = 1.5
-EXPLORATION_MIN = 0.05
-EXPLORATION_DECAY = 0.999
-UPDATE_EVERY = 150  # how often to update the target network
+EXPLORATION_MIN = 0.09
+EXPLORATION_DECAY = 0.998
+UPDATE_EVERY = 50  # how often to update the target network
 ALPHA = 0.5
 
 # Q network layer sizes
@@ -28,7 +28,7 @@ L1_DIM = 128
 L2_DIM = 64
 
 LOG_EVERY = 10  # how often to log the performance metrics
-MAX_STEPS = 500  # max number of steps per episode
+MAX_STEPS = 300  # max number of steps per episode
 
 current_os = platform.system()
 if current_os == "Darwin":  # macOS
@@ -260,7 +260,6 @@ class ReplayBuffer:
         if self.__len__() < batch_size:
             raise ValueError("Not enough experiences available for sampling.")
 
-        # Using prioritised sampling
         if self.prioritized:
 
             probs = self.priorities[:self.__len__()]**self.alpha
@@ -378,9 +377,6 @@ class DQNAgent:
             q_values_selected += q_values[torch.arange(
                 actions.size(0)), actions[:, i]]
 
-        # current_q_values = q_values.gather(
-        #     1, actions.unsqueeze(-1)).squeeze(-1)
-
         # Compute TD errors for PER
         td_errors = q_targets.detach() - q_values_selected
 
@@ -391,8 +387,8 @@ class DQNAgent:
         # Optimize model
         self.optimizer.zero_grad()
         loss.backward()
-        # torch.nn.utils.clip_grad_norm_(
-        #     self.policy_net.parameters(), max_norm=1.0)
+        torch.nn.utils.clip_grad_norm_(
+            self.policy_net.parameters(), max_norm=1.0)
         self.optimizer.step()
 
         # Update priorities in the replay buffer
@@ -408,7 +404,7 @@ if __name__ == "__main__":
 
     from macpp.core.environment import MACPPEnv
 
-    wandb.init(project='cpp', name='test_run', config={
+    wandb.init(project='cpp_dqn', name='test_run', config={
         "learning_rate": LEARNING_RATE,
         "batch_size": BATCH_SIZE,
         "architecture": "DQN",
@@ -458,17 +454,14 @@ if __name__ == "__main__":
         for t in range(MAX_STEPS):
 
             action = agent.get_action(state_flat)
-            # print(f"Action: {action}")
-
             next_state, reward, done, _ = env.step(action)
-            # print(f"Next state: {next_state}")
             next_state_flat = flatten_obs(next_state)
+            # print(f"Action: {action}")
+            # print(f"Next state: {next_state}")
 
-            # Store transition in the replay buffer
             agent.replay_buffer.add(
                 state_flat, action, reward, next_state_flat, done)
 
-            # Train the agent
             loss = agent.learn()
 
             if loss is not None:
@@ -489,12 +482,10 @@ if __name__ == "__main__":
         if episode_steps == MAX_STEPS:
             failed_episodes += 1
 
-        # Decay exploration rate after each episode
         agent.decay_exploration(episode)
 
         rewards.append(episode_reward)
 
-        # Log performance metrics
         if episode % LOG_EVERY == 0:
             recent_rewards = rewards[-LOG_EVERY:]
             avg_reward = np.mean(recent_rewards) if recent_rewards else np.nan
