@@ -8,20 +8,21 @@ import random
 import numpy as np
 import torch.optim as optim
 import platform
+import pdb
 # import warnings
 # warnings.filterwarnings('ignore', category=DeprecationWarning, module='gym')
 
 SEED = 1
 EPISODES = 10000
-LEARNING_RATE = 0.0001
-MEM_SIZE = 5000
-BATCH_SIZE = 128
-GAMMA = 0.95
+LEARNING_RATE = 0.001
+MEM_SIZE = 10000
+BATCH_SIZE = 256
+GAMMA = 0.98
 EXPLORATION_MAX = 1.5
 EXPLORATION_MIN = 0.09
 EXPLORATION_DECAY = 0.998
-UPDATE_EVERY = 50  # how often to update the target network
-ALPHA = 0.5
+UPDATE_EVERY = 100  # how often to update the target network
+ALPHA = 0.2
 
 # Q network layer sizes
 L1_DIM = 128
@@ -461,6 +462,8 @@ if __name__ == "__main__":
 
             agent.replay_buffer.add(
                 state_flat, action, reward, next_state_flat, done)
+
+            pdb.set_trace()
 
             loss = agent.learn()
 
