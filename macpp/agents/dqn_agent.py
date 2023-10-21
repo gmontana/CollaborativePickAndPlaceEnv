@@ -15,29 +15,77 @@ import torch.optim as optim
 # from torch.optim.lr_scheduler import StepLR
 # from torch.utils.tensorboard import SummaryWriter
 import warnings
+import platform
 warnings.filterwarnings('ignore', category=DeprecationWarning, module='gym')
 
 SEED = 42
 EPISODES = 2000
-LEARNING_RATE = 0.0001
+LEARNING_RATE = 0.001
 MEM_SIZE = 10000
 BATCH_SIZE = 64
-GAMMA = 0.95
-EXPLORATION = 1.0
+GAMMA = 0.98
 EXPLORATION_MAX = 1.0
-EXPLORATION_DECAY = 0.999
 EXPLORATION_MIN = 0.001
+EXPLORATION_DECAY = 0.999
 UPDATE_EVERY = 100  # how often to update the target network
 ALPHA = 0.4
 
-FC1_DIMS = 1024
-FC2_DIMS = 512
+# Q network layer sizes
+L1_DIM = 256
+L2_DIM = 128
 
 LOG_EVERY = 10  # how often to log the performance metrics
 MAX_STEPS = 300  # max number of steps per episode
 
-# DEVICE = torch.device("mps" if torch.cuda.is_available() else "cpu")
-DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+current_os = platform.system()
+if current_os == "Darwin":  # macOS
+    DEVICE = torch.device("mps" if torch.cuda.is_available() else "cpu")
+elif current_os == "Linux":  # Linux
+    DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+else:
+    DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
+
+def flatten_obs(obs):
+    """
+    Flattens the observation dictionary into a 1D numpy array 
+
+    Args:
+    obs (dict): The observation dictionary.
+
+    Returns:
+    np.ndarray: The flattened observation array.
+    """
+    flattened_obs = []
+    num_agents = len(obs)
+
+    # Information for each agent
+    for i in range(num_agents):
+        agent_key = f'agent_{i}'
+        agent_obs = obs[agent_key]
+
+        # Self information
+        flattened_obs.extend(agent_obs['self']['position'])
+        flattened_obs.append(int(agent_obs['self']['picker']))
+        flattened_obs.append(agent_obs['self']['carrying_object']
+                             if agent_obs['self']['carrying_object'] is not None else -1)
+
+        # Other agents' information
+        for other_agent in agent_obs['agents']:
+            flattened_obs.extend(other_agent['position'])
+            flattened_obs.append(int(other_agent['picker']))
+            flattened_obs.append(
+                other_agent['carrying_object'] if other_agent['carrying_object'] is not None else -1)
+
+    # Objects' information
+    for obj in obs['agent_0']['objects']:
+        flattened_obs.extend(obj['position'])
+
+    # Goals' information
+    for goal in obs['agent_0']['goals']:
+        flattened_obs.extend(goal)
+
+    return np.array(flattened_obs)
 
 
 def flatten_obs_dist(obs):
@@ -149,11 +197,11 @@ class Network(nn.Module):
         self.input_shape = input_shape
         self.num_actions = num_actions
 
-        self.fc1 = nn.Linear(self.input_shape[0], 256)
-        self.ln1 = nn.LayerNorm(256, elementwise_affine=False)
-        self.fc2 = nn.Linear(256, 128)
-        self.ln2 = nn.LayerNorm(128, elementwise_affine=False)
-        self.fc3 = nn.Linear(128, self.num_actions)
+        self.fc1 = nn.Linear(self.input_shape[0], L1_DIM)
+        self.ln1 = nn.LayerNorm(L1_DIM, elementwise_affine=False)
+        self.fc2 = nn.Linear(L1_DIM, L2_DIM)
+        self.ln2 = nn.LayerNorm(L2_DIM, elementwise_affine=False)
+        self.fc3 = nn.Linear(L2_DIM, self.num_actions)
 
         self.optimizer = torch.optim.Adam(self.parameters(), lr=learning_rate)
         self.loss = nn.MSELoss()
@@ -179,7 +227,7 @@ class Network(nn.Module):
 
 class ReplayBuffer:
 
-    def __init__(self, state_shape, capacity=MEM_SIZE, alpha=0.6, prioritized=False):
+    def __init__(self, state_shape, capacity=MEM_SIZE, alpha=0.6, prioritized=True):
 
         self.capacity = capacity
         self.prioritized = prioritized
@@ -261,7 +309,7 @@ class DQNAgent:
 
         self.env = env
 
-        self.exploration = EXPLORATION
+        self.exploration = EXPLORATION_MAX
 
         self.replay_buffer = ReplayBuffer(
             state_shape, capacity=MEM_SIZE, alpha=ALPHA, prioritized=True)
@@ -371,8 +419,6 @@ if __name__ == "__main__":
         "learning_rate": LEARNING_RATE,
         "batch_size": BATCH_SIZE,
         "architecture": "DQN",
-        "fc1_dims": FC1_DIMS,
-        "fc2_dims": FC2_DIMS,
         "epsilon_decay": EXPLORATION_DECAY,
     })
 
@@ -391,10 +437,10 @@ if __name__ == "__main__":
     grid_width, grid_length = env.grid_width, env.grid_length
 
     sample_obs, _ = env.reset()
-    # print(f"Sample obs: {sample_obs}")
-    flattened_obs = flatten_obs_dist(sample_obs)
-    # print(f"Flattened obs: {flattened_obs}")
+    flattened_obs = flatten_obs(sample_obs)
     # grid_obs = obs_to_grid(sample_obs, (grid_width, grid_length))
+    # print(f"Flattened obs: {flattened_obs}")
+    # print(f"Sample obs: {sample_obs}")
     # print(f"Grid obs: {grid_obs}")
 
     agent = DQNAgent(env, (len(flattened_obs),))
@@ -407,7 +453,7 @@ if __name__ == "__main__":
 
     for episode in range(1, EPISODES + 1):
         state, _ = env.reset()
-        state_flat = flatten_obs_dist(state)
+        state_flat = flatten_obs(state)
         episode_reward = 0
         loss_sum = 0
         num_updates = 0
@@ -423,7 +469,7 @@ if __name__ == "__main__":
 
             next_state, reward, done, _ = env.step(action)
             # print(f"Next state: {next_state}")
-            next_state_flat = flatten_obs_dist(next_state)
+            next_state_flat = flatten_obs(next_state)
 
             # Store transition in the replay buffer
             agent.replay_buffer.add(
@@ -458,12 +504,16 @@ if __name__ == "__main__":
         # Decay exploration rate after each episode
         agent.decay_exploration(episode)
 
+        rewards.append(episode_reward)
+
         # Log performance metrics
         if episode % LOG_EVERY == 0:
-            avg_reward = np.mean(rewards[-LOG_EVERY:])
-            avg_loss = loss_sum / num_updates if num_updates != 0 else 0
+            recent_rewards = rewards[-LOG_EVERY:]
+            avg_reward = np.mean(recent_rewards) if recent_rewards else np.nan
+            avg_loss = loss_sum / num_updates if num_updates != 0 else np.nan
             failure_rate = failed_episodes / LOG_EVERY
             avg_steps = total_steps / LOG_EVERY
+
             print(f"Episode: {episode}, "
                   f"Avg Reward: {avg_reward:.2f}, "
                   f"Avg Loss: {avg_loss:.2f}, "
@@ -473,7 +523,7 @@ if __name__ == "__main__":
 
             wandb.log({"Average Reward": avg_reward,
                        "Average Loss": avg_loss,
-                       "Epsilon": agent.returning_epsilon(),
+                       # "Epsilon": agent.returning_epsilon(),
                        "Failure Rate": failure_rate,
                        "Average Steps": avg_steps})
 
