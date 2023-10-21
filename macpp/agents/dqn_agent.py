@@ -26,61 +26,101 @@ EXPLORATION = 1.0
 EXPLORATION_MAX = 1.0
 EXPLORATION_DECAY = 0.999
 EXPLORATION_MIN = 0.001
-UPDATE_EVERY = 100
-LOG_EVERY = 10
+UPDATE_EVERY = 100  # how often to update the target network
 ALPHA = 0.4
-#
+
 FC1_DIMS = 1024
 FC2_DIMS = 512
+
+LOG_EVERY = 10  # how often to log the performance metrics
+MAX_STEPS = 300  # max number of steps per episode
 
 # DEVICE = torch.device("mps" if torch.cuda.is_available() else "cpu")
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 
 def flatten_obs_dist(obs):
-    '''
-    Flatten the original observation.
-    '''
+    """
+    Convert the structured observation of the environment into a flat numpy array, capturing the relative positions,
+    Manhattan distances, and picker status of agents, objects, and goals from the perspective of each agent.
 
-    flat_obs = []
-    for _, agent_observations in obs.items():
-        # Agent's own state
-        flat_obs.extend(agent_observations['self']['position'])
-        flat_obs.append(
-            1 if agent_observations['self']['carrying_object'] is not None else 0)
+    The function iterates through each agent's perspective in the observation dictionary. For each agent, it calculates
+    the relative positions (dx, dy) and the Manhattan distances of other agents, objects, and goals with respect to the
+    agent's own position. The agent's own position, picker status, and a binary indicator of whether it is carrying an
+    object are also included in the output array.
 
-        # Relative positions and distances to other agents
-        for other_agent in agent_observations['agents']:
-            dx = other_agent['position'][0] - \
-                agent_observations['self']['position'][0]
-            dy = other_agent['position'][1] - \
-                agent_observations['self']['position'][1]
-            flat_obs.extend([dx, dy])
-            flat_obs.append(abs(dx) + abs(dy))
+    The output array follows a specific pattern for each agent:
+    - Agent's own position (x, y)
+    - Binary indicator: 1 if the agent is a picker, 0 otherwise
+    - Binary indicator: 1 if carrying an object, 0 otherwise
+    - For each other agent:
+        - Relative position (dx, dy)
+        - Manhattan distance (|dx| + |dy|)
+        - Binary indicator: 1 if the other agent is a picker, 0 otherwise
+    - For each object:
+        - Relative position (dx, dy)
+        - Manhattan distance (|dx| + |dy|)
+    - For each goal:
+        - Relative position (dx, dy)
+        - Manhattan distance (|dx| + |dy|)
 
-        # Relative positions and distances to objects
-        for obj in agent_observations['objects']:
-            dx = obj['position'][0] - agent_observations['self']['position'][0]
-            dy = obj['position'][1] - agent_observations['self']['position'][1]
-            flat_obs.extend([dx, dy])
-            flat_obs.append(abs(dx) + abs(dy))
+    Args:
+    obs (dict): The observation of the environment, structured as a dictionary with agent IDs as keys and dictionaries
+                of their respective observations as values.
 
-        # Relative positions and distances to goals
-        for goal in agent_observations['goals']:
-            dx = goal[0] - agent_observations['self']['position'][0]
-            dy = goal[1] - agent_observations['self']['position'][1]
-            flat_obs.extend([dx, dy])
-            flat_obs.append(abs(dx) + abs(dy))
+    Returns:
+    np.ndarray: A flat numpy array representing the relative positions, Manhattan distances, and picker status of
+                entities in the environment from the perspective of each agent.
+    """
+    flattened_obs = []
+    for agent_id, agent_obs in obs.items():
+        # Agent's own position and picker status
+        flattened_obs.extend(agent_obs['self']['position'])
+        flattened_obs.append(int(agent_obs['self']['picker']))
+        flattened_obs.append(
+            1 if agent_obs['self']['carrying_object'] is not None else 0)
 
-    return np.array(flat_obs)
+        # Other agents
+        for other_agent in agent_obs['agents']:
+            dx = other_agent['position'][0] - agent_obs['self']['position'][0]
+            dy = other_agent['position'][1] - agent_obs['self']['position'][1]
+            manhattan_distance = abs(dx) + abs(dy)
+            flattened_obs.extend(
+                [dx, dy, manhattan_distance, int(other_agent['picker'])])
+
+        # Objects
+        for obj in agent_obs['objects']:
+            dx = obj['position'][0] - agent_obs['self']['position'][0]
+            dy = obj['position'][1] - agent_obs['self']['position'][1]
+            manhattan_distance = abs(dx) + abs(dy)
+            flattened_obs.extend([dx, dy, manhattan_distance])
+
+        # Goals
+        for goal in agent_obs['goals']:
+            dx = goal[0] - agent_obs['self']['position'][0]
+            dy = goal[1] - agent_obs['self']['position'][1]
+            manhattan_distance = abs(dx) + abs(dy)
+            flattened_obs.extend([dx, dy, manhattan_distance])
+
+    return np.array(flattened_obs)
 
 
 def obs_to_grid(obs, grid_size):
     '''
-    Represents agents, objects and goals as non-zero elements in a grid.
+    Converts the observation dictionary into a 3D grid representation.
+
+    The grid is represented as a 3D NumPy array with dimensions (grid_width, grid_length, 3),
+    where the last dimension corresponds to different channels for agents, objects, and goals.
+    Each cell in the grid can be either 0 or 1, indicating the absence or presence of an entity.
+
+    Args:
+    obs (dict): The observation dictionary containing information about agents, objects, and goals.
+    grid_size (tuple): A tuple representing the size of the grid as (grid_width, grid_length).
+
+    Returns:
+    np.ndarray: A 3D NumPy array representing the grid.
     '''
     grid_width, grid_length = grid_size
-    # We have 3 channels: agents, objects, and goals
     grid = np.zeros((grid_width, grid_length, 3))
 
     for _, agent_data in obs.items():
@@ -362,18 +402,21 @@ if __name__ == "__main__":
     rewards = []
     average_reward = 0
     best_reward = 0
+    total_steps = 0
+    failed_episodes = 0
 
-    for episode in tqdm(range(1, EPISODES + 1), desc="Training Progress"):
+    for episode in range(1, EPISODES + 1):
         state, _ = env.reset()
         state_flat = flatten_obs_dist(state)
-        episode_return = 0
+        episode_reward = 0
         loss_sum = 0
         num_updates = 0
+        episode_steps = 0
 
         if episode % UPDATE_EVERY == 0:
             agent.update_target_net()
 
-        while True:
+        for t in range(MAX_STEPS):
 
             action = agent.get_action(state_flat)
             # print(f"Action: {action}")
@@ -399,41 +442,40 @@ if __name__ == "__main__":
 
             state = next_state
             state_flat = next_state_flat
-            episode_return += reward
+
+            episode_steps += 1
+            episode_reward += reward
+            total_steps += 1
+            episode_steps += 1
 
             if done:
-                if episode_return > best_reward:
-                    best_reward = episode_return
-                    agent.save_model("best_model.pth")
-                average_reward += episode_return
-                rewards.append(episode_return)
+                # if episode_return > best_reward:
+                #     best_reward = episode_return
+                #     agent.save_model("best_model.pth")
+                # average_reward += episode_return
+                # rewards.append(episode_return)
                 break
+
+        if episode_steps == MAX_STEPS:
+            failed_episodes += 1
 
         # Decay exploration rate after each episode
         agent.decay_exploration(episode)
 
+        # Update average loss and reward
         average_loss = loss_sum / num_updates if num_updates != 0 else 0
         average_reward = np.mean(rewards)
 
         # Log episodic metrics
         wandb.log({
-            "episode_return": episode_return,
             "episode_avg_loss": average_loss,
             "episode_avg_reward": average_reward
         })
 
         if episode % LOG_EVERY == 0:
-            tqdm.write(f"Episode: {episode}, "
-                       f"Avg Reward: {np.mean(rewards[-LOG_EVERY:]):.2f}, "
-                       f"Avg Loss: {average_loss:.2f}, "
-                       f"Epsilon: {agent.returning_epsilon():.2f}")
+            print(f"Episode: {episode}, "
+                  f"Avg Reward: {np.mean(rewards[-LOG_EVERY:]):.2f}, "
+                  f"Avg Loss: {average_loss:.2f}, "
+                  f"Epsilon: {agent.returning_epsilon():.2f}")
 
-    wandb.finish()
-    if episode % LOG_EVERY == 0:
-        tqdm.write(f"Episode: {episode}, "
-                   f"Avg Reward: {np.mean(rewards[-LOG_EVERY:]):.2f}, "
-                   f"Avg Loss: {average_loss:.2f}, "
-                   f"Epsilon: {agent.returning_epsilon():.2f}")
-
-    wandb.finish()
     wandb.finish()
