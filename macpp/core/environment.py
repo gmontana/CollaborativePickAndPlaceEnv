@@ -172,6 +172,10 @@ class MACPPEnv(gym.Env):
             f"agent_{i}": agent_observation_space for i in range(self.n_agents)
         })
 
+        self.observation_space = spaces.Dict({
+            f"agent_{i}": agent_observation_space for i in range(self.n_agents)
+        })
+
         # self.observation_space = spaces.Dict(
         #     {
         #         "agents": spaces.Tuple([self.agent_space] * self.n_agents),
@@ -180,7 +184,7 @@ class MACPPEnv(gym.Env):
         #     }
         # )
 
-        self.done = False
+        self.done = [False] * self.n_agents
 
         # Initialise the environment either randomly or from a state
         if initial_state is None:
@@ -226,10 +230,10 @@ class MACPPEnv(gym.Env):
         else:
             self.random_reset(seed)
 
-        self.done = False
+        self.done = [False] * self.n_agents
         obs = self.get_obs()
 
-        return obs, {}
+        return obs
 
     '''
     def obs_to_hash(self, obs: Dict[str, Dict[str, Any]]) -> str:
@@ -440,7 +444,7 @@ class MACPPEnv(gym.Env):
                 agent.reward += REWARD_COMPLETION
                 if self.debug_mode:
                     print(f'Rewarded for completion: {REWARD_COMPLETION}')
-            self.done = True
+            self.done = [True] * self.n_agents
 
         # Collect frames for the video when required
         if self.create_video:
@@ -451,7 +455,8 @@ class MACPPEnv(gym.Env):
         if self.debug_mode:
             self._print_state()
 
-        total_reward = sum(self._get_rewards())
+        # total_reward = sum(self._get_rewards())
+        total_reward = self._get_rewards()
         if self.debug_mode:
             print(f'Total reward: {total_reward}')
             for idx, agent in enumerate(self.agents):
