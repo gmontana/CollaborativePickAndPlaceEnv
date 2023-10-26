@@ -24,22 +24,33 @@ class Viewer:
 
         # Create the offscreen surface for rendering
         self.offscreen_surface = pygame.Surface(
-            (self.env.grid_width * self.env.cell_size, self.env.grid_length * self.env.cell_size)
+            (self.env.grid_width * self.env.cell_size,
+             self.env.grid_length * self.env.cell_size)
         )
 
-        # Load agent icons
+        # Load all icons
         base_path = os.path.dirname(__file__)
         icon_path = os.path.join(base_path, "icons")
         self.picker_icon = self._load_image(
-            os.path.join(icon_path, "agent_picker.png"), RED
+            os.path.join(icon_path, "picker_not_carrying.png"), RED
+        )
+        self.picker_carrying_icon = self._load_image(
+            os.path.join(icon_path, "picker_carrying.png"), RED
         )
         self.non_picker_icon = self._load_image(
-            os.path.join(icon_path, "agent_non_picker.png"), BLUE
+            os.path.join(icon_path, "dropper_not_carrying.png"), BLUE
+        )
+        self.non_picker_carrying_icon = self._load_image(
+            os.path.join(icon_path, "dropper_carrying.png"), BLUE
+        )
+        self.object_icon = self._load_image(
+            os.path.join(icon_path, "box.png"), BLUE
         )
 
         # Create the screen for display
         self.screen = pygame.display.set_mode(
-            (self.env.grid_width * self.env.cell_size, self.env.grid_length * self.env.cell_size)
+            (self.env.grid_width * self.env.cell_size,
+             self.env.grid_length * self.env.cell_size)
         )
         pygame.display.set_caption("Collaborative Multi-Agent Pick and Place")
 
@@ -79,46 +90,43 @@ class Viewer:
             )
             icon_size = int(self.env.cell_size * 0.8)
 
-            try:
-                agent_icon = self.picker_icon if agent.picker else self.non_picker_icon
-                agent_icon_resized = pygame.transform.scale(
-                    agent_icon, (icon_size, icon_size)
-                )
-                agent_icon_rect = agent_icon_resized.get_rect(center=cell_center)
-                self.offscreen_surface.blit(agent_icon_resized, agent_icon_rect)
+            # Select icon based on picker status and carrying
+            if agent.picker:
+                if agent.carrying_object:
+                    agent_icon = self.picker_carrying_icon
+                else:
+                    agent_icon = self.picker_icon
+            else:
+                if agent.carrying_object:
+                    agent_icon = self.non_picker_carrying_icon
+                else:
+                    agent_icon = self.non_picker_icon
 
-                # Draw rectangle around the agent carrying an object
-                if agent.carrying_object is not None:
-                    pygame.draw.rect(
-                        self.offscreen_surface, GREEN, agent_icon_rect, 5
-                    )
-
-            except Exception:
-                # Fallback rendering
-                color = RED if agent.picker else BLUE
-                pygame.draw.rect(
-                    self.offscreen_surface,
-                    color,
-                    (
-                        x * self.env.cell_size + self.env.cell_size // 4,
-                        y * self.env.cell_size + self.env.cell_size // 4,
-                        self.env.cell_size // 2,
-                        self.env.cell_size // 2,
-                    ),
-                )
+            # Resize and draw icon
+            agent_icon_resized = pygame.transform.scale(
+                agent_icon, (icon_size, icon_size))
+            agent_icon_rect = agent_icon_resized.get_rect(center=cell_center)
+            self.offscreen_surface.blit(agent_icon_resized, agent_icon_rect)
 
     def _draw_objects(self):
         for obj in self.env.objects:
             x, y = obj.position
-            pygame.draw.circle(
-                self.offscreen_surface,
-                (0, 255, 0),
-                (
-                    x * self.env.cell_size + self.env.cell_size // 2,
-                    y * self.env.cell_size + self.env.cell_size // 2,
-                ),
-                self.env.cell_size // 4,
-            )
+            # Load, resize and draw image
+            img_size = self.env.cell_size // 2
+            obj_img_resized = pygame.transform.scale(
+                self.object_icon, (img_size, img_size))
+            pos = (x * self.env.cell_size + self.env.cell_size // 2 - img_size // 2,
+                   y * self.env.cell_size + self.env.cell_size // 2 - img_size // 2)
+            self.offscreen_surface.blit(obj_img_resized, pos)
+            # pygame.draw.circle(
+            #     self.offscreen_surface,
+            #     (0, 255, 0),
+            #     (
+            #         x * self.env.cell_size + self.env.cell_size // 2,
+            #         y * self.env.cell_size + self.env.cell_size // 2,
+            #     ),
+            #     self.env.cell_size // 4,
+            # )
 
     def _draw_goals(self):
         for goal in self.env.goals:
