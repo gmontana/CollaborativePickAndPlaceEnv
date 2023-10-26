@@ -32,20 +32,15 @@ class Viewer:
         base_path = os.path.dirname(__file__)
         icon_path = os.path.join(base_path, "icons")
         self.picker_icon = self._load_image(
-            os.path.join(icon_path, "picker_not_carrying.png"), RED
-        )
+            os.path.join(icon_path, "picker_not_carrying.png"))
         self.picker_carrying_icon = self._load_image(
-            os.path.join(icon_path, "picker_carrying.png"), RED
-        )
+            os.path.join(icon_path, "picker_carrying.png"))
         self.non_picker_icon = self._load_image(
-            os.path.join(icon_path, "dropper_not_carrying.png"), BLUE
-        )
+            os.path.join(icon_path, "dropper_not_carrying.png"),)
         self.non_picker_carrying_icon = self._load_image(
-            os.path.join(icon_path, "dropper_carrying.png"), BLUE
-        )
+            os.path.join(icon_path, "dropper_carrying.png"))
         self.object_icon = self._load_image(
-            os.path.join(icon_path, "box.png"), BLUE
-        )
+            os.path.join(icon_path, "box.png"))
 
         # Create the screen for display
         self.screen = pygame.display.set_mode(
@@ -54,16 +49,13 @@ class Viewer:
         )
         pygame.display.set_caption("Collaborative Multi-Agent Pick and Place")
 
-    def _load_image(self, image_path, placeholder_color):
+    def _load_image(self, image_path):
         try:
             return pygame.image.load(image_path)
         except FileNotFoundError:
-            print(
-                f"Warning: Image file {image_path} not found. Using a default placeholder."
+            raise FileNotFoundError(
+                    f"Error: Image file {image_path} not found."
             )
-            placeholder = pygame.Surface((50, 50))
-            pygame.draw.rect(placeholder, placeholder_color, (0, 0, 50, 50))
-            return placeholder
 
     def _draw_grid(self):
         for x in range(0, self.env.grid_width * self.env.cell_size, self.env.cell_size):
@@ -88,16 +80,18 @@ class Viewer:
                 x * self.env.cell_size + self.env.cell_size // 2,
                 y * self.env.cell_size + self.env.cell_size // 2,
             )
-            icon_size = int(self.env.cell_size * 0.8)
+            icon_size = int(self.env.cell_size * 0.95)
+
+            print(f"agent: {agent} position {agent.position} carrying: {agent.carrying_object}")
 
             # Select icon based on picker status and carrying
             if agent.picker:
-                if agent.carrying_object:
+                if agent.carrying_object is not None:
                     agent_icon = self.picker_carrying_icon
                 else:
                     agent_icon = self.picker_icon
             else:
-                if agent.carrying_object:
+                if agent.carrying_object is not None:
                     agent_icon = self.non_picker_carrying_icon
                 else:
                     agent_icon = self.non_picker_icon
@@ -111,42 +105,38 @@ class Viewer:
     def _draw_objects(self):
         for obj in self.env.objects:
             x, y = obj.position
-            # Load, resize and draw image
-            img_size = self.env.cell_size // 2
+            img_size = int(self.env.cell_size * 0.8)
             obj_img_resized = pygame.transform.scale(
                 self.object_icon, (img_size, img_size))
             pos = (x * self.env.cell_size + self.env.cell_size // 2 - img_size // 2,
                    y * self.env.cell_size + self.env.cell_size // 2 - img_size // 2)
             self.offscreen_surface.blit(obj_img_resized, pos)
-            # pygame.draw.circle(
-            #     self.offscreen_surface,
-            #     (0, 255, 0),
-            #     (
-            #         x * self.env.cell_size + self.env.cell_size // 2,
-            #         y * self.env.cell_size + self.env.cell_size // 2,
-            #     ),
-            #     self.env.cell_size // 4,
-            # )
+
+    def _draw_tick_border(self, x, y, color, thickness=8):
+        cell_size = self.env.cell_size
+        rect = pygame.Rect(x * cell_size, y * cell_size, cell_size, cell_size)
+        # Draw the tick border
+        pygame.draw.rect(self.offscreen_surface, color, rect, thickness)
 
     def _draw_goals(self):
         for goal in self.env.goals:
             x, y = goal
-            pygame.draw.rect(
-                self.offscreen_surface,
-                GRAY,
-                (
-                    x * self.env.cell_size + self.env.cell_size // 3,
-                    y * self.env.cell_size + self.env.cell_size // 3,
-                    self.env.cell_size // 3,
-                    self.env.cell_size // 3,
-                ),
-            )
+            object_at_goal = any(obj.position == (x, y) for obj in self.env.objects)
+            dropper_at_goal = any(agent.position == (x, y) and not agent.picker for agent in self.env.agents)
+            
+            if object_at_goal and (not any(agent.position == (x, y) for agent in self.env.agents) or dropper_at_goal):
+                border_color = GREEN
+            else:
+                border_color = GRAY
+                
+            self._draw_tick_border(x, y, border_color)
+
 
     def render(self):
         self.offscreen_surface.fill(WHITE)
         self._draw_grid()
-        self._draw_objects()
         self._draw_goals()
+        self._draw_objects()
         self._draw_agents()
         self.screen.blit(self.offscreen_surface, (0, 0))
         pygame.display.flip()
