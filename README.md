@@ -3,7 +3,7 @@
 </p>
 
 <p align="center">
-  <img width="150px" src="logo.png" alt="Collaborative Pick and Place Environment" />
+  <img width="300px" src="logo.png" alt="Collaborative Pick and Place Environment" />
 </p>
 
 <p align="center">
