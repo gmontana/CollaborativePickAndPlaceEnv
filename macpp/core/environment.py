@@ -172,14 +172,6 @@ class MACPPEnv(gym.Env):
             f"agent_{i}": agent_observation_space for i in range(self.n_agents)
         })
 
-        # self.observation_space = spaces.Dict(
-        #     {
-        #         "agents": spaces.Tuple([self.agent_space] * self.n_agents),
-        #         "objects": spaces.Tuple([self.object_space] * self.n_objects),
-        #         "goals": spaces.Tuple([self.goal_space] * self.n_objects),
-        #     }
-        # )
-
         self.done = False
 
         # Initialise the environment either randomly or from a state
