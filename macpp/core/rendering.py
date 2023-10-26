@@ -82,8 +82,6 @@ class Viewer:
             )
             icon_size = int(self.env.cell_size * 0.95)
 
-            print(f"agent: {agent} position {agent.position} carrying: {agent.carrying_object}")
-
             # Select icon based on picker status and carrying
             if agent.picker:
                 if agent.carrying_object is not None:
