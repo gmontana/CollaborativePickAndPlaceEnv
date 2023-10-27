@@ -10,12 +10,11 @@ import sys
 import hashlib
 
 REWARD_STEP = -1
-REWARD_GOOD_PASS = 100
-REWARD_BAD_PASS = -100
-REWARD_DROP = 100
-REWARD_PICKUP = 100
-REWARD_COMPLETION = 500
-
+REWARD_GOOD_PASS = 5
+REWARD_BAD_PASS = -10
+REWARD_DROP = 10
+REWARD_PICKUP = 10
+REWARD_COMPLETION = 20
 
 class Action(Enum):
     UP = 0
@@ -162,7 +161,7 @@ class MACPPEnv(gym.Env):
         # An agent's observation space
         agent_observation_space = spaces.Dict({
             "self": agent_space,
-            "agents": spaces.Tuple([agent_space] * (self.n_objects-1)),
+            "agents": spaces.Tuple([agent_space] * (self.n_agents-1)),
             "objects": spaces.Tuple([object_space] * self.n_objects),
             "goals": spaces.Tuple([goal_space] * self.n_objects)
         })
@@ -171,6 +170,7 @@ class MACPPEnv(gym.Env):
         self.observation_space = spaces.Dict({
             f"agent_{i}": agent_observation_space for i in range(self.n_agents)
         })
+
 
         self.observation_space = spaces.Dict({
             f"agent_{i}": agent_observation_space for i in range(self.n_agents)
@@ -185,7 +185,6 @@ class MACPPEnv(gym.Env):
         # )
 
         self.done = [False] * self.n_agents
-
         # Initialise the environment either randomly or from a state
         if initial_state is None:
             self.random_reset()
@@ -207,6 +206,10 @@ class MACPPEnv(gym.Env):
     @property
     def action_space_n(self):
         return np.prod(self.action_space.nvec)
+
+    @property
+    def num_agents(self):
+        return self.n_agents
 
     def _validate_actions(self, actions: List[int]) -> None:
         for action in actions:
@@ -422,13 +425,9 @@ class MACPPEnv(gym.Env):
             self._validate_actions(actions)
             print(f"\nExecuting actions: {actions}\n")
 
-        # reset the rewards
-        for agent in self.agents:
-            agent.reward = 0
-
         # Negative reward given at every step
         for agent in self.agents:
-            agent.reward += REWARD_STEP
+            agent.reward = REWARD_STEP
             if self.debug_mode:
                 print(f'Rewarded for step: {REWARD_STEP}')
 

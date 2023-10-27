@@ -1,5 +1,6 @@
 import unittest
 from ..core.environment import MACPPEnv, Action, REWARD_PICKUP, REWARD_COMPLETION, REWARD_STEP, REWARD_BAD_PASS, REWARD_GOOD_PASS, REWARD_DROP
+import gym
 
 DEBUG = False
 
@@ -441,12 +442,36 @@ class MACPPTests(unittest.TestCase):
         }
 
         env = MACPPEnv(grid_size=(5, 5), n_agents=2, n_pickers=1,
-                       initial_state=initial_state, debug_mode=True)
+                       initial_state=initial_state, debug_mode=DEBUG)
         actions = [1, 3]
         _, reward, _, _ = env.step(actions)
         expected_reward = 2 * REWARD_STEP
         self.assertEqual(reward, expected_reward,
                          "Incorrect reward for moving.")
+
+    def test_env_settings(self):
+        env_settings = [
+            'macpp-10x10-2a-1p-2o-v0',
+            'macpp-10x10-4a-2p-3o-v0',
+            'macpp-10x10-4a-2p-2o-v0',
+            'macpp-10x10-4a-3p-3o-v0'
+        ]
+
+        for setting in env_settings:
+            env = gym.make(setting, debug_mode=DEBUG)
+            obs, _ = env.reset()
+            obs_space = env.observation_space
+
+            # Check observation spaces are correct
+            self.assertEqual(len(obs), len(
+                obs_space), f"Observation and observation space lengths do not match for {setting}")
+
+            # Take 10 steps with random actions
+            for _ in range(10):
+                actions = list(env.action_space.sample())
+                obs, reward, done, info = env.step(actions)
+                if done:
+                    break
 
 
 if __name__ == "__main__":
