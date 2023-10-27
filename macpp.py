@@ -9,9 +9,9 @@ def game_loop(env, render=True):
     Run a single game loop.
     """
     obs = env.reset()
-    done = False
+    done = [False] * env.n_agents
 
-    while not done:
+    while not any(done):
         actions = env.action_space.sample()
         obs, _, done, _ = env.step(actions)
         print(obs)
@@ -23,7 +23,7 @@ def game_loop(env, render=True):
         time.sleep(0.5)
 
 def main(game_count=1, render=True):
-    env = gym.make('macpp-3x3-2a-1p-2o-v0', debug_mode=False)
+    env = gym.make('macpp-10x10-2a-1p-3o-v0', debug_mode=False)
 
     for episode in range(game_count):
         game_loop(env, True)

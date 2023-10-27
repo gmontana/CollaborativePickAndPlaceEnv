@@ -508,6 +508,8 @@ class MACPPEnv(gym.Env):
         for agent in self.agents:
             if agent.picker and agent.carrying_object is None:
                 for obj in self.objects:
+                    if obj.position in self.goals:
+                        continue
                     if obj.position == agent.position:
                         agent.carrying_object = obj.id
                         agent.reward += REWARD_PICKUP
