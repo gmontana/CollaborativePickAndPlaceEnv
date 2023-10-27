@@ -479,16 +479,34 @@ class MACPPEnv(gym.Env):
             return new_position
         return agent.position
 
+    # def _handle_moves(self, actions: List[int]) -> None:
+    #     for idx, agent_action in enumerate(actions):
+    #         agent = self.agents[idx]
+    #         agent.position = self._move_agent(agent, agent_action)
+    #
+    #         # if an agent is carrying an object, the position of the object being carried needs to be updated
+    #         if agent.carrying_object is not None:
+    #             carried_object = next(
+    #                 (o for o in self.objects if o.id == agent.carrying_object), None
+    #             )
+    #             if carried_object:
+    #                 carried_object.position = agent.position
+
     def _handle_moves(self, actions: List[int]) -> None:
         for idx, agent_action in enumerate(actions):
             agent = self.agents[idx]
-            agent.position = self._move_agent(agent, agent_action)
+            new_position = self._move_agent(agent, agent_action)
 
-            # if an agent is carrying an object, the position of the object being carried needs to be updated
+            # Check if the agent is carrying an object and the new position has an object
+            if agent.carrying_object is not None and any(obj.position == new_position for obj in self.objects):
+                continue  # Skip the move if the agent is carrying an object and the new position has an object
+
+            agent.position = new_position
+
+            # If an agent is carrying an object, the position of the object being carried needs to be updated
             if agent.carrying_object is not None:
                 carried_object = next(
-                    (o for o in self.objects if o.id == agent.carrying_object), None
-                )
+                    (o for o in self.objects if o.id == agent.carrying_object), None)
                 if carried_object:
                     carried_object.position = agent.position
 
@@ -521,7 +539,6 @@ class MACPPEnv(gym.Env):
                             print(f'Rewarded for dropoff: {REWARD_DROP}')
 
     def _handle_passes(self, actions: List[int]) -> None:
-
         # Create a list to store agents that will receive objects
         receiving_agents = [None] * len(self.agents)
 
@@ -538,19 +555,11 @@ class MACPPEnv(gym.Env):
                         adj_agent
                         and actions[self.agents.index(adj_agent)] == Action.PASS.value
                         and adj_agent.carrying_object is None
+                        # Added condition
+                        and not any(obj.position == adj_agent.position for obj in self.objects)
                     ):
-                        receiving_agents[
-                            self.agents.index(adj_agent)
-                        ] = agent.carrying_object
-                        obj = next(
-                            (o for o in self.objects if o.id ==
-                             agent.carrying_object),
-                            None,
-                        )
-                        if obj:
-                            obj.position = (
-                                adj_agent.position
-                            )  # Update the object's position
+                        receiving_agents[self.agents.index(
+                            adj_agent)] = agent.carrying_object
                         agent.carrying_object = None
 
                         # Assign rewards based on the type of pass
@@ -573,21 +582,6 @@ class MACPPEnv(gym.Env):
         for idx, obj_id in enumerate(receiving_agents):
             if obj_id is not None:
                 self.agents[idx].carrying_object = obj_id
-
-    # def check_termination(self) -> bool:
-    #     goal_positions = set(self.goals)
-    #     object_positions = {obj.position for obj in self.objects}
-    #     carrying_agents = {
-    #         agent.position for agent in self.agents if agent.carrying_object is not None}
-    #     # Check if every goal has an object on it, no goal has more than one object,
-    #     # and no non-picker agent is carrying an object
-    #     if (object_positions == goal_positions and
-    #         not carrying_agents.intersection(goal_positions) and
-    #             all(agent.picker or agent.carrying_object is None for agent in self.agents)):
-    #         if self.debug_mode:
-    #             print("Termination checked!")
-    #         return True
-    #     return False
 
     def check_termination(self) -> bool:
         # Check if all objects are on their goal positions and not being carried
