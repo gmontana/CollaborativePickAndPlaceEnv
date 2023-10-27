@@ -125,7 +125,7 @@ class Viewer:
             if object_at_goal and (not any(agent.position == (x, y) for agent in self.env.agents) or dropper_at_goal):
                 border_color = GREEN
             else:
-                border_color = GRAY
+                border_color = RED
                 
             self._draw_tick_border(x, y, border_color)
 
