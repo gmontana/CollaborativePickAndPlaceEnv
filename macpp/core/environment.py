@@ -425,6 +425,7 @@ class MACPPEnv(gym.Env):
         self._handle_drops()
         self._handle_pickups()
         self._handle_passes(actions)
+        self._handle_drops()
 
         # Check for termination
         if self.check_termination():
@@ -573,20 +574,33 @@ class MACPPEnv(gym.Env):
             if obj_id is not None:
                 self.agents[idx].carrying_object = obj_id
 
+    # def check_termination(self) -> bool:
+    #     goal_positions = set(self.goals)
+    #     object_positions = {obj.position for obj in self.objects}
+    #     carrying_agents = {
+    #         agent.position for agent in self.agents if agent.carrying_object is not None}
+    #     # Check if every goal has an object on it, no goal has more than one object,
+    #     # and no non-picker agent is carrying an object
+    #     if (object_positions == goal_positions and
+    #         not carrying_agents.intersection(goal_positions) and
+    #             all(agent.picker or agent.carrying_object is None for agent in self.agents)):
+    #         if self.debug_mode:
+    #             print("Termination checked!")
+    #         return True
+    #     return False
+
     def check_termination(self) -> bool:
-        goal_positions = set(self.goals)
-        object_positions = {obj.position for obj in self.objects}
-        carrying_agents = {
-            agent.position for agent in self.agents if agent.carrying_object is not None}
-        # Check if every goal has an object on it, no goal has more than one object,
-        # and no non-picker agent is carrying an object
-        if (object_positions == goal_positions and
-            not carrying_agents.intersection(goal_positions) and
-                all(agent.picker or agent.carrying_object is None for agent in self.agents)):
-            if self.debug_mode:
-                print("Termination checked!")
-            return True
-        return False
+        # Check if all objects are on their goal positions and not being carried
+        for obj in self.objects:
+            if obj.position not in self.goals or any(agent.carrying_object == obj.id for agent in self.agents):
+                return False
+
+        # Check if no non-picker agent is carrying an object
+        for agent in self.agents:
+            if not agent.picker and agent.carrying_object is not None:
+                return False
+
+        return True
 
     def _init_render(self) -> None:
         from macpp.core.rendering import Viewer
