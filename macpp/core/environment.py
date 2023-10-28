@@ -65,13 +65,27 @@ class Agent:
 class Object:
     def __init__(self,
                  position: Tuple[int, int],
-                 id: int) -> None:
-        self.position = position
+                 id: int):
+        self._position  = position
         self.id = id
+        self.carrying_agent = None
 
     def get_object_obs(self) -> Dict[str, Union[Tuple[int, int], int]]:
         return {"id": self.id, "position": self.position}
 
+    @property
+    def position(self) -> Tuple[int, int]:
+        if self.carrying_agent:
+          return self.carrying_agent.position
+        return self._position
+
+    @property
+    def carrying_agent(self) -> Optional[Agent]:
+        return self._carrying_agent
+
+    @carrying_agent.setter
+    def carrying_agent(self, agent: Optional[Agent]) -> None:
+        self._carrying_agent = agent
 
 class MACPPEnv(gym.Env):
     """
@@ -479,41 +493,28 @@ class MACPPEnv(gym.Env):
 
         new_position = (x, y)
 
-        # If agents collide, they don't move
-        if new_position not in [a.position for a in self.agents]:
-            return new_position
-        return agent.position
+        # If the new position contains an agent, move is now allowed
+        if new_position in [a.position for a in self.agents if a != agent]:  
+            return agent.position
 
-    # def _handle_moves(self, actions: List[int]) -> None:
-    #     for idx, agent_action in enumerate(actions):
-    #         agent = self.agents[idx]
-    #         agent.position = self._move_agent(agent, agent_action)
-    #
-    #         # if an agent is carrying an object, the position of the object being carried needs to be updated
-    #         if agent.carrying_object is not None:
-    #             carried_object = next(
-    #                 (o for o in self.objects if o.id == agent.carrying_object), None
-    #             )
-    #             if carried_object:
-    #                 carried_object.position = agent.position
+        # If the agent is carrying an object, and the new position contains an object, move is now allowed
+        if agent.carrying_object is not None and any(obj.position == new_position for obj in  self.objects):
+                return agent.position
+
+        return new_position
 
     def _handle_moves(self, actions: List[int]) -> None:
         for idx, agent_action in enumerate(actions):
             agent = self.agents[idx]
-            new_position = self._move_agent(agent, agent_action)
+            new_pos = self._move_agent(agent, agent_action)
+            agent.position = new_pos
 
-            # Check if the agent is carrying an object and the new position has an object
-            if agent.carrying_object is not None and any(obj.position == new_position for obj in self.objects):
-                continue  # Skip the move if the agent is carrying an object and the new position has an object
-
-            agent.position = new_position
-
-            # If an agent is carrying an object, the position of the object being carried needs to be updated
+            # If the agent is carrying an object, update the object's position
             if agent.carrying_object is not None:
-                carried_object = next(
-                    (o for o in self.objects if o.id == agent.carrying_object), None)
-                if carried_object:
-                    carried_object.position = agent.position
+                carried_obj = next((obj for obj in self.objects if obj.id == agent.carrying_object), None)
+                if carried_obj:
+                    # carried_obj.position = new_pos
+                    carried_obj.carrying_agent = agent
 
     def _handle_pickups(self) -> None:
         for agent in self.agents:
@@ -521,6 +522,7 @@ class MACPPEnv(gym.Env):
                 for obj in self.objects:
                     if obj.position == agent.position:
                         agent.carrying_object = obj.id
+                        obj.carrying_agent = agent
                         agent.reward += REWARD_PICKUP
                         if self.debug_mode:
                             print(f'Rewarded for pickup: {REWARD_PICKUP}')
@@ -528,20 +530,18 @@ class MACPPEnv(gym.Env):
 
     def _handle_drops(self) -> None:
         for agent in self.agents:
-            # Check if the agent is carrying an object and is NOT a picker
             if agent.carrying_object is not None and not agent.picker:
-                # Check if the agent's position matches any of the goal positions
                 if agent.position in self.goals:
                     # Check if the goal position already has an object
                     if not any(obj.position == agent.position and obj.id != agent.carrying_object for obj in self.objects):
-                        # Drop the object at the goal position
-                        obj = next(
-                            obj for obj in self.objects if obj.id == agent.carrying_object)
-                        obj.position = agent.position
-                        agent.carrying_object = None
-                        agent.reward += REWARD_DROP
-                        if self.debug_mode:
-                            print(f'Rewarded for dropoff: {REWARD_DROP}')
+                        obj = next((obj for obj in self.objects if obj.id == agent.carrying_object), None)
+                        if obj:
+                            obj._position = agent.position  # Set the object's position explicitly
+                            obj.carrying_agent = None  
+                            agent.carrying_object = None
+                            agent.reward += REWARD_DROP
+                            if self.debug_mode:
+                                print(f'Rewarded for dropoff: {REWARD_DROP}')
 
 
     def _handle_passes(self, actions: List[int]) -> None:
