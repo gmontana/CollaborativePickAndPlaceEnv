@@ -224,6 +224,11 @@ class MACPPEnv(gym.Env):
 
         self.done = False
         obs = self.get_obs()
+        
+        # Debug info
+        if self.debug_mode:
+            print("State from reset:")
+            self._print_state()
 
         return obs, {}
 
@@ -538,50 +543,69 @@ class MACPPEnv(gym.Env):
                         if self.debug_mode:
                             print(f'Rewarded for dropoff: {REWARD_DROP}')
 
+
     def _handle_passes(self, actions: List[int]) -> None:
-        # Create a list to store agents that will receive objects
-        receiving_agents = [None] * len(self.agents)
+        picker_to_non_picker_passes = []
+        other_possible_passes = []
 
-        for idx, agent in enumerate(self.agents):
-            if actions[idx] == Action.PASS.value and agent.carrying_object is not None:
-                x, y = agent.position
-                adjacent_positions = [
-                    (x + 1, y), (x - 1, y), (x, y + 1), (x, y - 1)]
-                for adj_pos in adjacent_positions:
-                    adj_agent = next(
-                        (a for a in self.agents if a.position == adj_pos), None
-                    )
-                    if (
-                        adj_agent
-                        and actions[self.agents.index(adj_agent)] == Action.PASS.value
-                        and adj_agent.carrying_object is None
-                        # Added condition
-                        and not any(obj.position == adj_agent.position for obj in self.objects)
-                    ):
-                        receiving_agents[self.agents.index(
-                            adj_agent)] = agent.carrying_object
-                        agent.carrying_object = None
+        for giver, giver_action in zip(self.agents, actions):
+            if giver_action == Action.PASS.value and giver.carrying_object is not None:
+                for adj_pos in self._get_adjacent_positions(giver.position):
+                    receiver = self._find_agent_at_position(adj_pos)
+                    if receiver:
+                        receiver_action = actions[self.agents.index(receiver)]
+                        if self._can_receive_object(giver, giver_action, receiver, receiver_action):
+                            if giver.picker and not receiver.picker:
+                                picker_to_non_picker_passes.append((giver, receiver, giver.carrying_object))
+                            else:
+                                other_possible_passes.append((giver, receiver, giver.carrying_object))
 
-                        # Assign rewards based on the type of pass
-                        if agent.picker and not adj_agent.picker:
-                            agent.reward += REWARD_GOOD_PASS
-                            adj_agent.reward += REWARD_GOOD_PASS
-                            if self.debug_mode:
-                                print(
-                                    f'Rewarded for good pass: {REWARD_GOOD_PASS}')
-                        elif not agent.picker and adj_agent.picker:
-                            agent.reward += REWARD_BAD_PASS
-                            adj_agent.reward += REWARD_BAD_PASS
-                            if self.debug_mode:
-                                print(
-                                    f'Rewarded for bad pass: {REWARD_BAD_PASS}')
+        if picker_to_non_picker_passes:
+            giver, receiver, obj_id = random.choice(picker_to_non_picker_passes)
+            giver.carrying_object = None
+            receiver.carrying_object = obj_id
+            self._reward_agents(giver, receiver)
+        elif other_possible_passes:
+            giver, receiver, obj_id = random.choice(other_possible_passes)
+            giver.carrying_object = None
+            receiver.carrying_object = obj_id
+            self._reward_agents(giver, receiver)
 
-                        break
 
-        # Process the passing of objects
-        for idx, obj_id in enumerate(receiving_agents):
-            if obj_id is not None:
-                self.agents[idx].carrying_object = obj_id
+    def _reward_agents(self, giver: Agent, receiver: Agent) -> None:
+        if giver.reward is not None and receiver.reward is not None:
+            if giver.picker and not receiver.picker:
+                giver.reward += REWARD_GOOD_PASS
+                receiver.reward += REWARD_GOOD_PASS
+                self._log_reward("good", REWARD_GOOD_PASS)
+            elif not giver.picker and receiver.picker:
+                giver.reward += REWARD_BAD_PASS
+                receiver.reward += REWARD_BAD_PASS
+                self._log_reward("bad", REWARD_BAD_PASS)
+        else:
+            print("Warning: Attempted to update reward of agent with None reward.")
+
+
+    def _find_agent_at_position(self, position: Tuple[int, int]) -> Optional[Agent]:
+        return next((agent for agent in self.agents if agent.position == position), None)
+
+    def _can_receive_object(self, giver: Agent, giver_action: int, receiver: Agent, receiver_action: int) -> bool:
+        return (
+            giver.carrying_object is not None and
+            giver_action == Action.PASS.value and
+            receiver_action == Action.PASS.value and
+            receiver.carrying_object is None and
+            not any(obj.position == receiver.position for obj in self.objects)
+        )
+
+
+    def _log_reward(self, pass_type: str, reward_amount: int) -> None:
+        if self.debug_mode:
+            print(f'Rewarded for {pass_type} pass: {reward_amount}')
+
+    def _get_adjacent_positions(self, position: Tuple[int, int]) -> List[Tuple[int, int]]:
+        x, y = position
+        return [(x + 1, y), (x - 1, y), (x, y + 1), (x, y - 1)]
 
     def check_termination(self) -> bool:
         # Check if all objects are on their goal positions and not being carried
