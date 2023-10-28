@@ -544,30 +544,47 @@ class MACPPEnv(gym.Env):
                             print(f'Rewarded for dropoff: {REWARD_DROP}')
 
     def _handle_passes(self, actions: List[int]) -> None:
-        picker_to_non_picker_passes = []
-        other_possible_passes = []
+        eligible_givers = [
+            (idx, agent) for idx, (agent, action) in enumerate(zip(self.agents, actions))
+            if action == Action.PASS.value and agent.carrying_object is not None
+        ]
+        eligible_receivers = [
+            (idx, agent) for idx, (agent, action) in enumerate(zip(self.agents, actions))
+            if action == Action.PASS.value
+        ]
 
-        for giver, giver_action in zip(self.agents, actions):
-            if giver_action == Action.PASS.value and giver.carrying_object is not None:
-                for adj_pos in self._get_adjacent_positions(giver.position):
-                    receiver = self._find_agent_at_position(adj_pos)
-                    if receiver:
-                        receiver_action = actions[self.agents.index(receiver)]
-                        if self._can_receive_object(giver, giver_action, receiver, receiver_action):
+        picker_to_non_picker_passes = []
+        other_valid_passes = []
+        
+        for (giver_idx, giver) in eligible_givers:
+            for adj_pos in self._get_adjacent_positions(giver.position):
+                for (receiver_idx, receiver) in eligible_receivers:
+                    if receiver.position == adj_pos and giver_idx != receiver_idx:
+                        if self._can_receive_object(giver, Action.PASS.value, receiver, Action.PASS.value):
                             if giver.picker and not receiver.picker:
                                 picker_to_non_picker_passes.append((giver, receiver))
                             else:
-                                other_possible_passes.append((giver, receiver))
-
+                                other_valid_passes.append((giver, receiver))
+                            break  # No need to check other receivers at the same position
+        
         if picker_to_non_picker_passes:
             giver, receiver = random.choice(picker_to_non_picker_passes)
-            giver.pass_object(receiver)
-            self._reward_agents(giver, receiver)
-        elif other_possible_passes:
-            giver, receiver = random.choice(other_possible_passes)
-            giver.pass_object(receiver)
-            self._reward_agents(giver, receiver)
+        elif other_valid_passes:
+            giver, receiver = random.choice(other_valid_passes)
+        else:
+            return  # No valid pass found
 
+        giver.pass_object(receiver)
+        self._reward_agents(giver, receiver)
+
+    def _can_receive_object(self, giver: Agent, giver_action: int, receiver: Agent, receiver_action: int) -> bool:
+        return (
+            giver.carrying_object is not None and
+            giver_action == Action.PASS.value and
+            receiver_action == Action.PASS.value and
+            receiver.carrying_object is None and
+            not any(obj.position == receiver.position for obj in self.objects)
+        )
 
     def _reward_agents(self, giver: Agent, receiver: Agent) -> None:
         if giver.reward is not None and receiver.reward is not None:
@@ -581,19 +598,6 @@ class MACPPEnv(gym.Env):
                 self._log_reward("bad", REWARD_BAD_PASS)
         else:
             print("Warning: Attempted to update reward of agent with None reward.")
-
-
-    def _find_agent_at_position(self, position: Tuple[int, int]) -> Optional[Agent]:
-        return next((agent for agent in self.agents if agent.position == position), None)
-
-    def _can_receive_object(self, giver: Agent, giver_action: int, receiver: Agent, receiver_action: int) -> bool:
-        return (
-            giver.carrying_object is not None and
-            giver_action == Action.PASS.value and
-            receiver_action == Action.PASS.value and
-            receiver.carrying_object is None and
-            not any(obj.position == receiver.position for obj in self.objects)
-        )
 
 
     def _log_reward(self, pass_type: str, reward_amount: int) -> None:
