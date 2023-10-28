@@ -510,6 +510,24 @@ class MACPPEnv(gym.Env):
         return new_position
 
     def _handle_moves(self, actions: List[int]) -> None:
+        """
+        Handles the movement of agents in the environment based on their specified actions.
+
+        This function iterates through all agents and performs the following actions:
+        1. For each agent, it calls the '_move_agent' method to update the agent's position based on its current action.
+        2. If the agent is carrying an object, the position of the object is also updated to match the new position of the agent.
+        3. The 'carrying_agent' attribute of the object is updated to maintain the association between the agent and the object.
+
+        The function ensures that the state of both agents and any objects they are carrying are consistently updated
+        after each movement action.
+
+        Args:
+        actions (List[int]): A list of actions corresponding to each agent in the environment. The actions are represented
+                             as integers, where each integer corresponds to a specific action that an agent can take.
+
+        Returns:
+        None
+        """
         for idx, agent_action in enumerate(actions):
             agent = self.agents[idx]
             self._move_agent(agent, agent_action)
@@ -521,6 +539,23 @@ class MACPPEnv(gym.Env):
                     carried_obj.carrying_agent = agent
 
     def _handle_pickups(self) -> None:
+        """
+        Handles the picking up of objects by picker agents in the environment.
+
+        This function iterates through all agents and performs the following actions:
+        1. If the agent is a picker and is not currently carrying an object, it checks for any objects at its current position.
+        2. If an object is found at the agent's position, and the object is not currently being carried by another agent, 
+           the picker agent picks up the object.
+        3. Upon successfully picking up an object, the agent's 'carrying_object' attribute is updated.
+        4. The loop breaks after a successful pickup, ensuring that a picker agent can only pick up one object per call to 
+           this function.
+
+        This function is typically called after all agents have performed their actions for a given time step, to ensure
+        that any objects that should be picked up are handled appropriately.
+
+        Returns:
+        None
+        """
         for agent in self.agents:
             if agent.picker and agent.carrying_object is None:
                 for obj in self.objects:
@@ -531,6 +566,26 @@ class MACPPEnv(gym.Env):
                         break
 
     def _handle_drops(self) -> None:
+        """
+        Handles the dropping of objects by non-picker agents at goal positions.
+
+        This function iterates through all agents in the environment. If an agent is not a picker and is carrying an object,
+        it checks if the agent is at a goal position. If the agent is at a goal position and there is no other object at
+        that position, the object is dropped.
+
+        When an object is successfully dropped at a goal position:
+        1. The object's position is updated to the current position of the agent.
+        2. The object's carrying agent is set to None, indicating that it is no longer being carried.
+        3. The agent's carried object is set to None, indicating that it is no longer carrying an object.
+        4. The agent is rewarded with a predefined reward for successfully dropping the object at a goal position.
+        5. If the environment is in debug mode, a message is printed to the console indicating the reward for the dropoff.
+
+        This function is typically called after all agents have performed their actions for a given time step, to
+        ensure that any objects that should be dropped are handled appropriately.
+
+        Returns:
+        None
+        """
         for agent in self.agents:
             if agent.carrying_object is not None and not agent.picker:
                 if agent.position in self.goals:
@@ -544,6 +599,29 @@ class MACPPEnv(gym.Env):
                             print(f'Rewarded for dropoff: {REWARD_DROP}')
 
     def _handle_passes(self, actions: List[int]) -> None:
+        """
+        Handles the passing of objects between agents based on their actions and positions.
+
+        The function identifies eligible givers (agents performing a PASS action and carrying an object) and
+        eligible receivers (agents performing a PASS action). It then checks for possible passes between
+        adjacent eligible givers and receivers.
+
+        Two types of passes are considered:
+        1. Picker to non-picker: When a picker agent passes an object to a non-picker agent.
+        2. Other valid passes: All other passes that are allowed based on the environment rules.
+
+        Priority is given to picker to non-picker passes. If any are available, one is randomly selected and executed.
+        If there are no picker to non-picker passes but there are other valid passes, one of them is randomly selected and executed.
+
+        The random selection adds an element of unpredictability and ensures a variety of scenarios are explored,
+        which can be beneficial for training reinforcement learning algorithms.
+
+        Args:
+        actions (List[int]): A list of actions performed by the agents.
+
+        Returns:
+        None
+        """
         eligible_givers = [
             (idx, agent) for idx, (agent, action) in enumerate(zip(self.agents, actions))
             if action == Action.PASS.value and agent.carrying_object is not None
@@ -565,17 +643,18 @@ class MACPPEnv(gym.Env):
                                 picker_to_non_picker_passes.append((giver, receiver))
                             else:
                                 other_valid_passes.append((giver, receiver))
-                            break  # No need to check other receivers at the same position
-        
-        if picker_to_non_picker_passes:
-            giver, receiver = random.choice(picker_to_non_picker_passes)
-        elif other_valid_passes:
-            giver, receiver = random.choice(other_valid_passes)
-        else:
-            return  # No valid pass found
 
-        giver.pass_object(receiver)
-        self._reward_agents(giver, receiver)
+        # Handle picker to non-picker passes first
+        for giver, receiver in picker_to_non_picker_passes:
+            if giver.carrying_object is not None and receiver.carrying_object is None:
+                giver.pass_object(receiver)
+                self._reward_agents(giver, receiver)
+
+        # Handle other passes
+        for giver, receiver in other_valid_passes:
+            if giver.carrying_object is not None and receiver.carrying_object is None:
+                giver.pass_object(receiver)
+                self._reward_agents(giver, receiver)
 
     def _can_receive_object(self, giver: Agent, giver_action: int, receiver: Agent, receiver_action: int) -> bool:
         return (
