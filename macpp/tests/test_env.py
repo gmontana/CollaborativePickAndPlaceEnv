@@ -54,14 +54,9 @@ class MACPPTests(unittest.TestCase):
                          "Incorrect reward for good pass.")
 
         # Check that the picker agent passed its object to the non-picker agent
-        self.assertIsNone(
-            env.agents[0].carrying_object, "Picker Agent did not pass the object."
-        )
-        self.assertEqual(
-            env.agents[1].carrying_object,
-            0,
-            "Non-picker Agent did not receive the object.",
-        )
+        self.assertIsNone(env.agents[0].carrying_object, "Picker Agent did not pass the object.")
+        self.assertEqual(env.agents[1].carrying_object.id if env.agents[1].carrying_object else None, 0, "Non-picker Agent did not receive the object.")
+
 
     def test_invalid_moves(self):
         initial_state = {
@@ -115,14 +110,18 @@ class MACPPTests(unittest.TestCase):
             "objects": [{"position": (1, 2), "id": 0}],
             "goals": [(1, 2)],
         }
-        env = MACPPEnv((10, 10), 2, 1, initial_state=get_obs(
-            initial_state), debug_mode=DEBUG)
-        actions = [1, 5]
+        env = MACPPEnv((10, 10), 2, 1, initial_state=get_obs(initial_state), debug_mode=DEBUG)
+        actions = [1, 3] 
         env.step(actions)
-        self.assertEqual(
+
+        self.assertIsNotNone(
             env.agents[0].carrying_object,
-            0,
             "Picker agent failed to pick up the object.",
+        )
+        self.assertEqual(
+            env.agents[0].carrying_object.id,
+            0,
+            "Picker agent is carrying the wrong object.",
         )
 
     def test_non_picker_agent_trying_to_pick_up_object(self):
@@ -176,14 +175,15 @@ class MACPPTests(unittest.TestCase):
             initial_state), debug_mode=DEBUG)
         actions = [4, 4, 4]
         env.step(actions)
+
         self.assertTrue(
-            env.agents[2].carrying_object in [
-                0, 1], "Agent did not receive an object."
+            env.agents[2].carrying_object.id in [0, 1] if env.agents[2].carrying_object else False, "Agent did not receive an object."
         )
         self.assertTrue(
             sum([1 for agent in env.agents if agent.carrying_object is not None]) == 2,
             "More than one object was passed to the same agent.",
-        )
+            )
+
 
     def test_agent_moving_to_goal_without_object(self):
         initial_state = {
@@ -237,12 +237,8 @@ class MACPPTests(unittest.TestCase):
             initial_state), debug_mode=DEBUG)
         actions = [4, 4]
         env.step(actions)
-        self.assertIsNone(
-            env.agents[0].carrying_object, "Agent 1 did not pass the object"
-        )
-        self.assertEqual(
-            env.agents[1].carrying_object, 0, "Agent 2 did not receive the object"
-        )
+        self.assertIsNone(env.agents[0].carrying_object, "Agent 1 did not pass the object")
+        self.assertEqual(env.agents[1].carrying_object.id if env.agents[1].carrying_object else None, 0, "Agent 2 did not receive the object")
 
     def test_multiple_agents_pick_same_object(self):
         initial_state = {
@@ -300,8 +296,9 @@ class MACPPTests(unittest.TestCase):
             initial_state), debug_mode=DEBUG)
         actions = [4, 5]
         env.step(actions)
+
         self.assertEqual(
-            env.agents[0].carrying_object,
+            env.agents[0].carrying_object.id if env.agents[0].carrying_object else None,
             0,
             "Agent passed the object when it was not valid.",
         )
@@ -337,35 +334,11 @@ class MACPPTests(unittest.TestCase):
             initial_state), debug_mode=DEBUG)
         actions = [4, 4]
         env.step(actions)
+
         # Check that both agents still have their objects after trying to pass to each other
-        self.assertEqual(env.agents[0].carrying_object,
-                         0, "Agent 1 lost its object.")
-        self.assertEqual(env.agents[1].carrying_object,
-                         1, "Agent 2 lost its object.")
+        self.assertEqual(env.agents[0].carrying_object.id if env.agents[0].carrying_object else None, 0, "Agent 1 lost its object.")
+        self.assertEqual(env.agents[1].carrying_object.id if env.agents[1].carrying_object else None, 1, "Agent 2 lost its object.")
 
-
-    # def test_complex_pass_between_four_agents(self):
-    #     initial_state = {
-    #         "agents": [
-    #             {"position": (0, 0), "picker": True, "carrying_object": 0},  # Picker Agent 1
-    #             {"position": (0, 1), "picker": True, "carrying_object": 1},  # Picker Agent 2
-    #             {"position": (1, 0), "picker": False, "carrying_object": None},  # Non-picker Agent 1
-    #             {"position": (1, 1), "picker": False, "carrying_object": None},  # Non-picker Agent 2
-    #         ],
-    #         "objects": [{"position": (0, 0), "id": 0}, {"position": (0, 1), "id": 1}],
-    #         "goals": [],
-    #     }
-    #     env = MACPPEnv((10, 10), 4, 2, initial_state=get_obs(initial_state), debug_mode=DEBUG)
-    #
-    #     pass_action = Action.PASS.value
-    #     actions = [pass_action, pass_action, pass_action, pass_action]
-    #     env.step(actions)
-    #
-    #     self.assertIsNone(env.agents[0].carrying_object, "Picker Agent 1 did not pass the object.")
-    #     self.assertIsNone(env.agents[1].carrying_object, "Picker Agent 2 did not pass the object.")
-    #     self.assertIn(env.agents[2].carrying_object, [0, 1], "Non-picker Agent 1 did not receive an object.")
-    #     self.assertIn(env.agents[3].carrying_object, [0, 1], "Non-picker Agent 2 did not receive an object.")
-    #     self.assertNotEqual(env.agents[2].carrying_object, env.agents[3].carrying_object, "Agents received the same object.")
 
 
     def test_non_picker_drop_on_goal(self):
@@ -449,7 +422,7 @@ class MACPPTests(unittest.TestCase):
                 if done:
                     break
 
-    def test_pass_between_two_agents(self):
+    def test_another_pass_between_two_agents(self):
             # Initialize the environment for this specific test case
             initial_state = {
                 "agents": [
@@ -480,7 +453,7 @@ class MACPPTests(unittest.TestCase):
                 env.agents[0].carrying_object, "Picker Agent did not pass the object."
             )
             self.assertEqual(
-                env.agents[1].carrying_object,
+                env.agents[1].carrying_object.id if env.agents[1].carrying_object else None,
                 0,
                 "Non-picker Agent did not receive the object.",
             )
@@ -503,7 +476,7 @@ class MACPPTests(unittest.TestCase):
 
          # Check that Agent 1 received the object
         self.assertEqual(
-            env.agents[1].carrying_object, 0, "Non-picker Agent 1 did not receive the object."
+            env.agents[1].carrying_object.id if env.agents[1].carrying_object else None, 0, "Non-picker Agent 1 did not receive the object."
         )
 
     def test_pass_two_agents(self):
@@ -527,7 +500,7 @@ class MACPPTests(unittest.TestCase):
         print(f"New state: {new_state}")
 
         self.assertEqual(
-            env.agents[1].carrying_object, 0, "Agent 1 did not receive the object from Agent 0."
+            env.agents[1].carrying_object.id if env.agents[1].carrying_object else None, 0, "Agent 1 did not receive the object from Agent 0."
         )
 
 
@@ -549,12 +522,10 @@ class MACPPTests(unittest.TestCase):
 
         new_state, _, _, _ = env.step(actions)
 
-
         self.assertIsNone(env.agents[0].carrying_object, "Picker Agent did not pass the object.")
-        self.assertEqual(env.agents[1].carrying_object, 0, "First Non-picker Agent did not receive the object.")
+        self.assertEqual(env.agents[1].carrying_object.id if env.agents[1].carrying_object else None, 0, "First Non-picker Agent did not receive the object.")
         self.assertIsNone(env.agents[2].carrying_object, "Second Non-picker Agent should not have the object.")
         self.assertIsNone(env.agents[3].carrying_object, "Third Non-picker Agent should not have the object.")
-
 
     def test_pass_with_three_agents(self):
         initial_state = {
@@ -573,14 +544,13 @@ class MACPPTests(unittest.TestCase):
         actions = [4, 4, 4]
         new_state, _, _, _ = env.step(actions)
 
-
         self.assertIsNone(env.agents[0].carrying_object, "Agent 0 should not be carrying the object.")
-        self.assertEqual(env.agents[1].carrying_object, 0, "Agent 1 should be carrying the object.")
+        self.assertEqual(env.agents[1].carrying_object.id if env.agents[1].carrying_object else None, 0, "Agent 1 should be carrying the object.")
         self.assertIsNone(env.agents[2].carrying_object, "Agent 2 should not be carrying the object.")
 
-        expected_reward_agent_0 = REWARD_GOOD_PASS + REWARD_STEP  # 5 + (-1) = 4
-        expected_reward_agent_1 = REWARD_GOOD_PASS + REWARD_STEP  # 5 + (-1) = 4
-        expected_reward_agent_2 = REWARD_STEP  # -1
+        expected_reward_agent_0 = REWARD_GOOD_PASS + REWARD_STEP  
+        expected_reward_agent_1 = REWARD_GOOD_PASS + REWARD_STEP 
+        expected_reward_agent_2 = REWARD_STEP  
 
         self.assertEqual(env.agents[0].reward, expected_reward_agent_0, "Agent 0 should receive a bad pass reward.")
         self.assertEqual(env.agents[1].reward, expected_reward_agent_1, "Agent 1 should be penalized for movement.")
@@ -613,11 +583,12 @@ class MACPPTests(unittest.TestCase):
             ]
 
             # Loop through only the agents involved in the test (assumed to be the first two agents)
-            for i in range(2):  # Adjust the range as needed
+            for i in range(2):
                 agent = env.agents[i]
+                carrying_object_id = agent.carrying_object.id if agent.carrying_object else None
                 with self.subTest(agent=f"Agent {i}"):
                     self.assertEqual(agent.position, expected_outcomes[i]["position"])
-                    self.assertEqual(agent.carrying_object, expected_outcomes[i]["carrying_object"])
+                    self.assertEqual(carrying_object_id, expected_outcomes[i]["carrying_object"])
                     self.assertEqual(agent.picker, expected_outcomes[i]["picker"])
                     self.assertEqual(agent.reward, expected_outcomes[i]["reward"])
 
