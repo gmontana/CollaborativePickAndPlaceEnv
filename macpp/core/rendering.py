@@ -69,7 +69,7 @@ class Viewer:
             )
 
 
-    def _draw_agents_and_objects(self):
+    def _draw_agents(self):
         for agent in self.env.agents:
             x, y = agent.position
             cell_center = (
@@ -145,7 +145,7 @@ class Viewer:
         self._draw_grid()
         self._draw_goals()
         self._draw_objects()
-        self._draw_agents_and_objects()
+        self._draw_agents()
         self.screen.blit(self.offscreen_surface, (0, 0))
         pygame.display.flip()
 
