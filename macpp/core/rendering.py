@@ -19,7 +19,6 @@ class Viewer:
 
         self.env = env
 
-        # Initialize pygame
         pygame.init()
 
         # Create the offscreen surface for rendering
@@ -83,8 +82,8 @@ class Viewer:
                 x * self.env.cell_size + self.env.cell_size // 2,
                 y * self.env.cell_size + self.env.cell_size // 2,
             )
-            cell_size = self.env.cell_size  # Get the cell size
-            icon_size = int(cell_size * 0.8)  # Adjust the agent and object icon size
+            cell_size = self.env.cell_size  
+            icon_size = int(cell_size * 0.8) 
 
             # Check if there is an object at the agent's position
             object_at_position = any(obj.position == agent.position for obj in self.env.objects)
@@ -123,9 +122,7 @@ class Viewer:
                 self.offscreen_surface.blit(agent_icon_resized, agent_icon_rect)
 
             except Exception as e:
-                # Handle exceptions here (e.g., image loading errors)
                 print(f"Error loading icon: {e}")
-                # Optionally, you can set a default icon or behavior here
 
 
     def _draw_objects(self):
