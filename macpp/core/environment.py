@@ -10,6 +10,7 @@ import numpy as np
 import time
 import sys
 import hashlib
+
 REWARD_STEP = -1
 REWARD_GOOD_PASS = 5
 REWARD_BAD_PASS = -5
@@ -32,6 +33,17 @@ class Action(Enum):
 
 
 class Object:
+    """
+    Represents an object in the environment.
+
+    Attributes:
+        position (Tuple[int, int]): The current position of the object.
+        id (int): A unique identifier for the object.
+        carrying_agent (Optional['Agent']): The agent carrying the object, or None if not carried.
+
+    Methods:
+        get_object_obs() -> Dict[str, Union[Tuple[int, int], int]]: Returns object observation.
+    """
     def __init__(self,
                  position: Tuple[int, int],
                  id: int):
@@ -62,7 +74,24 @@ class Object:
 
 
 class Agent:
+    """
+    Represents an agent in the environment.
 
+    Attributes:
+        position (Tuple[int, int]): The current position of the agent.
+        picker (bool): True if the agent is a picker, False otherwise.
+        carrying_object (Optional['Object']): The object the agent is carrying, or None if not carrying.
+        reward (int): The reward earned by the agent.
+
+    Methods:
+        move_up(), move_down(grid_length), move_left(), move_right(grid_width): Move the agent.
+        pick_up(obj: Object): Pick up an object if the agent is a picker and not carrying.
+        drop(obj: Object): Drop an object if the agent is not a picker and carrying.
+        pass_object(other_agent: 'Agent'): Pass the carried object to another agent.
+        get_agent_obs(all_agents: list['Agent'], all_objects: list[Object], goals: Any) -> Dict[str, Any]: 
+            Get the agent's observation.
+        get_basic_agent_obs() -> Dict[str, Any]: Get a basic observation of the agent.
+    """
     carrying_object: Optional[Object] = None
 
     def __init__(self, 
@@ -150,7 +179,7 @@ class Agent:
 
 class MACPPEnv(gym.Env):
     """
-    Class implementing the logic for the collaborative pick and place environment
+    Collaborative pick and place environment.
     """
 
     metadata = {"render.modes": ["human"]}
@@ -167,6 +196,24 @@ class MACPPEnv(gym.Env):
         create_video: Optional[bool] = False,
         seed: Optional[int] = None
     ) -> None:
+
+        """
+        Initialize the environment.
+
+        Args:
+            grid_size (Tuple[int, int]): Size of the grid.
+            n_agents (int): Number of agents.
+            n_pickers (int): Number of picker agents.
+            n_objects (Optional[int]): Number of objects. Default is 1.
+            initial_state: Initial state of the environment.
+            cell_size (Optional[int]): Size of grid cells. Default is 300.
+            debug_mode (Optional[bool]): Enable debug mode. Default is False.
+            create_video (Optional[bool]): Create video frames. Default is False.
+            seed (Optional[int]): Random seed for environment initialization.
+
+        Returns:
+            None
+        """
 
         self.grid_width, self.grid_length = grid_size
         self.cell_size = cell_size
@@ -260,16 +307,20 @@ class MACPPEnv(gym.Env):
         self.renderer = None
 
         # If a video is required, create frames
-        if self.create_video:
+        if self.create_video and self.cell_size is not None:
             self.offscreen_surface = pygame.Surface(
                 (self.grid_width * self.cell_size,
                  self.grid_length * self.cell_size)
             )
             self.frames = []
 
+    # @property
+    # def action_space_n(self):
+    #     return np.prod(self.action_space.nvec)
+
     @property
     def action_space_n(self):
-        return np.prod(self.action_space.nvec)
+        return np.prod([len(Action)] * self.n_agents)
 
     @property
     def num_agents(self):
@@ -290,7 +341,14 @@ class MACPPEnv(gym.Env):
 
     def reset(self, seed: Optional[int] = None, options: Optional[Any] = None) -> Tuple[Dict[str, Dict[str, Any]], Dict[str, Any]]:
         """
-        Reset the environment to either a random state or an predefined initial state
+        Reset the environment to an initial state.
+
+        Args:
+            seed (Optional[int]): Random seed for environment initialization.
+            options (Optional[Any]): Additional options for resetting.
+
+        Returns:
+            Tuple containing initial observations and additional info.
         """
         if self.initial_state:
             self.reset_from_obs(self.initial_state)
@@ -437,6 +495,15 @@ class MACPPEnv(gym.Env):
         return (random.randint(0, self.grid_width - 1), random.randint(0, self.grid_length - 1))
 
     def step(self, actions: List[int]) -> Tuple[Dict[str, Dict[str, Any]], int, bool, Dict[str, Any]]:
+        """
+        Perform one time step in the environment.
+
+        Args:
+            actions (List[int]): List of actions for each agent.
+
+        Returns:
+            Tuple containing observations, total reward, termination flag, and additional info.
+        """
         # Check that no invalid actions are taken
         if self.debug_mode:
             self._validate_actions(actions)
@@ -486,6 +553,16 @@ class MACPPEnv(gym.Env):
         return [agent.reward for agent in self.agents]
 
     def _move_agent(self, agent: Agent, action: int) -> Tuple[int, int]:
+        """
+        Move an agent based on the specified action.
+
+        Args:
+            agent (Agent): The agent to move.
+            action (int): The action representing the direction of movement.
+
+        Returns:
+            Tuple[int, int]: The new position of the agent after the move.
+        """
         x, y = agent.position
         if action == Action.UP.value:
             y = max(0, y - 1)
@@ -510,24 +587,6 @@ class MACPPEnv(gym.Env):
         return new_position
 
     def _handle_moves(self, actions: List[int]) -> None:
-        """
-        Handles the movement of agents in the environment based on their specified actions.
-
-        This function iterates through all agents and performs the following actions:
-        1. For each agent, it calls the '_move_agent' method to update the agent's position based on its current action.
-        2. If the agent is carrying an object, the position of the object is also updated to match the new position of the agent.
-        3. The 'carrying_agent' attribute of the object is updated to maintain the association between the agent and the object.
-
-        The function ensures that the state of both agents and any objects they are carrying are consistently updated
-        after each movement action.
-
-        Args:
-        actions (List[int]): A list of actions corresponding to each agent in the environment. The actions are represented
-                             as integers, where each integer corresponds to a specific action that an agent can take.
-
-        Returns:
-        None
-        """
         for idx, agent_action in enumerate(actions):
             agent = self.agents[idx]
             self._move_agent(agent, agent_action)
@@ -539,23 +598,6 @@ class MACPPEnv(gym.Env):
                     carried_obj.carrying_agent = agent
 
     def _handle_pickups(self) -> None:
-        """
-        Handles the picking up of objects by picker agents in the environment.
-
-        This function iterates through all agents and performs the following actions:
-        1. If the agent is a picker and is not currently carrying an object, it checks for any objects at its current position.
-        2. If an object is found at the agent's position, and the object is not currently being carried by another agent, 
-           the picker agent picks up the object.
-        3. Upon successfully picking up an object, the agent's 'carrying_object' attribute is updated.
-        4. The loop breaks after a successful pickup, ensuring that a picker agent can only pick up one object per call to 
-           this function.
-
-        This function is typically called after all agents have performed their actions for a given time step, to ensure
-        that any objects that should be picked up are handled appropriately.
-
-        Returns:
-        None
-        """
         for agent in self.agents:
             if agent.picker and agent.carrying_object is None:
                 for obj in self.objects:
@@ -566,26 +608,6 @@ class MACPPEnv(gym.Env):
                         break
 
     def _handle_drops(self) -> None:
-        """
-        Handles the dropping of objects by non-picker agents at goal positions.
-
-        This function iterates through all agents in the environment. If an agent is not a picker and is carrying an object,
-        it checks if the agent is at a goal position. If the agent is at a goal position and there is no other object at
-        that position, the object is dropped.
-
-        When an object is successfully dropped at a goal position:
-        1. The object's position is updated to the current position of the agent.
-        2. The object's carrying agent is set to None, indicating that it is no longer being carried.
-        3. The agent's carried object is set to None, indicating that it is no longer carrying an object.
-        4. The agent is rewarded with a predefined reward for successfully dropping the object at a goal position.
-        5. If the environment is in debug mode, a message is printed to the console indicating the reward for the dropoff.
-
-        This function is typically called after all agents have performed their actions for a given time step, to
-        ensure that any objects that should be dropped are handled appropriately.
-
-        Returns:
-        None
-        """
         for agent in self.agents:
             if agent.carrying_object is not None and not agent.picker:
                 if agent.position in self.goals:
@@ -599,29 +621,6 @@ class MACPPEnv(gym.Env):
                             print(f'Rewarded for dropoff: {REWARD_DROP}')
 
     def _handle_passes(self, actions: List[int]) -> None:
-        """
-        Handles the passing of objects between agents based on their actions and positions.
-
-        The function identifies eligible givers (agents performing a PASS action and carrying an object) and
-        eligible receivers (agents performing a PASS action). It then checks for possible passes between
-        adjacent eligible givers and receivers.
-
-        Two types of passes are considered:
-        1. Picker to non-picker: When a picker agent passes an object to a non-picker agent.
-        2. Other valid passes: All other passes that are allowed based on the environment rules.
-
-        Priority is given to picker to non-picker passes. If any are available, one is randomly selected and executed.
-        If there are no picker to non-picker passes but there are other valid passes, one of them is randomly selected and executed.
-
-        The random selection adds an element of unpredictability and ensures a variety of scenarios are explored,
-        which can be beneficial for training reinforcement learning algorithms.
-
-        Args:
-        actions (List[int]): A list of actions performed by the agents.
-
-        Returns:
-        None
-        """
         eligible_givers = [
             (idx, agent) for idx, (agent, action) in enumerate(zip(self.agents, actions))
             if action == Action.PASS.value and agent.carrying_object is not None
@@ -701,12 +700,23 @@ class MACPPEnv(gym.Env):
         self._rendering_initialised = True
 
     def render(self, mode: str = 'human') -> Union[None, np.ndarray]:
+        """
+        Render the environment.
+
+        Args:
+            mode (str): Rendering mode ('human' or other).
+
+        Returns:
+            Rendered image or None.
+        """
         if not self._rendering_initialised:
             self._init_render()
         return self.renderer.render()
 
     def close(self) -> None:
-        # Close the renderer
+        """
+        Close the environment, release resources.
+        """
         if self.renderer:
             self.renderer.close()
         # Save the video frames
@@ -733,30 +743,3 @@ def make_env(width: int, length: int, n_agents: int, n_pickers: int, n_objects: 
         return MACPPEnv((width, length), n_agents, n_pickers, n_objects)
     return _init
 
-
-def game_loop(env, render):
-    """
-    Game loop for the MultiAgentPickAndPlace environment.
-    """
-    env.reset()
-    done = False
-
-    if render:
-        env.render()
-
-    while not done:
-        # Sample random actions for each agent
-        actions = env.action_space.sample().tolist()
-        print(actions)
-
-        nobs, nreward, ndone, _ = env.step(actions)
-        print(nreward)
-
-        if render:
-            env.render()
-            time.sleep(0.5)
-
-        done = np.all(ndone)
-
-    env.close()
-    print("Episode finished.")
