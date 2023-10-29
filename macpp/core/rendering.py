@@ -128,33 +128,6 @@ class Viewer:
                 # Optionally, you can set a default icon or behavior here
 
 
-    def _draw_agents(self):
-        for agent in self.env.agents:
-            x, y = agent.position
-            cell_center = (
-                x * self.env.cell_size + self.env.cell_size // 2,
-                y * self.env.cell_size + self.env.cell_size // 2,
-            )
-            icon_size = int(self.env.cell_size * 0.95)
-
-            # Select icon based on picker status and carrying
-            if agent.picker:
-                if agent.carrying_object is not None:
-                    agent_icon = self.picker_carrying_icon
-                else:
-                    agent_icon = self.picker_icon
-            else:
-                if agent.carrying_object is not None:
-                    agent_icon = self.non_picker_carrying_icon
-                else:
-                    agent_icon = self.non_picker_icon
-
-            # Resize and draw icon
-            agent_icon_resized = pygame.transform.scale(
-                agent_icon, (icon_size, icon_size))
-            agent_icon_rect = agent_icon_resized.get_rect(center=cell_center)
-            self.offscreen_surface.blit(agent_icon_resized, agent_icon_rect)
-
     def _draw_objects(self):
         for obj in self.env.objects:
             x, y = obj.position
@@ -190,7 +163,6 @@ class Viewer:
         self._draw_grid()
         self._draw_goals()
         self._draw_objects()
-        # self._draw_agents()
         self._draw_agents_and_objects()
         self.screen.blit(self.offscreen_surface, (0, 0))
         pygame.display.flip()
