@@ -86,7 +86,7 @@ class MACPPEnv(gym.Env):
         n_pickers: int,
         n_objects: Optional[int] = 1,
         initial_state=None,
-        cell_size: Optional[int] = 300,
+        cell_size: Optional[int] = 50,
         debug_mode: Optional[bool] = False,
         create_video: Optional[bool] = False,
         seed: Optional[int] = None
@@ -443,6 +443,7 @@ class MACPPEnv(gym.Env):
                 agent.reward += REWARD_COMPLETION
                 if self.debug_mode:
                     print(f'Rewarded for completion: {REWARD_COMPLETION}')
+                print(f'received{REWARD_COMPLETION} for completion')
             self.done = [True] * self.n_agents
 
         # Collect frames for the video when required
