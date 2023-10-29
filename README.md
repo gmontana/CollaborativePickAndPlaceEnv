@@ -28,6 +28,7 @@
 - [Contact](#contact)
 
 <!-- OVERVIEW -->
+
 # Overview
 
 In the Collaborative Pick and Place environment, you'll find a grid-based world where multiple agents work together to achieve a common goal. Their mission is to pick up and place all the boxes into designated goal positions.
@@ -56,9 +57,7 @@ Agents receive rewards for successfully placing boxes into goal positions. The u
 
 ### Key Requirement
 
-To tackle this challenge, it's crucial to have at least one Picker agent in your team. Their unique ability is essential for initiating the process.
-
-In summary, the Collaborative Pick and Place environment is all about teamwork, strategy, and coordination. Agents must work together, combining their skills, to achieve a successful outcome.
+To tackle this challenge, it's crucial to have at least one Picker agent in your team. 
 
 
 <!-- GETTING STARTED -->
