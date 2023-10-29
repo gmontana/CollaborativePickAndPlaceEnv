@@ -35,6 +35,8 @@ class Viewer:
             os.path.join(icon_path, "picker_not_carrying.png"))
         self.picker_carrying_icon = self._load_image(
             os.path.join(icon_path, "picker_carrying.png"))
+        self.non_picker_with_box_icon = self._load_image(
+            os.path.join(icon_path, "dropper_not_carrying_with_box.png"))
         self.non_picker_icon = self._load_image(
             os.path.join(icon_path, "dropper_not_carrying.png"),)
         self.non_picker_carrying_icon = self._load_image(
@@ -72,6 +74,59 @@ class Viewer:
                 (0, y),
                 (self.env.grid_width * self.env.cell_size, y),
             )
+
+
+    def _draw_agents_and_objects(self):
+        for agent in self.env.agents:
+            x, y = agent.position
+            cell_center = (
+                x * self.env.cell_size + self.env.cell_size // 2,
+                y * self.env.cell_size + self.env.cell_size // 2,
+            )
+            cell_size = self.env.cell_size  # Get the cell size
+            icon_size = int(cell_size * 0.8)  # Adjust the agent and object icon size
+
+            # Check if there is an object at the agent's position
+            object_at_position = any(obj.position == agent.position for obj in self.env.objects)
+
+            # Check if the agent is a non-picker, not carrying an object, and overlapping with an object
+            can_display_side_by_side = (
+                not agent.picker
+                and agent.carrying_object is None
+                and object_at_position
+            )
+
+            try:
+                if can_display_side_by_side:
+                    # Use the non_picker_with_box_icon if conditions are met
+                    agent_icon = self.non_picker_with_box_icon
+                    icon_size = int(cell_size * 0.8)  # Adjust the icon size
+                else:
+                    # Select agent icon based on picker status and carrying
+                    if agent.picker:
+                        if agent.carrying_object is not None:
+                            agent_icon = self.picker_carrying_icon
+                        else:
+                            agent_icon = self.picker_icon
+                    else:
+                        if agent.carrying_object is not None:
+                            agent_icon = self.non_picker_carrying_icon
+                        else:
+                            agent_icon = self.non_picker_icon
+
+                # Resize agent icon
+                agent_icon_resized = pygame.transform.scale(
+                    agent_icon, (icon_size, icon_size))
+
+                # Draw agent icon on the offscreen surface
+                agent_icon_rect = agent_icon_resized.get_rect(center=cell_center)
+                self.offscreen_surface.blit(agent_icon_resized, agent_icon_rect)
+
+            except Exception as e:
+                # Handle exceptions here (e.g., image loading errors)
+                print(f"Error loading icon: {e}")
+                # Optionally, you can set a default icon or behavior here
+
 
     def _draw_agents(self):
         for agent in self.env.agents:
@@ -135,7 +190,8 @@ class Viewer:
         self._draw_grid()
         self._draw_goals()
         self._draw_objects()
-        self._draw_agents()
+        # self._draw_agents()
+        self._draw_agents_and_objects()
         self.screen.blit(self.offscreen_surface, (0, 0))
         pygame.display.flip()
 
