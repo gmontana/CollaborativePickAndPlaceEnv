@@ -5,7 +5,16 @@ from macpp.core.environment import Action
 
 class InteractivePolicy:
     '''
-    Class to manually control a two-player game using the keyboard 
+    This class enables the manual control of a two-player game using the keyboard. 
+
+    Attributes:
+        actions (list): A list to store the actions chosen for each agent. The default value is [None, None].
+        current_agent (int): An integer to track the currently active agent. The default value is 0.
+        key_mapping (dict): A dictionary mapping pygame key events to corresponding actions.
+
+    Methods:
+        action(): Returns a list of actions for both agents if actions are available, otherwise None.
+        handle_key(key): Updates the action list based on the key event received.
     '''
 
     def __init__(self):
@@ -47,8 +56,6 @@ def game_loop(env):
                 policy.handle_key(event.key)
         actions = policy.action()
         if actions is not None:
-            print(f"Actions: {actions}")
-        if actions is not None:
             _, reward, done, _ = env.step(actions)
             print(f"Actions: {actions}, Reward: {reward}")
             env.render()
@@ -59,6 +66,6 @@ def game_loop(env):
 
 if __name__ == "__main__":
     env = MACPPEnv(
-        grid_size=(5, 5), n_agents=2, n_pickers=1, n_objects=4, debug_mode=True, cell_size=200
+        grid_size=(10, 10), n_agents=2, n_pickers=1, n_objects=8, debug_mode=True, cell_size=200
     )
     game_loop(env)
