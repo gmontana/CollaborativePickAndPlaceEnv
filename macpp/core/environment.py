@@ -64,13 +64,27 @@ class Agent:
 class Object:
     def __init__(self,
                  position: Tuple[int, int],
-                 id: int) -> None:
-        self.position = position
+                 id: int):
+        self._position  = position
         self.id = id
+        self.carrying_agent = None
 
     def get_object_obs(self) -> Dict[str, Union[Tuple[int, int], int]]:
         return {"id": self.id, "position": self.position}
 
+    @property
+    def position(self) -> Tuple[int, int]:
+        if self.carrying_agent:
+          return self.carrying_agent.position
+        return self._position
+
+    @property
+    def carrying_agent(self) -> Optional[Agent]:
+        return self._carrying_agent
+
+    @carrying_agent.setter
+    def carrying_agent(self, agent: Optional[Agent]) -> None:
+        self._carrying_agent = agent
 
 class MACPPEnv(gym.Env):
     """
@@ -235,72 +249,13 @@ class MACPPEnv(gym.Env):
 
         self.done = [False] * self.n_agents
         obs = self.get_obs()
+        
+        # Debug info
+        if self.debug_mode:
+            print("State from reset:")
+            self._print_state()
 
         return obs
-
-    '''
-    def obs_to_hash(self, obs: Dict[str, Dict[str, Any]]) -> str:
-        def position_to_number(pos, length):
-            return pos[0] * length + pos[1]
-
-        encoded_obs = []
-
-        for agent_id in sorted(obs.keys()):
-            agent_data = obs[agent_id]
-            # Encode agent's own observation
-            encoded_obs.append(position_to_number(agent_data['self']['position'], self.grid_length))
-            encoded_obs.append(1 if agent_data['self']['picker'] else 0)
-            encoded_obs.append(agent_data['self']['carrying_object'] if agent_data['self']['carrying_object'] is not None else -1)
-            # Encode other agents' observations
-            for other_agent in agent_data['agents']:
-                encoded_obs.append(position_to_number(other_agent['position'], self.grid_length))
-                encoded_obs.append(1 if other_agent['picker'] else 0)
-                encoded_obs.append(other_agent['carrying_object'] if other_agent['carrying_object'] is not None else -1)
-            # Encode objects' observations
-            for obj in agent_data['objects']:
-                encoded_obs.append(position_to_number(obj['position'], self.grid_length))
-                encoded_obs.append(obj['id'])
-            # Encode goals
-            for goal in agent_data['goals']:
-                encoded_obs.append(position_to_number(goal, self.grid_length))
-
-        # Convert the list of numbers to a single string and hash it
-        concatenated_obs = ''.join(map(str, encoded_obs))
-        return hashlib.md5(concatenated_obs.encode()).hexdigest()
-    '''
-
-    '''
-    def obs_to_hash(self, obs: Dict[str, Dict[str, Any]]) -> str:
-        def position_to_number(pos, length):
-            return pos[0] * length + pos[1]
-
-        encoded_obs = []
-
-        for agent_id in sorted(obs.keys()):
-            agent_data = obs[agent_id]
-            # Encode agent's own observation
-            encoded_obs.append(position_to_number(
-                agent_data['self']['position'], self.grid_length))
-            encoded_obs.append(1 if agent_data['self']['picker'] else 0)
-            encoded_obs.append(agent_data['self']['carrying_object']
-                               if agent_data['self']['carrying_object'] is not None else -1)
-
-        # Encode objects' observations
-        # We can use 'agent_0' as a reference since all agents see the same objects
-        for obj in obs['agent_0']['objects']:
-            encoded_obs.append(position_to_number(
-                obj['position'], self.grid_length))
-            encoded_obs.append(obj['id'])
-
-        # Encode goals
-        # We can use 'agent_0' as a reference since all agents see the same goals
-        for goal in obs['agent_0']['goals']:
-            encoded_obs.append(position_to_number(goal, self.grid_length))
-
-        # Convert the list of numbers to a single string and hash it
-        concatenated_obs = ''.join(map(str, encoded_obs))
-        return hashlib.md5(concatenated_obs.encode()).hexdigest()
-    '''
 
     def random_reset(self, seed: Optional[int] = None) -> None:
         """
@@ -436,6 +391,7 @@ class MACPPEnv(gym.Env):
         self._handle_drops()
         self._handle_pickups()
         self._handle_passes(actions)
+        self._handle_drops()
 
         # Check for termination
         if self.check_termination():
@@ -486,23 +442,28 @@ class MACPPEnv(gym.Env):
 
         new_position = (x, y)
 
-        # If agents collide, they don't move
-        if new_position not in [a.position for a in self.agents]:
-            return new_position
-        return agent.position
+        # If the new position contains an agent, move is now allowed
+        if new_position in [a.position for a in self.agents if a != agent]:  
+            return agent.position
+
+        # If the agent is carrying an object, and the new position contains an object, move is now allowed
+        if agent.carrying_object is not None and any(obj.position == new_position for obj in  self.objects):
+                return agent.position
+
+        return new_position
 
     def _handle_moves(self, actions: List[int]) -> None:
         for idx, agent_action in enumerate(actions):
             agent = self.agents[idx]
-            agent.position = self._move_agent(agent, agent_action)
+            new_pos = self._move_agent(agent, agent_action)
+            agent.position = new_pos
 
-            # if an agent is carrying an object, the position of the object being carried needs to be updated
+            # If the agent is carrying an object, update the object's position
             if agent.carrying_object is not None:
-                carried_object = next(
-                    (o for o in self.objects if o.id == agent.carrying_object), None
-                )
-                if carried_object:
-                    carried_object.position = agent.position
+                carried_obj = next((obj for obj in self.objects if obj.id == agent.carrying_object), None)
+                if carried_obj:
+                    # carried_obj.position = new_pos
+                    carried_obj.carrying_agent = agent
 
     def _handle_pickups(self) -> None:
         for agent in self.agents:
@@ -512,6 +473,7 @@ class MACPPEnv(gym.Env):
                         continue
                     if obj.position == agent.position:
                         agent.carrying_object = obj.id
+                        obj.carrying_agent = agent
                         agent.reward += REWARD_PICKUP
                         if self.debug_mode:
                             print(f'Rewarded for pickup: {REWARD_PICKUP}')
@@ -519,89 +481,95 @@ class MACPPEnv(gym.Env):
 
     def _handle_drops(self) -> None:
         for agent in self.agents:
-            # Check if the agent is carrying an object and is NOT a picker
             if agent.carrying_object is not None and not agent.picker:
-                # Check if the agent's position matches any of the goal positions
                 if agent.position in self.goals:
                     # Check if the goal position already has an object
                     if not any(obj.position == agent.position and obj.id != agent.carrying_object for obj in self.objects):
-                        # Drop the object at the goal position
-                        obj = next(
-                            obj for obj in self.objects if obj.id == agent.carrying_object)
-                        obj.position = agent.position
-                        agent.carrying_object = None
-                        agent.reward += REWARD_DROP
-                        if self.debug_mode:
-                            print(f'Rewarded for dropoff: {REWARD_DROP}')
+                        obj = next((obj for obj in self.objects if obj.id == agent.carrying_object), None)
+                        if obj:
+                            obj._position = agent.position  # Set the object's position explicitly
+                            obj.carrying_agent = None  
+                            agent.carrying_object = None
+                            agent.reward += REWARD_DROP
+                            if self.debug_mode:
+                                print(f'Rewarded for dropoff: {REWARD_DROP}')
+
 
     def _handle_passes(self, actions: List[int]) -> None:
+        picker_to_non_picker_passes = []
+        other_possible_passes = []
 
-        # Create a list to store agents that will receive objects
-        receiving_agents = [None] * len(self.agents)
+        for giver, giver_action in zip(self.agents, actions):
+            if giver_action == Action.PASS.value and giver.carrying_object is not None:
+                for adj_pos in self._get_adjacent_positions(giver.position):
+                    receiver = self._find_agent_at_position(adj_pos)
+                    if receiver:
+                        receiver_action = actions[self.agents.index(receiver)]
+                        if self._can_receive_object(giver, giver_action, receiver, receiver_action):
+                            if giver.picker and not receiver.picker:
+                                picker_to_non_picker_passes.append((giver, receiver, giver.carrying_object))
+                            else:
+                                other_possible_passes.append((giver, receiver, giver.carrying_object))
 
-        for idx, agent in enumerate(self.agents):
-            if actions[idx] == Action.PASS.value and agent.carrying_object is not None:
-                x, y = agent.position
-                adjacent_positions = [
-                    (x + 1, y), (x - 1, y), (x, y + 1), (x, y - 1)]
-                for adj_pos in adjacent_positions:
-                    adj_agent = next(
-                        (a for a in self.agents if a.position == adj_pos), None
-                    )
-                    if (
-                        adj_agent
-                        and actions[self.agents.index(adj_agent)] == Action.PASS.value
-                        and adj_agent.carrying_object is None
-                    ):
-                        receiving_agents[
-                            self.agents.index(adj_agent)
-                        ] = agent.carrying_object
-                        obj = next(
-                            (o for o in self.objects if o.id ==
-                             agent.carrying_object),
-                            None,
-                        )
-                        if obj:
-                            obj.position = (
-                                adj_agent.position
-                            )  # Update the object's position
-                        agent.carrying_object = None
+        if picker_to_non_picker_passes:
+            giver, receiver, obj_id = random.choice(picker_to_non_picker_passes)
+            giver.carrying_object = None
+            receiver.carrying_object = obj_id
+            self._reward_agents(giver, receiver)
+        elif other_possible_passes:
+            giver, receiver, obj_id = random.choice(other_possible_passes)
+            giver.carrying_object = None
+            receiver.carrying_object = obj_id
+            self._reward_agents(giver, receiver)
 
-                        # Assign rewards based on the type of pass
-                        if agent.picker and not adj_agent.picker:
-                            agent.reward += REWARD_GOOD_PASS
-                            adj_agent.reward += REWARD_GOOD_PASS
-                            if self.debug_mode:
-                                print(
-                                    f'Rewarded for good pass: {REWARD_GOOD_PASS}')
-                        elif not agent.picker and adj_agent.picker:
-                            agent.reward += REWARD_BAD_PASS
-                            adj_agent.reward += REWARD_BAD_PASS
-                            if self.debug_mode:
-                                print(
-                                    f'Rewarded for bad pass: {REWARD_BAD_PASS}')
 
-                        break
+    def _reward_agents(self, giver: Agent, receiver: Agent) -> None:
+        if giver.reward is not None and receiver.reward is not None:
+            if giver.picker and not receiver.picker:
+                giver.reward += REWARD_GOOD_PASS
+                receiver.reward += REWARD_GOOD_PASS
+                self._log_reward("good", REWARD_GOOD_PASS)
+            elif not giver.picker and receiver.picker:
+                giver.reward += REWARD_BAD_PASS
+                receiver.reward += REWARD_BAD_PASS
+                self._log_reward("bad", REWARD_BAD_PASS)
+        else:
+            print("Warning: Attempted to update reward of agent with None reward.")
 
-        # Process the passing of objects
-        for idx, obj_id in enumerate(receiving_agents):
-            if obj_id is not None:
-                self.agents[idx].carrying_object = obj_id
+
+    def _find_agent_at_position(self, position: Tuple[int, int]) -> Optional[Agent]:
+        return next((agent for agent in self.agents if agent.position == position), None)
+
+    def _can_receive_object(self, giver: Agent, giver_action: int, receiver: Agent, receiver_action: int) -> bool:
+        return (
+            giver.carrying_object is not None and
+            giver_action == Action.PASS.value and
+            receiver_action == Action.PASS.value and
+            receiver.carrying_object is None and
+            not any(obj.position == receiver.position for obj in self.objects)
+        )
+
+
+    def _log_reward(self, pass_type: str, reward_amount: int) -> None:
+        if self.debug_mode:
+            print(f'Rewarded for {pass_type} pass: {reward_amount}')
+
+    def _get_adjacent_positions(self, position: Tuple[int, int]) -> List[Tuple[int, int]]:
+        x, y = position
+        return [(x + 1, y), (x - 1, y), (x, y + 1), (x, y - 1)]
 
     def check_termination(self) -> bool:
-        goal_positions = set(self.goals)
-        object_positions = {obj.position for obj in self.objects}
-        carrying_agents = {
-            agent.position for agent in self.agents if agent.carrying_object is not None}
-        # Check if every goal has an object on it, no goal has more than one object,
-        # and no non-picker agent is carrying an object
-        if (object_positions == goal_positions and
-            not carrying_agents.intersection(goal_positions) and
-                all(agent.picker or agent.carrying_object is None for agent in self.agents)):
-            if self.debug_mode:
-                print("Termination checked!")
-            return True
-        return False
+        # Check if all objects are on their goal positions and not being carried
+        for obj in self.objects:
+            if obj.position not in self.goals or any(agent.carrying_object == obj.id for agent in self.agents):
+                return False
+
+        # Check if no non-picker agent is carrying an object
+        for agent in self.agents:
+            if not agent.picker and agent.carrying_object is not None:
+                return False
+
+        return True
 
     def _init_render(self) -> None:
         from macpp.core.rendering import Viewer

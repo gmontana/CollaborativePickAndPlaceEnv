@@ -32,6 +32,7 @@ class InteractivePolicy:
             self.actions[self.current_agent] = self.key_mapping[key].value
             self.current_agent = (self.current_agent + 1) % 2
 
+
 def game_loop(env):
     env.reset()
     done = False
@@ -55,8 +56,9 @@ def game_loop(env):
 
     env.close()
 
+
 if __name__ == "__main__":
     env = MACPPEnv(
-        grid_size=(4, 4), n_agents=2, n_pickers=1, n_objects=2, debug_mode=True, cell_size=250
+        grid_size=(5, 5), n_agents=2, n_pickers=1, n_objects=4, debug_mode=True, cell_size=200
     )
     game_loop(env)
