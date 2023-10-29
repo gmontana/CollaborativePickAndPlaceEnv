@@ -4,9 +4,6 @@
 import pygame
 import os
 
-_ANIMATION_FPS = 5
-
-# Colors
 WHITE = (255, 255, 255)
 GRAY = (200, 200, 200)
 BLUE = (0, 0, 255)
@@ -21,13 +18,11 @@ class Viewer:
 
         pygame.init()
 
-        # Create the offscreen surface for rendering
         self.offscreen_surface = pygame.Surface(
             (self.env.grid_width * self.env.cell_size,
              self.env.grid_length * self.env.cell_size)
         )
 
-        # Load all icons
         base_path = os.path.dirname(__file__)
         icon_path = os.path.join(base_path, "icons")
         self.picker_icon = self._load_image(
@@ -43,7 +38,6 @@ class Viewer:
         self.object_icon = self._load_image(
             os.path.join(icon_path, "box.png"))
 
-        # Create the screen for display
         self.screen = pygame.display.set_mode(
             (self.env.grid_width * self.env.cell_size,
              self.env.grid_length * self.env.cell_size)
@@ -84,11 +78,7 @@ class Viewer:
             )
             cell_size = self.env.cell_size  
             icon_size = int(cell_size * 0.8) 
-
-            # Check if there is an object at the agent's position
             object_at_position = any(obj.position == agent.position for obj in self.env.objects)
-
-            # Check if the agent is a non-picker, not carrying an object, and overlapping with an object
             can_display_side_by_side = (
                 not agent.picker
                 and agent.carrying_object is None
@@ -97,11 +87,9 @@ class Viewer:
 
             try:
                 if can_display_side_by_side:
-                    # Use the non_picker_with_box_icon if conditions are met
                     agent_icon = self.non_picker_with_box_icon
-                    icon_size = int(cell_size * 0.8)  # Adjust the icon size
+                    icon_size = int(cell_size * 0.8) 
                 else:
-                    # Select agent icon based on picker status and carrying
                     if agent.picker:
                         if agent.carrying_object is not None:
                             agent_icon = self.picker_carrying_icon
@@ -113,11 +101,9 @@ class Viewer:
                         else:
                             agent_icon = self.non_picker_icon
 
-                # Resize agent icon
                 agent_icon_resized = pygame.transform.scale(
                     agent_icon, (icon_size, icon_size))
 
-                # Draw agent icon on the offscreen surface
                 agent_icon_rect = agent_icon_resized.get_rect(center=cell_center)
                 self.offscreen_surface.blit(agent_icon_resized, agent_icon_rect)
 
@@ -138,7 +124,6 @@ class Viewer:
     def _draw_tick_border(self, x, y, color, thickness=8):
         cell_size = self.env.cell_size
         rect = pygame.Rect(x * cell_size, y * cell_size, cell_size, cell_size)
-        # Draw the tick border
         pygame.draw.rect(self.offscreen_surface, color, rect, thickness)
 
     def _draw_goals(self):
