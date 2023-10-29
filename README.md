@@ -30,23 +30,36 @@
 <!-- OVERVIEW -->
 # Overview
 
-In the Collaborative Pick and Place environment, multiple agents collaborate in a grid-based world to achieve a common objective. 
+In the Collaborative Pick and Place environment, you'll find a grid-based world where multiple agents work together to achieve a common goal. Their mission is to pick up and place all the boxes into designated goal positions.
 
-Their mission is to pick up and place all the objects (green circles) into designated goal positions (gray rectangles). 
+### Agent Roles
 
-Agents are divided into two categories:
+Within this environment, agents fall into two distinct categories:
 
-- **Pickers**: These agents can automatically collect objects while traversing the grid but cannot place them in goal positions.
+- **Pickers**: These specialized agents have the unique ability to automatically collect boxes while navigating the grid. However, they are unable to place the boxes into goal positions.
 
-- **Non-pickers**: In contrast, non-picker agents can drop off objects into goal positions upon reaching them but cannot pick up objects from the grid.
+- **Droppers**: In contrast, the non-picker agents, referred to as "Droppers," possess the skill of depositing boxes into goal positions once they reach them. However, they cannot pick up boxes from the grid.
 
-Success in this task relies on the agents' ability to develop a collaborative strategy. 
+### Actions
 
-Agents can perform movements in four cardinal directions (UP, DOWN, LEFT, RIGHT) and have the option to WAIT in their current position. 
+Agents have several actions at their disposal:
 
-A pair of agents can also engage in collaboration by using the PASS action to transfer objects between them. Successful object placement in goal positions results in rewards for the agents, and the task is considered complete when all objects are in their designated goal positions.
+- **Movements**: They can move in any of the four cardinal directions—UP, DOWN, LEFT, and RIGHT—allowing them to traverse the grid efficiently.
 
-To solve the task, at least one picket agent is always required. 
+- **WAIT**: Agents can choose to remain in their current position if it's strategically advantageous.
+
+- **Collaboration**: Agents can work together by employing the "PASS" action, enabling them to transfer boxes between one another. This collaborative approach can be essential for success.
+
+### Objective
+
+Agents receive rewards for successfully placing boxes into goal positions. The ultimate task is considered complete when all boxes are placed in their designated goal positions.
+
+### Key Requirement
+
+To tackle this challenge, it's crucial to have at least one Picker agent in your team. Their unique ability is essential for initiating the process.
+
+In summary, the Collaborative Pick and Place environment is all about teamwork, strategy, and coordination. Agents must work together, combining their skills, to achieve a successful outcome.
+
 
 <!-- GETTING STARTED -->
 # Getting Started
