@@ -621,18 +621,28 @@ class MACPPEnv(gym.Env):
                             print(f'Rewarded for dropoff: {REWARD_DROP}')
 
     def _handle_passes(self, actions: List[int]) -> None:
+
+        """
+        Handle object passing between agents based on their actions and positions.
+        
+        Args:
+        actions (List[int]): A list of actions corresponding to each agent.
+        """
+        # Create a list of eligible givers, i.e., agents who want to pass an object and are currently carrying one
         eligible_givers = [
             (idx, agent) for idx, (agent, action) in enumerate(zip(self.agents, actions))
             if action == Action.PASS.value and agent.carrying_object is not None
         ]
+
+        # Create a list of eligible receivers, i.e., agents who want to receive an object and are not currently carrying one
         eligible_receivers = [
             (idx, agent) for idx, (agent, action) in enumerate(zip(self.agents, actions))
-            if action == Action.PASS.value
+            if action == Action.PASS.value and agent.carrying_object is None
         ]
 
+        # Classify the passes
         picker_to_non_picker_passes = []
         other_valid_passes = []
-        
         for (giver_idx, giver) in eligible_givers:
             for adj_pos in self._get_adjacent_positions(giver.position):
                 for (receiver_idx, receiver) in eligible_receivers:
@@ -643,17 +653,23 @@ class MACPPEnv(gym.Env):
                             else:
                                 other_valid_passes.append((giver, receiver))
 
+        # Handle passes
+        pass_made = False  
         # Handle picker to non-picker passes first
         for giver, receiver in picker_to_non_picker_passes:
             if giver.carrying_object is not None and receiver.carrying_object is None:
                 giver.pass_object(receiver)
                 self._reward_agents(giver, receiver)
+                pass_made = True  
+                break  
 
-        # Handle other passes
-        for giver, receiver in other_valid_passes:
-            if giver.carrying_object is not None and receiver.carrying_object is None:
-                giver.pass_object(receiver)
-                self._reward_agents(giver, receiver)
+        # Handle other passes if no pass has been made yet
+        if not pass_made:
+            for giver, receiver in other_valid_passes:
+                if giver.carrying_object is not None and receiver.carrying_object is None:
+                    giver.pass_object(receiver)
+                    self._reward_agents(giver, receiver)
+                    break 
 
     def _can_receive_object(self, giver: Agent, giver_action: int, receiver: Agent, receiver_action: int) -> bool:
         return (
