@@ -557,40 +557,103 @@ class MACPPTests(unittest.TestCase):
         self.assertEqual(env.agents[2].reward, expected_reward_agent_2, "Agent 2 should be penalized for movement.")
 
 
-    def test_complex_passing_scenario(self):
-            initial_state = {
-                "agents": [
-                    {"position": (0, 0), "picker": True, "carrying_object": 0},
-                    {"position": (1, 0), "picker": False, "carrying_object": None},
-                    {"position": (2, 0), "picker": True, "carrying_object": 1},
-                    {"position": (3, 0), "picker": False, "carrying_object": None},
-                    {"position": (4, 0), "picker": True, "carrying_object": None},
-                ],
-                "objects": [{"position": (0, 0), "id": 0}, {"position": (2, 0), "id": 1}],
-                "goals": [(5, 5), (6, 6)],
-            }
+    def test_five_agents_single_pass(self):
+        initial_state = {
+            "agents": [
+                {"position": (0, 0), "picker": True, "carrying_object": 0},
+                {"position": (1, 0), "picker": False, "carrying_object": None},
+                {"position": (2, 0), "picker": True, "carrying_object": 1},
+                {"position": (3, 0), "picker": False, "carrying_object": None},
+                {"position": (4, 0), "picker": True, "carrying_object": None},
+            ],
+            "objects": [{"position": (0, 0), "id": 0}, {"position": (2, 0), "id": 1}],
+            "goals": [(5, 5), (6, 6)],
+        }
 
-            print(f"Initial state: {initial_state}")
+        print(f"Initial state: {initial_state}")
 
-            env = MACPPEnv((10, 10), 5, 2, initial_state=get_obs(initial_state), debug_mode=False)
-            actions = [4, 4]
-            new_state, _, _, _ = env.step(actions)
+        env = MACPPEnv((10, 10), 5, 2, initial_state=get_obs(initial_state), debug_mode=False)
+        actions = [4, 4]
+        new_state, _, _, _ = env.step(actions)
 
-            # Updated expected positions, carrying objects, and rewards for each agent involved in the test
-            expected_outcomes = [
-                {"position": (0, 0), "carrying_object": None, "picker": True, "reward": 4},
-                {"position": (1, 0), "carrying_object": 0, "picker": False, "reward": 4}
-            ]
+        # Updated expected positions, carrying objects, and rewards for each agent involved in the test
+        expected_outcomes = [
+            {"position": (0, 0), "carrying_object": None, "picker": True, "reward": 4},
+            {"position": (1, 0), "carrying_object": 0, "picker": False, "reward": 4}
+        ]
 
-            # Loop through only the agents involved in the test (assumed to be the first two agents)
-            for i in range(2):
-                agent = env.agents[i]
-                carrying_object_id = agent.carrying_object.id if agent.carrying_object else None
-                with self.subTest(agent=f"Agent {i}"):
-                    self.assertEqual(agent.position, expected_outcomes[i]["position"])
-                    self.assertEqual(carrying_object_id, expected_outcomes[i]["carrying_object"])
-                    self.assertEqual(agent.picker, expected_outcomes[i]["picker"])
-                    self.assertEqual(agent.reward, expected_outcomes[i]["reward"])
+        # Loop through only the agents involved in the test (assumed to be the first two agents)
+        for i in range(2):
+            agent = env.agents[i]
+            carrying_object_id = agent.carrying_object.id if agent.carrying_object else None
+            with self.subTest(agent=f"Agent {i}"):
+                self.assertEqual(agent.position, expected_outcomes[i]["position"])
+                self.assertEqual(carrying_object_id, expected_outcomes[i]["carrying_object"])
+                self.assertEqual(agent.picker, expected_outcomes[i]["picker"])
+                self.assertEqual(agent.reward, expected_outcomes[i]["reward"])
+
+    def test_three_agents_simultaneous_pass(self):
+        initial_state = {
+            "agents": [
+                {"position": (0, 0), "picker": True, "carrying_object": 0},
+                {"position": (1, 0), "picker": False, "carrying_object": None},
+                {"position": (2, 0), "picker": True, "carrying_object": 1},
+            ],
+            "objects": [{"position": (0, 0), "id": 0}, {"position": (2, 0), "id": 1}],
+            "goals": [(5, 5), (6, 6)],
+        }
+
+        print(f"Initial state: {initial_state}")
+
+        env = MACPPEnv((10, 10), 3, 2, initial_state=get_obs(initial_state), debug_mode=False)
+        actions = [4, 4, 4]
+        new_state, _, _, _ = env.step(actions)
+
+        expected_outcomes = [
+            {"position": (0, 0), "carrying_object": None, "picker": True},
+            {"position": (1, 0), "carrying_object": 0, "picker": False},
+            {"position": (2, 0), "carrying_object": 1, "picker": True}
+        ]
+
+        for i in range(3):
+            agent = env.agents[i]
+            carrying_object_id = agent.carrying_object.id if agent.carrying_object else None
+            with self.subTest(agent=f"Agent {i}"):
+                self.assertEqual(agent.position, expected_outcomes[i]["position"])
+                self.assertEqual(carrying_object_id, expected_outcomes[i]["carrying_object"])
+                self.assertEqual(agent.picker, expected_outcomes[i]["picker"])
+
+    def test_five_agents_two_passes(self):
+        initial_state = {
+            "agents": [
+                {"position": (0, 0), "picker": True, "carrying_object": 0},
+                {"position": (1, 0), "picker": False, "carrying_object": None},
+                {"position": (2, 0), "picker": True, "carrying_object": 1},
+                {"position": (3, 0), "picker": False, "carrying_object": None},
+            ],
+            "objects": [{"position": (0, 0), "id": 0}, {"position": (2, 0), "id": 1}],
+            "goals": [(5, 5), (6, 6)],
+        }
+
+        env = MACPPEnv((10, 10), 5, 2, initial_state=get_obs(initial_state), debug_mode=False)
+        actions = [4, 4, 4, 4]  # All agents are trying to pass
+        new_state, _, _, _ = env.step(actions)
+
+        expected_outcomes = [
+            {"position": (0, 0), "carrying_object": None, "picker": True, "reward": 4},
+            {"position": (1, 0), "carrying_object": 0, "picker": False, "reward": 4},
+            {"position": (2, 0), "carrying_object": None, "picker": True, "reward": 4},
+            {"position": (3, 0), "carrying_object": 1, "picker": False, "reward": 4}
+        ]
+
+        for i in range(4):
+            agent = env.agents[i]
+            carrying_object_id = agent.carrying_object.id if agent.carrying_object else None
+            with self.subTest(agent=f"Agent {i}"):
+                self.assertEqual(agent.position, expected_outcomes[i]["position"])
+                self.assertEqual(carrying_object_id, expected_outcomes[i]["carrying_object"])
+                self.assertEqual(agent.picker, expected_outcomes[i]["picker"])
+                self.assertEqual(agent.reward, expected_outcomes[i]["reward"])
 
 
 if __name__ == "__main__":
