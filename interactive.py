@@ -66,6 +66,6 @@ def game_loop(env):
 
 if __name__ == "__main__":
     env = MACPPEnv(
-        grid_size=(10, 10), n_agents=2, n_pickers=1, n_objects=8, debug_mode=True, cell_size=200
+        grid_size=(5, 5), n_agents=2, n_pickers=1, n_objects=3, debug_mode=True, cell_size=200
     )
     game_loop(env)
