@@ -68,48 +68,34 @@ class Viewer:
                 (self.env.grid_width * self.env.cell_size, y),
             )
 
+    def _draw_agent_icon(self, agent_icon, cell_center, icon_size):
+        try:
+            agent_icon_resized = pygame.transform.scale(agent_icon, (icon_size, icon_size))
+            agent_icon_rect = agent_icon_resized.get_rect(center=cell_center)
+            self.offscreen_surface.blit(agent_icon_resized, agent_icon_rect)
+        except Exception as e:
+            print(f"Error loading icon: {e}")
+
+    def _get_agent_icon(self, agent, can_display_side_by_side):
+        if can_display_side_by_side:
+            return self.non_picker_with_box_icon
+        if agent.picker:
+            return self.picker_carrying_icon if agent.carrying_object is not None else self.picker_icon
+        return self.non_picker_carrying_icon if agent.carrying_object is not None else self.non_picker_icon
 
     def _draw_agents(self):
+        cell_size = self.env.cell_size  
+        icon_size = int(cell_size * 0.8)
+
         for agent in self.env.agents:
             x, y = agent.position
-            cell_center = (
-                x * self.env.cell_size + self.env.cell_size // 2,
-                y * self.env.cell_size + self.env.cell_size // 2,
-            )
-            cell_size = self.env.cell_size  
-            icon_size = int(cell_size * 0.8) 
+            cell_center = (x * cell_size + cell_size // 2, y * cell_size + cell_size // 2)
+            
             object_at_position = any(obj.position == agent.position for obj in self.env.objects)
-            can_display_side_by_side = (
-                not agent.picker
-                and agent.carrying_object is None
-                and object_at_position
-            )
-
-            try:
-                if can_display_side_by_side:
-                    agent_icon = self.non_picker_with_box_icon
-                    icon_size = int(cell_size * 0.8) 
-                else:
-                    if agent.picker:
-                        if agent.carrying_object is not None:
-                            agent_icon = self.picker_carrying_icon
-                        else:
-                            agent_icon = self.picker_icon
-                    else:
-                        if agent.carrying_object is not None:
-                            agent_icon = self.non_picker_carrying_icon
-                        else:
-                            agent_icon = self.non_picker_icon
-
-                agent_icon_resized = pygame.transform.scale(
-                    agent_icon, (icon_size, icon_size))
-
-                agent_icon_rect = agent_icon_resized.get_rect(center=cell_center)
-                self.offscreen_surface.blit(agent_icon_resized, agent_icon_rect)
-
-            except Exception as e:
-                print(f"Error loading icon: {e}")
-
+            can_display_side_by_side = not agent.picker and agent.carrying_object is None and object_at_position
+            agent_icon = self._get_agent_icon(agent, can_display_side_by_side)
+            
+            self._draw_agent_icon(agent_icon, cell_center, icon_size)
 
     def _draw_objects(self):
         for obj in self.env.objects:
