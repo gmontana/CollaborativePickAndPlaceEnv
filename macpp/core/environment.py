@@ -13,11 +13,10 @@ import hashlib
 
 REWARD_STEP = -1
 REWARD_GOOD_PASS = 5
-REWARD_BAD_PASS = -5
+REWARD_BAD_PASS = -10
 REWARD_DROP = 10
 REWARD_PICKUP = 10
-REWARD_COMPLETION = 50
-
+REWARD_COMPLETION = 20
 
 class Action(Enum):
     UP = 0
@@ -191,7 +190,7 @@ class MACPPEnv(gym.Env):
         n_pickers: int,
         n_objects: Optional[int] = 1,
         initial_state=None,
-        cell_size: Optional[int] = 300,
+        cell_size: Optional[int] = 50,
         debug_mode: Optional[bool] = False,
         create_video: Optional[bool] = False,
         seed: Optional[int] = None
@@ -294,8 +293,20 @@ class MACPPEnv(gym.Env):
             f"agent_{i}": agent_observation_space for i in range(self.n_agents)
         })
 
-        self.done = False
 
+        self.observation_space = spaces.Dict({
+            f"agent_{i}": agent_observation_space for i in range(self.n_agents)
+        })
+
+        # self.observation_space = spaces.Dict(
+        #     {
+        #         "agents": spaces.Tuple([self.agent_space] * self.n_agents),
+        #         "objects": spaces.Tuple([self.object_space] * self.n_objects),
+        #         "goals": spaces.Tuple([self.goal_space] * self.n_objects),
+        #     }
+        # )
+
+        self.done = [False] * self.n_agents
         # Initialise the environment either randomly or from a state
         if initial_state is None:
             self.random_reset()
@@ -355,7 +366,7 @@ class MACPPEnv(gym.Env):
         else:
             self.random_reset(seed)
 
-        self.done = False
+        self.done = [False] * self.n_agents
         obs = self.get_obs()
         
         # Debug info
@@ -363,7 +374,7 @@ class MACPPEnv(gym.Env):
             print("State from reset:")
             self._print_state()
 
-        return obs, {}
+        return obs
 
     def random_reset(self, seed: Optional[int] = None) -> None:
         """
@@ -528,7 +539,8 @@ class MACPPEnv(gym.Env):
                 agent.reward += REWARD_COMPLETION
                 if self.debug_mode:
                     print(f'Rewarded for completion: {REWARD_COMPLETION}')
-            self.done = True
+                print(f'received{REWARD_COMPLETION} for completion')
+            self.done = [True] * self.n_agents
 
         # Collect frames for the video when required
         if self.create_video:
@@ -539,7 +551,8 @@ class MACPPEnv(gym.Env):
         if self.debug_mode:
             self._print_state()
 
-        total_reward = sum(self._get_rewards())
+        # total_reward = sum(self._get_rewards())
+        total_reward = self._get_rewards()
         if self.debug_mode:
             print(f'Total reward: {total_reward}')
             for idx, agent in enumerate(self.agents):
@@ -601,8 +614,12 @@ class MACPPEnv(gym.Env):
         for agent in self.agents:
             if agent.picker and agent.carrying_object is None:
                 for obj in self.objects:
+                    if obj.position in self.goals:
+                        continue
+                        # TODO still needed?
                     if obj.position == agent.position and not obj.carrying_agent:
                         agent.pick_up(obj) 
+
                         if self.debug_mode:
                             print(f'Rewarded for pickup: {REWARD_PICKUP}')
                         break
