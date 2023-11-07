@@ -88,7 +88,7 @@ class Viewer:
         icon_size = int(cell_size * 0.8)
 
         for agent in self.env.agents:
-            x, y = agent.position
+            y,x  = agent.position
             cell_center = (x * cell_size + cell_size // 2, y * cell_size + cell_size // 2)
             
             object_at_position = any(obj.position == agent.position for obj in self.env.objects)
@@ -99,7 +99,7 @@ class Viewer:
 
     def _draw_objects(self):
         for obj in self.env.objects:
-            x, y = obj.position
+            y,x = obj.position
             img_size = int(self.env.cell_size * 0.8)
             obj_img_resized = pygame.transform.scale(
                 self.object_icon, (img_size, img_size))
@@ -107,23 +107,23 @@ class Viewer:
                    y * self.env.cell_size + self.env.cell_size // 2 - img_size // 2)
             self.offscreen_surface.blit(obj_img_resized, pos)
 
-    def _draw_tick_border(self, x, y, color, thickness=8):
+    def _draw_tick_border(self, y, x, color, thickness=8):
         cell_size = self.env.cell_size
         rect = pygame.Rect(x * cell_size, y * cell_size, cell_size, cell_size)
         pygame.draw.rect(self.offscreen_surface, color, rect, thickness)
 
     def _draw_goals(self):
         for goal in self.env.goals:
-            x, y = goal
-            object_at_goal = any(obj.position == (x, y) for obj in self.env.objects)
-            dropper_at_goal = any(agent.position == (x, y) and not agent.picker for agent in self.env.agents)
+            y, x = goal
+            object_at_goal = any(obj.position == (y, x) for obj in self.env.objects)
+            dropper_at_goal = any(agent.position == (y, x) and not agent.picker for agent in self.env.agents)
             
-            if object_at_goal and (not any(agent.position == (x, y) for agent in self.env.agents) or dropper_at_goal):
+            if object_at_goal and (not any(agent.position == (y, x) for agent in self.env.agents) or dropper_at_goal):
                 border_color = GREEN
             else:
                 border_color = RED
                 
-            self._draw_tick_border(x, y, border_color)
+            self._draw_tick_border(y, x, border_color)
 
 
     def render(self):
