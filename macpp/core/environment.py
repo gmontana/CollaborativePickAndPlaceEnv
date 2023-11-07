@@ -214,6 +214,7 @@ class MACPPEnv(gym.Env):
             None
         """
 
+        self.grid_size = grid_size
         self.grid_width, self.grid_length = grid_size
         self.cell_size = cell_size
         self.n_agents = n_agents
@@ -221,7 +222,6 @@ class MACPPEnv(gym.Env):
         self.initial_state = initial_state
         self.create_video = create_video
         self.debug_mode = debug_mode
-
         # Check that there are at least two agents
         if n_agents < 2:
             raise ValueError(
