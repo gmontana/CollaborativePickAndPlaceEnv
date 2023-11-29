@@ -3,3 +3,4 @@
 /collaborative_pick_and_place.egg-info/*
 /wandb
 /*.pyc
+.DS_Store
