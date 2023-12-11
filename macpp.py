@@ -13,20 +13,20 @@ def game_loop(env, render=True):
 
     while not any(done):
         actions = env.action_space.sample()
-        obs, _, done, _ = env.step(actions)
-        print(obs)
+        obs, reward, done, _ = env.step(actions)
+        # print(obs)
         obs = flatten_obs(obs)
-        print(len(obs[0]),len(obs[1]))
+        # print(len(obs[0]),len(obs[1]))
         if render:
             env.render()
-
+        print(reward)
         time.sleep(0.5)
 
 def main(game_count=1, render=True):
-    env = gym.make('macpp-10x10-2a-1p-3o-v0', debug_mode=False)
+    env = gym.make('macpp-5x5-2a-1p-3o-sparse-v0', debug_mode=False)
 
     for episode in range(game_count):
-        game_loop(env, True)
+        game_loop(env, render=False)
 
 
 def flatten_obs(obs):
