@@ -17,7 +17,14 @@ REWARD_BAD_PASS = -10
 REWARD_DROP = 10
 REWARD_PICKUP = 10
 REWARD_COMPLETION = 20
-
+# REWARD_STEP = 0
+# REWARD_GOOD_PASS = 0.5
+# REWARD_BAD_PASS = -1
+# REWARD_DROP = 1
+# REWARD_PICKUP = 1
+# REWARD_COMPLETION = 0
+# max for 10x10-4-2-2 is 0.5x2x2 + 2x2 + 2x2 = 10    
+# max for 10x10-4-2-3 is 0.5x2x3 + 3x2 + 3x2 = 15
 class Action(Enum):
     UP = 0
     DOWN = 1

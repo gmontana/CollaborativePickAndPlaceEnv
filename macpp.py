@@ -14,16 +14,18 @@ def game_loop(env, render=True):
     while not any(done):
         actions = env.action_space.sample()
         obs, _, done, _ = env.step(actions)
-        print(obs)
         obs = flatten_obs(obs)
-        print(len(obs[0]),len(obs[1]))
+        # print(obs)
+        # obs = flatten_obs(obs)
+        # obs = obs_to_grid(obs,(env.grid_width,env.grid_length))
+        print(obs[0])
         if render:
             env.render()
 
         time.sleep(0.5)
 
 def main(game_count=1, render=True):
-    env = gym.make('macpp-10x10-2a-1p-3o-v0', debug_mode=False)
+    env = gym.make('macpp-10x10-4a-2p-3o-v0', debug_mode=True)
 
     for episode in range(game_count):
         game_loop(env, True)
@@ -72,6 +74,52 @@ def flatten_obs(obs):
         flattened_obs_all.append(flattened_obs)
 
     return flattened_obs_all
+
+def obs_to_grid(obs, grid_size):
+    '''
+    Converts the observation dictionary into a 3D grid representation.
+
+    The grid is represented as a 3D NumPy array with dimensions (grid_width, grid_length, 3),
+    where the last dimension corresponds to different channels for agents, objects, and goals.
+    Each cell in the grid can be either 0 or 1, indicating the absence or presence of an entity.
+
+    Args:
+    obs (dict): The observation dictionary containing information about agents, objects, and goals.
+    grid_size (tuple): A tuple representing the size of the grid as (grid_width, grid_length).
+
+    Returns:
+    np.ndarray: A 3D NumPy array representing the grid.
+    '''
+    grid_width, grid_length = grid_size
+    obs_all = []
+
+    for _, agent_data in obs.items():
+        grid = np.zeros((grid_width, grid_length, 6))
+        x, y = agent_data['self']['position']
+        grid[x, y, 3] = 1 # ID layer
+        grid[x, y, 0] = 1
+        grid[x, y, 4] = 1 if agent_data['self']['carrying_object'] is not None else -1
+        grid[x, y, 5] = agent_data['self']['picker']
+
+        for other_agent in agent_data['agents']:
+            x, y = other_agent['position']
+            grid[x, y, 0] = 1
+            grid[x, y, 4] = 1 if other_agent['carrying_object'] is not None else -1
+            grid[x, y, 5] = other_agent['picker']
+
+        for obj in agent_data['objects']:
+            x, y = obj['position']
+            grid[x, y, 1] = 1
+
+        for goal in agent_data['goals']:
+            x, y = goal
+            grid[x, y, 2] = 1
+
+        obs_all.append(grid)
+
+    return obs_all
+
+
 
 if __name__ == "__main__":
 
