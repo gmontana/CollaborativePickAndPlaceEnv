@@ -10,21 +10,23 @@ import numpy as np
 import time
 import sys
 import hashlib
+class DenseReward:
+    REWARD_STEP = -1
+    REWARD_GOOD_PASS = 5
+    REWARD_BAD_PASS = -10
+    REWARD_DROP = 10
+    REWARD_PICKUP = 10
+    REWARD_COMPLETION = 20
 
-REWARD_STEP = -1
-REWARD_GOOD_PASS = 5
-REWARD_BAD_PASS = -10
-REWARD_DROP = 10
-REWARD_PICKUP = 10
-REWARD_COMPLETION = 20
-# REWARD_STEP = 0
-# REWARD_GOOD_PASS = 0.5
-# REWARD_BAD_PASS = -1
-# REWARD_DROP = 1
-# REWARD_PICKUP = 1
-# REWARD_COMPLETION = 0
-# max for 10x10-4-2-2 is 0.5x2x2 + 2x2 + 2x2 = 10    
-# max for 10x10-4-2-3 is 0.5x2x3 + 3x2 + 3x2 = 15
+class SparseReward:
+    REWARD_STEP = 0
+    REWARD_GOOD_PASS = 0.5
+    REWARD_BAD_PASS = -1
+    REWARD_DROP = 1
+    REWARD_PICKUP = 1
+    REWARD_COMPLETION = 0
+
+
 class Action(Enum):
     UP = 0
     DOWN = 1
@@ -102,13 +104,17 @@ class Agent:
 
     def __init__(self, 
                  position: Tuple[int, int], 
-                 picker: bool, 
-                 carrying_object: Optional[Object] = None, 
-                 reward: int = 0) -> None:
+                 picker: bool,
+                 reward_class: object,
+                 carrying_object: Optional[Object] = None,
+                 reward: int = 0,
+
+                 ) -> None:
         self._position = position
         self.picker = picker
         self.carrying_object = carrying_object
         self.reward = reward
+        self.reward_class = reward_class
 
     @property
     def position(self) -> Tuple[int, int]:
@@ -140,14 +146,14 @@ class Agent:
         if self.picker and self.carrying_object is None:
             self.carrying_object = obj  
             obj.carrying_agent = self
-            self.reward += REWARD_PICKUP
+            self.reward += self.reward_class.REWARD_PICKUP
 
     def drop(self, obj: Object) -> None:
         if self.carrying_object is not None and not self.picker:
             obj._position = self.position
             obj.carrying_agent = None  
             self.carrying_object = None
-            self.reward += REWARD_DROP
+            self.reward += self.reward_class.REWARD_DROP
 
     def pass_object(self, other_agent: 'Agent') -> None:
         if self.carrying_object is not None:
@@ -200,6 +206,7 @@ class MACPPEnv(gym.Env):
         cell_size: Optional[int] = 50,
         debug_mode: Optional[bool] = False,
         create_video: Optional[bool] = False,
+        sparse_reward: Optional[bool] = False,
         seed: Optional[int] = None
     ) -> None:
 
@@ -229,6 +236,11 @@ class MACPPEnv(gym.Env):
         self.initial_state = initial_state
         self.create_video = create_video
         self.debug_mode = debug_mode
+
+        if sparse_reward:
+            self.reward_class = SparseReward()
+        else:
+            self.reward_class = DenseReward()
         # Check that there are at least two agents
         if n_agents < 2:
             raise ValueError(
@@ -422,6 +434,7 @@ class MACPPEnv(gym.Env):
                 Agent(
                     position=agent_position,
                     picker=picker_flags.pop(),
+                    reward_class=self.reward_class,
                     carrying_object=None,
                     reward=0
                 )
@@ -470,6 +483,7 @@ class MACPPEnv(gym.Env):
             agent = Agent(
                 position=tuple(agent_state['position']),
                 picker=agent_state['picker'],
+                reward_class=self.reward_class,
                 carrying_object=carrying_object,  
                 reward=0  
             )
@@ -529,9 +543,9 @@ class MACPPEnv(gym.Env):
 
         # Negative reward given at every step
         for agent in self.agents:
-            agent.reward = REWARD_STEP
+            agent.reward = self.reward_class.REWARD_STEP
             if self.debug_mode:
-                print(f'Rewarded for step: {REWARD_STEP}')
+                print(f'Rewarded for step: {self.reward_class.REWARD_STEP}')
 
         # Execute the actions
         self._handle_moves(actions)
@@ -543,10 +557,9 @@ class MACPPEnv(gym.Env):
         # Check for termination
         if self.check_termination():
             for agent in self.agents:
-                agent.reward += REWARD_COMPLETION
+                agent.reward += self.reward_class.REWARD_COMPLETION
                 if self.debug_mode:
-                    print(f'Rewarded for completion: {REWARD_COMPLETION}')
-                print(f'received{REWARD_COMPLETION} for completion')
+                    print(f'Rewarded for completion: {self.reward_class.REWARD_COMPLETION}')
             self.done = [True] * self.n_agents
 
         # Collect frames for the video when required
@@ -628,7 +641,7 @@ class MACPPEnv(gym.Env):
                         agent.pick_up(obj) 
 
                         if self.debug_mode:
-                            print(f'Rewarded for pickup: {REWARD_PICKUP}')
+                            print(f'Rewarded for pickup: {self.reward_class.REWARD_PICKUP}')
                         break
 
     def _handle_drops(self) -> None:
@@ -640,9 +653,9 @@ class MACPPEnv(gym.Env):
                         agent.carrying_object.position = agent.position
                         agent.carrying_object.carrying_agent = None  
                         agent.carrying_object = None
-                        agent.reward += REWARD_DROP
+                        agent.reward += self.reward_class.REWARD_DROP
                         if self.debug_mode:
-                            print(f'Rewarded for dropoff: {REWARD_DROP}')
+                            print(f'Rewarded for dropoff: {self.reward_class.REWARD_DROP}')
 
     from typing import List, Tuple
 
@@ -704,13 +717,13 @@ class MACPPEnv(gym.Env):
     def _reward_agents(self, giver: Agent, receiver: Agent) -> None:
         if giver.reward is not None and receiver.reward is not None:
             if giver.picker and not receiver.picker:
-                giver.reward += REWARD_GOOD_PASS
-                receiver.reward += REWARD_GOOD_PASS
-                self._log_reward("good", REWARD_GOOD_PASS)
+                giver.reward += self.reward_class.REWARD_GOOD_PASS
+                receiver.reward += self.reward_class.REWARD_GOOD_PASS
+                self._log_reward("good", self.reward_class.REWARD_GOOD_PASS)
             elif not giver.picker and receiver.picker:
-                giver.reward += REWARD_BAD_PASS
-                receiver.reward += REWARD_BAD_PASS
-                self._log_reward("bad", REWARD_BAD_PASS)
+                giver.reward += self.reward_class.REWARD_BAD_PASS
+                receiver.reward += self.reward_class.REWARD_BAD_PASS
+                self._log_reward("bad", self.reward_class.REWARD_BAD_PASS)
         else:
             print("Warning: Attempted to update reward of agent with None reward.")
 
