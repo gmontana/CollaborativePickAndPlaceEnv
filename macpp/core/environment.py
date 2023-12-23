@@ -11,6 +11,7 @@ import time
 import sys
 import hashlib
 class DenseReward:
+    ''' every step a reward to incentives easy learning'''
     REWARD_STEP = -1
     REWARD_GOOD_PASS = 5
     REWARD_BAD_PASS = -10
@@ -18,7 +19,26 @@ class DenseReward:
     REWARD_PICKUP = 10
     REWARD_COMPLETION = 20
 
+class TakeTimeReward:
+    ''' original rewards but without incentive to finish early'''
+    REWARD_STEP = 0
+    REWARD_GOOD_PASS = 5
+    REWARD_BAD_PASS = -10
+    REWARD_DROP = 10
+    REWARD_PICKUP = 10
+    REWARD_COMPLETION = 20
+
+class StandardisedReward:
+    ''' Standardised rewards '''
+    REWARD_STEP = -0.1
+    REWARD_GOOD_PASS = 0.5
+    REWARD_BAD_PASS = -1
+    REWARD_DROP = 1
+    REWARD_PICKUP = 1
+    REWARD_COMPLETION = 1
+
 class SparseReward:
+    ''' Standardised rewards without incentive to finish early '''
     REWARD_STEP = 0
     REWARD_GOOD_PASS = 0.5
     REWARD_BAD_PASS = -1
@@ -207,6 +227,8 @@ class MACPPEnv(gym.Env):
         debug_mode: Optional[bool] = False,
         create_video: Optional[bool] = False,
         sparse_reward: Optional[bool] = False,
+        take_time_reward: Optional[bool] = False,
+        standardised_reward: Optional[bool] = False,
         seed: Optional[int] = None
     ) -> None:
 
@@ -239,6 +261,10 @@ class MACPPEnv(gym.Env):
 
         if sparse_reward:
             self.reward_class = SparseReward()
+        elif standardised_reward:
+            self.reward_class = StandardisedReward()
+        elif take_time_reward:
+            self.reward_class = TakeTimeReward()
         else:
             self.reward_class = DenseReward()
         # Check that there are at least two agents
