@@ -38,6 +38,16 @@ class StandardisedReward:
     REWARD_PICKUP = 1
     REWARD_COMPLETION = 1
 
+class StandardisedReward2:
+    ''' Standardised rewards '''
+    REWARD_STEP = -0.1
+    REWARD_GOOD_PASS = 0.5
+    REWARD_BAD_PASS = -1
+    REWARD_DROP = 1
+    REWARD_PICKUP = 1
+    REWARD_COMPLETION = 0
+
+
 class SparseReward:
     ''' Standardised rewards without incentive to finish early '''
     REWARD_STEP = 0
@@ -230,6 +240,7 @@ class MACPPEnv(gym.Env):
         sparse_reward: Optional[bool] = False,
         take_time_reward: Optional[bool] = False,
         standardised_reward: Optional[bool] = False,
+        completion_reward: Optional[bool] = True,
         seed: Optional[int] = None
     ) -> None:
 
@@ -259,11 +270,14 @@ class MACPPEnv(gym.Env):
         self.initial_state = initial_state
         self.create_video = create_video
         self.debug_mode = debug_mode
+        # completion_reward = False
 
         if sparse_reward:
             self.reward_class = SparseReward()
         elif standardised_reward:
             self.reward_class = StandardisedReward()
+        elif not completion_reward:
+            self.reward_class = StandardisedReward2()
         elif take_time_reward:
             self.reward_class = TakeTimeReward()
         else:
