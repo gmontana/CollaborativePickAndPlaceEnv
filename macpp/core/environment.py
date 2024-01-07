@@ -38,6 +38,9 @@ class StandardisedReward:
     REWARD_PICKUP = 1
     REWARD_COMPLETION = 1
 
+    
+    
+    
 class StandardisedReward2:
     ''' Standardised rewards '''
     REWARD_STEP = -0.1
@@ -46,6 +49,16 @@ class StandardisedReward2:
     REWARD_DROP = 1
     REWARD_PICKUP = 1
     REWARD_COMPLETION = 0
+
+    
+class StandardisedReward3:
+    ''' Standardised - time steps + completion rewards '''
+    REWARD_STEP = 0
+    REWARD_GOOD_PASS = 0.5
+    REWARD_BAD_PASS = -1
+    REWARD_DROP = 1
+    REWARD_PICKUP = 1
+    REWARD_COMPLETION = 1
 
 
 class SparseReward:
@@ -274,8 +287,13 @@ class MACPPEnv(gym.Env):
 
         if sparse_reward:
             self.reward_class = SparseReward()
+                          
         elif standardised_reward:
-            self.reward_class = StandardisedReward()
+            if take_time_reward:
+                self.reawrd_class = StandardisedReward3()
+                print('using stand3 reward')
+            else:
+                self.reward_class = StandardisedReward()
         elif not completion_reward:
             self.reward_class = StandardisedReward2()
         elif take_time_reward:
