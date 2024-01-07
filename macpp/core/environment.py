@@ -290,7 +290,7 @@ class MACPPEnv(gym.Env):
                           
         elif standardised_reward:
             if take_time_reward:
-                self.reawrd_class = StandardisedReward3()
+                self.reward_class = StandardisedReward3()
                 print('using stand3 reward')
             else:
                 self.reward_class = StandardisedReward()
