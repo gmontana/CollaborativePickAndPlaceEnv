@@ -63,3 +63,30 @@ for grid_size, n_agents, n_pickers, n_objects in product(grid_sizes,
         }
     )
 
+    register(
+        id=f'{env_name}-v4',
+        entry_point='macpp.core.environment:MACPPEnv',
+        kwargs={
+            'grid_size': grid_size,
+            'n_agents': n_agents,
+            'n_pickers': n_pickers,
+            'n_objects': n_objects,
+            'completion_reward': False,
+        }
+    )
+    
+    
+    register(
+        id=f'{env_name}-v5',
+        entry_point='macpp.core.environment:MACPPEnv',
+        kwargs={
+            'grid_size': grid_size,
+            'n_agents': n_agents,
+            'n_pickers': n_pickers,
+            'n_objects': n_objects,
+            'standardised_reward': True, 
+            'take_time_reward': True,
+        }
+    )
+
+
