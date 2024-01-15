@@ -11,7 +11,7 @@ import time
 import sys
 import hashlib
 class DenseReward:
-    ''' every step a reward to incentives easy learning'''
+    '''v0 - every step a reward to incentives easy learning'''
     REWARD_STEP = -1
     REWARD_GOOD_PASS = 5
     REWARD_BAD_PASS = -10
@@ -20,7 +20,7 @@ class DenseReward:
     REWARD_COMPLETION = 20
 
 class TakeTimeReward:
-    ''' original rewards but without incentive to finish early'''
+    '''v2 - original rewards but without incentive to finish early'''
     REWARD_STEP = 0
     REWARD_GOOD_PASS = 5
     REWARD_BAD_PASS = -10
@@ -29,7 +29,7 @@ class TakeTimeReward:
     REWARD_COMPLETION = 20
 
 class StandardisedReward:
-    ''' Standardised rewards '''
+    ''' v3 - Standardised rewards '''
     REWARD_STEP = -0.1
     REWARD_GOOD_PASS = 0.5
     REWARD_BAD_PASS = -1
@@ -38,7 +38,7 @@ class StandardisedReward:
     REWARD_COMPLETION = 1
 
 class SparseReward:
-    ''' Standardised rewards without incentive to finish early '''
+    ''' v1 - Standardised rewards without incentive to finish early '''
     REWARD_STEP = 0
     REWARD_GOOD_PASS = 0.5
     REWARD_BAD_PASS = -1
