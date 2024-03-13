@@ -11,7 +11,7 @@ GREEN = (0, 255, 0)
 
 class Viewer:
     def __init__(self, env):
-
+        self.ticker = 0
         self.env = env
 
         pygame.init()
@@ -120,13 +120,18 @@ class Viewer:
             self._draw_rect(border_color, x, y, self.env.cell_size, self.env.cell_size, thickness=8)
 
 
-    def render(self):
+    def render(self, save=False, name= 'file_name'):
+        self.ticker+=1
         self.offscreen_surface.fill(WHITE)
+        rect_frame = pygame.Rect(0, 0, self.env.grid_width*self.env.cell_size, self.env.grid_length*self.env.cell_size)
+        pygame.draw.rect(self.offscreen_surface, (0,0,0), rect_frame, 1)
         self._draw_grid()
         self._draw_goals()
         self._draw_objects()
         self._draw_agents()
         self.screen.blit(self.offscreen_surface, (0, 0))
+        if save:
+            pygame.image.save(self.screen, name)
         pygame.display.flip()
 
     def close(self):

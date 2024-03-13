@@ -37,11 +37,9 @@ class StandardisedReward:
     REWARD_PICKUP = 1
     REWARD_COMPLETION = 1
 
-    
-    
-    
+
 class StandardisedReward2:
-    ''' Standardised rewards '''
+    ''' v4 Standardised rewards '''
     REWARD_STEP = -0.1
     REWARD_GOOD_PASS = 0.5
     REWARD_BAD_PASS = -1
@@ -51,7 +49,8 @@ class StandardisedReward2:
 
     
 class StandardisedReward3:
-    ''' Standardised - time steps + completion rewards '''
+    ''' v5
+    Standardised - time steps + completion rewards '''
     REWARD_STEP = 0
     REWARD_GOOD_PASS = 0.5
     REWARD_BAD_PASS = -1
@@ -122,7 +121,6 @@ class Object:
     @carrying_agent.setter
     def carrying_agent(self, agent: Optional['Agent']) -> None:
         self._carrying_agent = agent
-
 
 class Agent:
     """
@@ -807,7 +805,7 @@ class MACPPEnv(gym.Env):
             print("Rendering initialised.")
         self._rendering_initialised = True
 
-    def render(self, mode: str = 'human') -> Union[None, np.ndarray]:
+    def render(self, mode: str = 'human', save=False, name='') -> Union[None, np.ndarray]:
         """
         Render the environment.
 
@@ -819,7 +817,7 @@ class MACPPEnv(gym.Env):
         """
         if not self._rendering_initialised:
             self._init_render()
-        return self.renderer.render()
+        return self.renderer.render(save=save, name=name)
 
     def close(self) -> None:
         """
