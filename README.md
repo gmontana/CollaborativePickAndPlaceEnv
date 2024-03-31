@@ -23,7 +23,6 @@
   - [Action Space](#action-space)
   - [Observation Space](#observation-space)
   - [Rewards](#rewards)
-- [Please Cite](#please-cite)
 - [Contributing](#contributing)
 - [Contact](#contact)
 
@@ -207,13 +206,6 @@ REWARD_BAD_PASS = -2
 REWARD_DROP = 10
 REWARD_PICKUP = 5
 REWARD_COMPLETION = 20
-```
-
-<!-- CITATION -->
-# Please Cite
-The paper that first uses this implementation of the CPP anvironment:
-```
-paper_here
 ```
 
 <!-- CONTRIBUTING -->
