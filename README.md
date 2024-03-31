@@ -30,7 +30,7 @@
 
 # Overview
 
-This project provides a Gym environment to test multi-agent reinforcement learning algorithms. In this grid-world environment, multiple agents learn a collaborative pick and place task. Agents are designed with different abilities, making them heterogeneous: some can only pick up objects, while others are responsible for placing these objects in specified goal locations.
+This project introduces a Gym environment designed for evaluating multi-agent reinforcement learning strategies. In this environment, agents are tasked with a collaborative objective: to pick up boxes and place them at specified target locations within a grid-world. To achieve this, agents are split into two distinct types: "Pickers," who have the sole ability to pick up boxes but cannot place them in targets, and "Droppers," who can place boxes in their target locations but are unable to pick them up. Success in this environment requires agents to collaboratively pass boxes between each other to complete the task efficiently.
 
 ### Agent Roles
 
@@ -42,13 +42,13 @@ Within this environment, agents fall into two distinct categories:
 
 ### Actions
 
-Agents have several actions at their disposal:
+Agents have these actions at their disposal:
 
 - **Movements**: They can move in any of the four cardinal directions—UP, DOWN, LEFT, and RIGHT—allowing them to traverse the grid efficiently.
 
 - **WAIT**: Agents can choose to remain in their current position if it's strategically advantageous.
 
-- **Collaboration**: Agents can work together by employing the "PASS" action, enabling them to transfer boxes between one another. This collaborative approach can be essential for success.
+- **Collaboration**: Agents can work together by employing the "PASS" action, enabling them to transfer boxes between one another. This collaborative aspect is essential for success.
 
 ### Objective
 
