@@ -30,7 +30,7 @@
 
 # Overview
 
-This project simulates a scenario where multiple agents collaborate in a task-oriented environment. Agents are designed with different abilities, making them heterogeneous: some can only pick up objects, while others are responsible for placing these objects in specified goal locations.
+This project provides a Gym environment to test multi-agent reinforcement learning algorithms. In this grid-world environment, multiple agents learn a collaborative pick and place task. Agents are designed with different abilities, making them heterogeneous: some can only pick up objects, while others are responsible for placing these objects in specified goal locations.
 
 ### Agent Roles
 
@@ -178,35 +178,36 @@ Here is a representation of this structure:
 
 ## Action space
 
-actions is a LIST of N INTEGERS (one of each agent) that should be executed in that step. The integers should correspond to the Enum below:
+The action space within the environment is represented by a list of integers, with each integer corresponding to a specific action that an agent can perform during a step. Each entry in the list corresponds to one agent, meaning the length of the list is equal to the number of agents in the environment.
+
+Actions that agents can perform are enumerated as follows:
+
+- **UP (0)**: Moves the agent up in the grid.
+- **DOWN (1)**: Moves the agent down in the grid.
+- **LEFT (2)**: Moves the agent left in the grid.
+- **RIGHT (3)**: Moves the agent right in the grid.
+- **PASS (4)**: Enables the agent to pass an object to another agent.
+- **WAIT (5)**: The agent waits or takes no action during the step.
+
+For example, if there are three agents in the environment, and you want the first agent to move up, the second to pass an object, and the third to wait, you would represent this set of actions as `[0, 4, 5]`.
+
+Valid actions for all agents can be sampled using the environment's action space, similar to other gym environments. This can be particularly useful for random action selection or testing purposes:
 
 ```python
-class Action(Enum):
-    UP = 0
-    DOWN = 1
-    LEFT = 2
-    RIGHT = 3
-    PASS = 4
-    WAIT = 5
+env.action_space.sample() # Example output: [2, 3, 0, 1]
 ```
-Valid actions can always be sampled like in a gym environment, using:
-```python
-env.action_space.sample() # [2, 3, 0, 1]
-```
-Also, ALL actions are valid. If an agent cannot move to a location or load, his action will be replaced with `NONE` automatically.
 
 ## Rewards
 
-The followsing rewards can be assigned to the agents:
+The following rewards can be assigned to the agents based on their actions within the environment:
 
-```python
-REWARD_STEP = -1
-REWARD_GOOD_PASS = 2
-REWARD_BAD_PASS = -2
-REWARD_DROP = 10
-REWARD_PICKUP = 5
-REWARD_COMPLETION = 20
-```
+- **REWARD_STEP**: Penalizes the agent for each action taken, encouraging efficiency and goal-directed behavior.
+- **REWARD_GOOD_PASS**: Awarded when an agent successfully passes an object to another agent, promoting collaboration.
+- **REWARD_BAD_PASS**: Penalizes an agent for an unsuccessful pass attempt, encouraging accurate and thoughtful passing of objects.
+- **REWARD_DROP**: Awarded when an agent successfully places an object in its designated goal location, reinforcing the objective of accurate placement.
+- **REWARD_PICKUP**: Awarded when an agent picks up an object, incentivizing the collection of objects for task completion.
+- **REWARD_COMPLETION**: A significant reward given upon the successful completion of the task, motivating agents to achieve the collective goal efficiently.
+
 
 <!-- CONTRIBUTING -->
 # Contributing
