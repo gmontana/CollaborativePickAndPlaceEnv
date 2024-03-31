@@ -53,12 +53,7 @@ Agents have several actions at their disposal:
 
 ### Objective
 
-Agents receive rewards for successfully placing boxes into goal positions. The ultimate task is considered complete when all boxes are placed in their designated goal positions.
-
-### Key Requirement
-
-To tackle this challenge, it's crucial to have at least one Picker agent in your team. 
-
+Agents receive rewards for successfully placing boxes into goal positions. The ultimate task is considered complete when all boxes are placed in their designated goal positions. 
 
 <!-- GETTING STARTED -->
 # Getting Started
