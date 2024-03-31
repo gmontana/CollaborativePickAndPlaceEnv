@@ -30,7 +30,7 @@
 
 # Overview
 
-This Gym environment is designed for multi-agent reinforcement learning, where the primary goal is for agents to collaboratively pick up boxes and place them at designated targets within a grid-world. Agents are categorized into "Pickers," who can only pick up boxes, and "Droppers," who can only place boxes into goal positions. To succeed, agents must learn to efficiently pass boxes between Pickers and Droppers. The environment supports movements in four cardinal directions, a wait action for strategic positioning, and a pass action for box transfer, emphasizing teamwork for achieving the objective of placing all boxes into their respective goals.
+This Gym environment is designed for multi-agent reinforcement learning, where the primary goal is for agents to collaboratively pick up boxes and place them at designated targets within a grid-world. Agents are categorized into "Pickers," who can only pick up boxes, and "Droppers," who can only place boxes into goal positions. To succeed, agents must learn to efficiently pass boxes between Pickers and Droppers. The environment supports movements in four cardinal directions, a wait action for strategic positioning, and a pass action for box transfer, emphasizing teamwork for achieving the objective of placing all boxes into their respective goals. Unfilled goal positions are marked as red bounding boxes, while filled ones are indicated in green.
 
 <!-- GETTING STARTED -->
 # Getting Started
