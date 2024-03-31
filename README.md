@@ -31,7 +31,7 @@
 
 # Overview
 
-In the Collaborative Pick and Place environment, you'll find a grid-based world where multiple agents work together to achieve a common goal. Their mission is to pick up and place all the boxes into designated goal positions.
+This project simulates a scenario where multiple agents collaborate in a task-oriented environment. Agents are designed with different abilities, making them heterogeneous: some can only pick up objects, while others are responsible for placing these objects in specified goal locations.
 
 ### Agent Roles
 
@@ -203,7 +203,7 @@ Also, ALL actions are valid. If an agent cannot move to a location or load, his 
 
 ## Rewards
 
-The followsing rewards are assigned to the agents:
+The followsing rewards can be assigned to the agents:
 
 ```python
 REWARD_STEP = -1
@@ -224,16 +224,10 @@ paper_here
 <!-- CONTRIBUTING -->
 # Contributing
 
-1. Fork the Project
-2. Create your Feature Branch (`git checkout -b feature/AmazingFeature`)
-3. Commit your Changes (`git commit -m 'Add some AmazingFeature`)
-4. Push to the Branch (`git push origin feature/AmazingFeature`)
-5. Open a Pull Request
-
+Contributions are welcome! If you have ideas for new features, improvements, or bug fixes, feel free to fork the repository, make your changes, and submit a pull request.
 
 <!-- CONTACT -->
 # Contact
 
-Giovanni Montana - g.montana@warwick.ac.uk
+For questions, suggestions, or collaborations, please contact Giovanni Montana at g.montana@warwick.ac.uk.
 
-Project Link: [https://github.com/gmontana/collaborative_pick_and_place](https://github.com/gmontana/collaborative_pick_and_place)
