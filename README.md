@@ -30,29 +30,7 @@
 
 # Overview
 
-This project introduces a Gym environment designed for evaluating multi-agent reinforcement learning strategies. In this environment, agents are tasked with a collaborative objective: to pick up boxes and place them at specified target locations within a grid-world. To achieve this, agents are split into two distinct types: "Pickers," who have the sole ability to pick up boxes but cannot place them in targets, and "Droppers," who can place boxes in their target locations but are unable to pick them up. Success in this environment requires agents to collaboratively pass boxes between each other to complete the task efficiently.
-
-### Agent Roles
-
-Within this environment, agents fall into two distinct categories:
-
-- **Pickers**: These specialized agents have the unique ability to automatically collect boxes while navigating the grid. However, they are unable to place the boxes into goal positions.
-
-- **Droppers**: In contrast, the non-picker agents, referred to as "Droppers," possess the skill of depositing boxes into goal positions once they reach them. However, they cannot pick up boxes from the grid.
-
-### Actions
-
-Agents have these actions at their disposal:
-
-- **Movements**: They can move in any of the four cardinal directions—UP, DOWN, LEFT, and RIGHT—allowing them to traverse the grid efficiently.
-
-- **WAIT**: Agents can choose to remain in their current position if it's strategically advantageous.
-
-- **Collaboration**: Agents can work together by employing the "PASS" action, enabling them to transfer boxes between one another. This collaborative aspect is essential for success.
-
-### Objective
-
-Agents receive rewards for successfully placing boxes into goal positions. The ultimate task is considered complete when all boxes are placed in their designated goal positions. 
+This Gym environment is designed for multi-agent reinforcement learning, where the primary goal is for agents to collaboratively pick up boxes and place them at designated targets within a grid-world. Agents are categorized into "Pickers," who can only pick up boxes, and "Droppers," who can only place boxes into goal positions. To succeed, agents must learn to efficiently pass boxes between Pickers and Droppers. The environment supports movements in four cardinal directions, a wait action for strategic positioning, and a pass action for box transfer, emphasizing teamwork for achieving the objective of placing all boxes into their respective goals.
 
 <!-- GETTING STARTED -->
 # Getting Started
