@@ -6,7 +6,7 @@ grid_sizes = [(3, 3), (5, 5), (10, 10), (15, 15), (20, 20)]
 n_agents_values = [2, 4]
 n_pickers_values = [1, 2, 3]
 n_objects_values = [1, 2, 3, 4]
-sparse_values = [True, False]
+# sparse_values = [True, False]
 
 # Register the environments
 for grid_size, n_agents, n_pickers, n_objects in product(grid_sizes,

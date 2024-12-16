@@ -120,7 +120,7 @@ class Viewer:
             self._draw_rect(border_color, x, y, self.env.cell_size, self.env.cell_size, thickness=8)
 
 
-    def render(self, save=False, name= 'file_name'):
+    def render(self, save=False, name='render'):
         self.ticker+=1
         self.offscreen_surface.fill(WHITE)
         rect_frame = pygame.Rect(0, 0, self.env.grid_width*self.env.cell_size, self.env.grid_length*self.env.cell_size)
@@ -131,7 +131,9 @@ class Viewer:
         self._draw_agents()
         self.screen.blit(self.offscreen_surface, (0, 0))
         if save:
-            pygame.image.save(self.screen, name)
+            current_path = os.getcwd()
+            path = os.path.join(current_path, 'images/', f'{name}_{self.ticker}' + '.tga')
+            pygame.image.save(self.screen, path)
         pygame.display.flip()
 
     def close(self):

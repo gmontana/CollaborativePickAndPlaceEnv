@@ -228,8 +228,6 @@ class Agent:
             'carrying_object': carrying_object_id
         }
 
-
-
 class MACPPEnv(gym.Env):
     """
     Collaborative pick and place environment.
@@ -251,7 +249,8 @@ class MACPPEnv(gym.Env):
         take_time_reward: Optional[bool] = False,
         standardised_reward: Optional[bool] = False,
         completion_reward: Optional[bool] = True,
-        seed: Optional[int] = None
+        enumerate_action: Optional[bool] = True,
+        seed: Optional[int] = 1000
     ) -> None:
 
         """
@@ -280,6 +279,7 @@ class MACPPEnv(gym.Env):
         self.initial_state = initial_state
         self.create_video = create_video
         self.debug_mode = debug_mode
+        self.enumerate_action = enumerate_action
         # completion_reward = False
 
         if sparse_reward:
@@ -414,6 +414,8 @@ class MACPPEnv(gym.Env):
 
     def _validate_actions(self, actions: List[int]) -> None:
         for action in actions:
+            if isinstance(action, np.ndarray):
+                action = np.argmax(action)
             if action is None or not (00 <= action <= len(Action)-1):
                 raise ValueError(
                     f"Invalid action: {action}.")
@@ -467,12 +469,13 @@ class MACPPEnv(gym.Env):
         picker_flags = [True] * self.n_pickers + [False] * (
             self.n_agents - self.n_pickers
         )
-        random.shuffle(picker_flags)
+        # random.shuffle(picker_flags)
 
         # Randomly allocate object positions
         object_positions = random.sample(all_positions, self.n_objects)
         for obj_pos in object_positions:
             all_positions.remove(obj_pos)
+        # print(object_positions)
 
         # Randomly allocate agent positions
         agent_positions = random.sample(all_positions, self.n_agents)
@@ -481,6 +484,11 @@ class MACPPEnv(gym.Env):
 
         # Randomly allocate goal positions.
         goal_positions = random.sample(all_positions, self.n_objects)
+
+        # object_positions = [(3,1)]
+        # goal_positions = [(4,1)]
+        # agent_positions = [(0,1), (1,3)]
+
 
         # Initialize agents
         self.agents = []
@@ -639,7 +647,7 @@ class MACPPEnv(gym.Env):
         return obs, total_reward, self.done, {}
 
     def _get_rewards(self) -> List[int]:
-        return [agent.reward for agent in self.agents]
+        return [[agent.reward] for agent in self.agents] #FIXME I have put a list around this because it did not work with SubProcVec otherwise
 
     def _move_agent(self, agent: Agent, action: int) -> Tuple[int, int]:
         """
@@ -678,6 +686,8 @@ class MACPPEnv(gym.Env):
     def _handle_moves(self, actions: List[int]) -> None:
         for idx, agent_action in enumerate(actions):
             agent = self.agents[idx]
+            if isinstance(agent_action, np.ndarray):
+                agent_action = np.argmax(agent_action)
             self._move_agent(agent, agent_action)
 
             # If the agent is carrying an object, update the object's position
@@ -725,7 +735,9 @@ class MACPPEnv(gym.Env):
         Args:
         actions (List[int]): A list of actions corresponding to each agent.
         """
-        # Identify eligible givers and receivers 
+        # Identify eligible givers and receivers
+        actions = [np.argmax(action) for action in actions if isinstance(action, np.ndarray)]
+
         eligible_givers = [
             (idx, agent) for idx, (agent, action) in enumerate(zip(self.agents, actions))
             if action == Action.PASS.value and agent.carrying_object is not None
@@ -805,7 +817,7 @@ class MACPPEnv(gym.Env):
             print("Rendering initialised.")
         self._rendering_initialised = True
 
-    def render(self, mode: str = 'human', save=False, name='') -> Union[None, np.ndarray]:
+    def render(self, mode: str = 'human', save=False) -> Union[None, np.ndarray]:
         """
         Render the environment.
 
@@ -817,7 +829,7 @@ class MACPPEnv(gym.Env):
         """
         if not self._rendering_initialised:
             self._init_render()
-        return self.renderer.render(save=save, name=name)
+        return self.renderer.render(save=save)
 
     def close(self) -> None:
         """

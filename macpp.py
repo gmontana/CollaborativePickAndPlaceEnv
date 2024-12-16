@@ -3,31 +3,44 @@ import gym
 import macpp
 import time
 import numpy as np
-
-def game_loop(env, render=True):
+from macpp.core import wrappers
+def game_loop(env, render=True, save=False):
     """
     Run a single game loop.
     """
     obs = env.reset()
     done = [False] * env.n_agents
-
-    while not any(done):
+    if render:
+        time.sleep(0.5)
+        env.render(save=save)
+    # while not any(done):
+    for i in range(10):
         actions = env.action_space.sample()
+        actions = [1,1]
         obs, reward, done, _ = env.step(actions)
         # print(obs)
-        obs = flatten_obs(obs)
+        # obs = flatten_obs(obs)
+        # print(obs)
         # print(len(obs[0]),len(obs[1]))
         if render:
-            env.render()
-        print(reward)
-        time.sleep(0.5)
+            time.sleep(0.5)
+            env.render(save=save)
+        # print(reward)
+        # time.sleep(0.5)
 
-def main(game_count=1, render=True):
-    env = gym.make('macpp-5x5-2a-1p-3o-sparse-v0', debug_mode=False)
-
-
+def main(game_count=1, render=True, save=False):
+    env = gym.make('macpp-10x10-2a-1p-1o-v3', debug_mode=False)
+    # env = wrappers.FlatObs(env)
+    # env = wrappers.GridObs(env)
+    attr = {'agent': 0,
+            'objects': 1,
+            'goals': 2,
+            'id': 3,
+            'carrying': 4,
+            'picker': 5,}
+    env = wrappers.RelGraphWrapper(env, attr)
     for episode in range(game_count):
-        game_loop(env, render=False)
+        game_loop(env, render=render, save=save)
 
 
 def flatten_obs(obs):
@@ -119,13 +132,13 @@ def obs_to_grid(obs, grid_size):
     return obs_all
 
 
-
 if __name__ == "__main__":
 
     parser = argparse.ArgumentParser(description="Play the MACPP environment.")
     parser.add_argument("--render", action="store_true", help="Render the environment.")
+    parser.add_argument("--save", action="store_true", help="Save image of environment.")
     parser.add_argument("--times", type=int, default=1, help="How many times to run the game.")
     
     args = parser.parse_args()
-    main(args.times, args.render)
+    main(args.times, args.render, args.save)
 
