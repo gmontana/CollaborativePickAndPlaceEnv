@@ -10,114 +10,116 @@
   A multi-agent reinforcement learning environment
 </p>
 
-
-
 <!-- TABLE OF CONTENTS -->
-<h1> Table of Contents </h1>
+
+## Table of Contents
 
 - [Overview](#overview)
 - [Getting Started](#getting-started)
-  - [Installation](#installation)
-  - [Interactive](#interactive)
 - [Usage](#usage)
   - [Action Space](#action-space)
   - [Observation Space](#observation-space)
   - [Rewards](#rewards)
+- [Interactive Mode](#interactive-mode)
 - [Contributing](#contributing)
 - [Contact](#contact)
 
 <!-- OVERVIEW -->
 
-# Overview
+## Overview
 
-This Gym environment is designed for multi-agent reinforcement learning, where the primary goal is for agents to collaboratively pick up boxes and place them at designated targets within a grid-world. Agents are categorized into "Pickers," who can only pick up boxes, and "Droppers," who can only place boxes into goal positions. To succeed, agents must learn to efficiently pass boxes between Pickers and Droppers. The environment supports movements in four cardinal directions, a wait action for strategic positioning, and a pass action for box transfer, emphasizing teamwork for achieving the objective of placing all boxes into their respective goals. Unfilled goal positions are marked as red bounding boxes, while filled ones are indicated in green.
+A Gym-compatible grid-world environment for multi-agent reinforcement learning (MARL). Agents must collaboratively pick up boxes and place them at designated goal positions.
 
-<!-- GETTING STARTED -->
-# Getting Started
+Agents are divided into two roles:
+- **Pickers** can pick up boxes but cannot place them at goals.
+- **Droppers** can place boxes at goals but cannot pick them up.
 
-## Installation
+To complete the task, Pickers must pass boxes to Droppers, who then carry them to goal positions. The environment supports four movement directions, a wait action, and a pass action for transferring boxes between adjacent agents. Unfilled goals are shown with red borders; filled goals turn green.
 
-You can install the Collaborative Pick and Place environment using pip:
+## Getting Started
 
-```sh
-pip install collaborative-pick-place
+### Installation
 
-```
-Or to ensure that you have the latest version:
 ```sh
 git clone https://github.com/gmontana/CollaborativePickAndPlaceEnv
 cd CollaborativePickAndPlaceEnv
 pip install -e .
 ```
 
-<!-- INTERACTIVE -->
+### Dependencies
 
-## Interactive
+- Python 3.8+
+- gym
+- pygame
+- numpy
 
-An interactive mode is available to manually control a two-agent game.
+## Usage
 
-<!-- USAGE EXAMPLES -->
-# Usage
-
-Create environments with the gym framework.
-First import
 ```python
+import gym
 import macpp
-```
 
-Then create an environment:
-```python
 env = gym.make("macpp-3x3-2a-1p-2o-v0")
+obs, info = env.reset()
+
+done = False
+while not done:
+    actions = env.action_space.sample()  # random actions for each agent
+    obs, reward, done, info = env.step(actions)
 ```
 
-We offer a variety of environments using this template:
+A variety of pre-registered environments are available using this naming convention:
 ```
-macpp-{grid_size[0]}x{grid_size[1]}-{n_agents}a-{n_pickers}p-{n_objects}o-v0
+macpp-{width}x{height}-{n_agents}a-{n_pickers}p-{n_objects}o-v0
 ```
 
-However you can register your own variation using different parameters:
+For example: `macpp-5x5-4a-2p-3o-v0` creates a 5x5 grid with 4 agents (2 pickers, 2 droppers) and 3 objects.
+
+You can also register custom configurations:
 ```python
 from gym.envs.registration import register
 
-env_name = f"macpp-{grid_size[0]}x{grid_size[1]}-{n_agents}a-{n_pickers}p-{n_objects}o-v0"
-    register(
-        id=env_name,
-        entry_point='macpp.core.environment:MACPPEnv',
-        kwargs={
-            'grid_size': grid_size,
-            'n_agents': n_agents,
-            'n_pickers': n_pickers,
-            'n_objects': n_objects
-        }
-    )
-
+register(
+    id="macpp-8x8-3a-1p-2o-v0",
+    entry_point='macpp.core.environment:MACPPEnv',
+    kwargs={
+        'grid_size': (8, 8),
+        'n_agents': 3,
+        'n_pickers': 1,
+        'n_objects': 2
+    }
+)
 ```
 
-Similarly to Gym, but adapted to multi-agent settings step() function is defined as
+### Step Function
+
 ```python
-nobs, nreward, ndone, ninfo = env.step(actions)
+obs, reward, done, info = env.step(actions)
 ```
 
-Where n-obs, n-rewards, n-done and n-info are LISTS of N items (where N is the number of agents). The i'th element of each list should be assigned to the i'th agent.
+- `obs`: Dictionary of observations, one per agent (see [Observation Space](#observation-space)).
+- `reward`: Total reward summed across all agents.
+- `done`: `True` when all objects have been placed at goal positions.
+- `info`: Additional information (currently empty).
 
-## Observation Space
+### Action Space
 
-The observation space for the environment is structured as a dictionary where each agent in the environment has its own observation. Each agent's observation is itself a dictionary with the following keys:
+Actions are provided as a list of integers, one per agent:
 
-- `self`: This key maps to a dictionary that describes the observing agent's own state:
-  - `position`: A tuple representing the 2D position on the grid.
-  - `picker`: A boolean value indicating if the agent is a picker (can pick up objects) or not.
-  - `carrying_object`: Either an integer ID representing the object the agent is currently carrying or `None` if the agent isn't carrying any object.
+| Action    | Value | Description                              |
+|-----------|-------|------------------------------------------|
+| UP        | 0     | Move up on the grid                      |
+| DOWN      | 1     | Move down on the grid                    |
+| LEFT      | 2     | Move left on the grid                    |
+| RIGHT     | 3     | Move right on the grid                   |
+| PASS      | 4     | Pass a carried object to an adjacent agent |
+| WAIT      | 5     | Do nothing                               |
 
-- `agents`: This key maps to a list of dictionaries. Each dictionary in this list represents the state of another agent in the environment (excluding the observing agent itself). Each dictionary contains the same fields, i.e., `position`, `picker`, and `carrying_object`.
+Example with three agents: `[0, 4, 5]` means agent 0 moves up, agent 1 passes, agent 2 waits.
 
-- `objects`: This key maps to a list of dictionaries. Each dictionary in this list represents an object in the environment. Each dictionary contains:
-  - `id`: An integer representing the unique ID of the object.
-  - `position`: A tuple representing the object's position on the grid.
+### Observation Space
 
-- `goals`: This key maps to a list of tuples. Each tuple in this list represents the 2D position of a goal on the grid.
-
-Here is a representation of this structure:
+Each agent receives a dictionary observation containing:
 
 ```python
 {
@@ -125,73 +127,52 @@ Here is a representation of this structure:
         'self': {
             'position': (x, y),
             'picker': True/False,
-            'carrying_object': ID/None
+            'carrying_object': object_id or None
         },
         'agents': [
-            {
-                'position': (x, y),
-                'picker': True/False,
-                'carrying_object': ID/None
-            },
-            ... (other agents)
+            {'position': (x, y), 'picker': True/False, 'carrying_object': object_id or None},
+            ...
         ],
         'objects': [
-            {
-                'id': ID,
-                'position': (x, y)
-            },
-            ... (other objects)
+            {'id': 0, 'position': (x, y)},
+            ...
         ],
-        'goals': [
-            (x, y),
-            ... (other goals)
-        ]
+        'goals': [(x, y), ...]
     },
     'agent_1': { ... },
-    ... (other agents)
+    ...
 }
 ```
 
-## Action space
+### Rewards
 
-The action space within the environment is represented by a list of integers, with each integer corresponding to a specific action that an agent can perform during a step. Each entry in the list corresponds to one agent, meaning the length of the list is equal to the number of agents in the environment.
+| Reward              | Value | Description                                                |
+|---------------------|-------|------------------------------------------------------------|
+| REWARD_STEP         | -1    | Per-step penalty to encourage efficiency                   |
+| REWARD_PICKUP       | +10   | Picker picks up an object                                  |
+| REWARD_DROP         | +10   | Dropper places an object at a goal                         |
+| REWARD_GOOD_PASS    | +5    | Successful pass from Picker to Dropper                     |
+| REWARD_BAD_PASS     | -5    | Pass in the wrong direction (Dropper to Picker)            |
+| REWARD_COMPLETION   | +50   | All objects placed at goals (awarded to all agents)        |
 
-Actions that agents can perform are enumerated as follows:
+## Interactive Mode
 
-- **UP (0)**: Moves the agent up in the grid.
-- **DOWN (1)**: Moves the agent down in the grid.
-- **LEFT (2)**: Moves the agent left in the grid.
-- **RIGHT (3)**: Moves the agent right in the grid.
-- **PASS (4)**: Enables the agent to pass an object to another agent.
-- **WAIT (5)**: The agent waits or takes no action during the step.
+A keyboard-controlled mode is available for two agents:
 
-For example, if there are three agents in the environment, and you want the first agent to move up, the second to pass an object, and the third to wait, you would represent this set of actions as `[0, 4, 5]`.
-
-Valid actions for all agents can be sampled using the environment's action space, similar to other gym environments. This can be particularly useful for random action selection or testing purposes:
-
-```python
-env.action_space.sample() # Example output: [2, 3, 0, 1]
+```sh
+python interactive.py
 ```
 
-## Rewards
+Controls: arrow keys for movement, Space for pass, P for wait. Actions alternate between agents.
 
-The following rewards can be assigned to the agents based on their actions within the environment:
+## Contributing
 
-- **REWARD_STEP**: Penalizes the agent for each action taken, encouraging efficiency and goal-directed behavior.
-- **REWARD_GOOD_PASS**: Awarded when an agent successfully passes an object to another agent, promoting collaboration.
-- **REWARD_BAD_PASS**: Penalizes an agent for an unsuccessful pass attempt, encouraging accurate and thoughtful passing of objects.
-- **REWARD_DROP**: Awarded when an agent successfully places an object in its designated goal location, reinforcing the objective of accurate placement.
-- **REWARD_PICKUP**: Awarded when an agent picks up an object, incentivizing the collection of objects for task completion.
-- **REWARD_COMPLETION**: A significant reward given upon the successful completion of the task, motivating agents to achieve the collective goal efficiently.
+Contributions are welcome. Fork the repository, make your changes, and submit a pull request.
 
+## License
 
-<!-- CONTRIBUTING -->
-# Contributing
+See [LICENCE](LICENCE) for details.
 
-Contributions are welcome! If you have ideas for new features, improvements, or bug fixes, feel free to fork the repository, make your changes, and submit a pull request.
-
-<!-- CONTACT -->
-# Contact
+## Contact
 
 For questions, suggestions, or collaborations, please contact Giovanni Montana at g.montana@warwick.ac.uk.
-
