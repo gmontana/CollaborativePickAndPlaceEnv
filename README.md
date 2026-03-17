@@ -45,8 +45,8 @@ pip install collaborative-pick-place
 ```
 Or to ensure that you have the latest version:
 ```sh
-git clone https://github.com/gmontana/collaborative_pick_and_place
-cd collaborative_pick_and_place
+git clone https://github.com/gmontana/CollaborativePickAndPlaceEnv
+cd CollaborativePickAndPlaceEnv
 pip install -e .
 ```
 
@@ -77,7 +77,7 @@ macpp-{grid_size[0]}x{grid_size[1]}-{n_agents}a-{n_pickers}p-{n_objects}o-v0
 
 However you can register your own variation using different parameters:
 ```python
-from gym.envs.registration register
+from gym.envs.registration import register
 
 env_name = f"macpp-{grid_size[0]}x{grid_size[1]}-{n_agents}a-{n_pickers}p-{n_objects}o-v0"
     register(

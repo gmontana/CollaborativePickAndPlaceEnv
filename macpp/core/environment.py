@@ -328,7 +328,7 @@ class MACPPEnv(gym.Env):
 
     def _validate_actions(self, actions: List[int]) -> None:
         for action in actions:
-            if action is None or not (00 <= action <= len(Action)-1):
+            if action is None or not (0 <= action <= len(Action)-1):
                 raise ValueError(
                     f"Invalid action: {action}.")
 
@@ -593,7 +593,7 @@ class MACPPEnv(gym.Env):
 
             # If the agent is carrying an object, update the object's position
             if agent.carrying_object is not None:
-                carried_obj = next((obj for obj in self.objects if obj.id == agent.carrying_object), None)
+                carried_obj = next((obj for obj in self.objects if obj.id == agent.carrying_object.id), None)
                 if carried_obj:
                     carried_obj.carrying_agent = agent
 
@@ -619,8 +619,6 @@ class MACPPEnv(gym.Env):
                         agent.reward += REWARD_DROP
                         if self.debug_mode:
                             print(f'Rewarded for dropoff: {REWARD_DROP}')
-
-    from typing import List, Tuple
 
     def _handle_passes(self, actions: List[int]) -> None:
         """

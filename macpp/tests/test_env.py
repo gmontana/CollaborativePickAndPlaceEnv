@@ -27,25 +27,29 @@ def get_obs(obs):
 
 class MACPPTests(unittest.TestCase):
 
-    def test_agents_swapping_places(self):
+    def test_agents_collision(self):
+        """Agents moving into each other's positions should be blocked."""
         initial_state = {
             "agents": [
                 {"position": (0, 0), "picker": True, "carrying_object": None},
-                {"position": (0, 1), "picker": False, "carrying_object": None},
+                {"position": (1, 0), "picker": False, "carrying_object": None},
             ],
             "objects": [],
             "goals": [],
         }
         env = MACPPEnv((10, 10), n_agents=2, n_pickers=1,
                        initial_state=get_obs(initial_state), debug_mode=True)
+        # Agent 0 tries RIGHT into Agent 1, Agent 1 tries LEFT into Agent 0
         actions = [3, 2]
         env.step(actions)
 
-        # After the step, agents should have swapped places
-        self.assertEqual(env.agents[0].position, (0, 1),
-                         "Agent 0 did not move to the right position.")
-        self.assertEqual(env.agents[1].position, (0, 0),
-                         "Agent 1 did not move to the left position.")
+        # Agent 0 moves first to (1,0) which is Agent 1's current position - blocked
+        # Agent 1 then moves to (0,0) which Agent 0 vacated (if sequential) or is occupied (if simultaneous)
+        # With sequential processing: Agent 0 blocked (Agent 1 at (1,0)), stays at (0,0). Agent 1 moves to (0,0) blocked (Agent 0 there), stays at (1,0).
+        self.assertEqual(env.agents[0].position, (0, 0),
+                         "Agent 0 should not have moved (blocked by Agent 1).")
+        self.assertEqual(env.agents[1].position, (1, 0),
+                         "Agent 1 should not have moved (blocked by Agent 0).")
 
     '''
     def test_pass_between_two_agents(self):

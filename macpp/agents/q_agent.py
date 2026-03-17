@@ -151,8 +151,8 @@ class QLearning(BaseAgent):
 
 class DoubleQLearning(BaseAgent):
     def __init__(self, env, exploration_strategy, discount_factor, learning_rate, min_learning_rate, learning_rate_decay):
-        super().__init__(env, exploration_strategy, learning_rate,
-                         min_learning_rate, learning_rate_decay, discount_factor)
+        super().__init__(env, exploration_strategy, discount_factor,
+                         learning_rate, min_learning_rate, learning_rate_decay)
         self.q_table2 = QTable()
         self.learning_rate = learning_rate
         self.discount_factor = discount_factor

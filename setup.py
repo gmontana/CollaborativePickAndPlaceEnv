@@ -11,6 +11,6 @@ setup(
         'pygame',
         'numpy'
     ],
-    extras_require={"test": ["unittest"]},
+    extras_require={"test": []},
     include_package_data=True,
 )
