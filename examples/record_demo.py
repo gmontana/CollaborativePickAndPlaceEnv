@@ -39,7 +39,7 @@ def demo_env():
 def captioned_frame(env, step, caption, reward_total):
     """Add status text around the actual environment render, without a window."""
     grid = env.render()
-    surface = pygame.Surface((480, 512))
+    surface = pygame.Surface((480, 560))
     surface.fill((246, 248, 252))
     title_font = pygame.font.Font(None, 29)
     label_font = pygame.font.Font(None, 23)
@@ -48,16 +48,23 @@ def captioned_frame(env, step, caption, reward_total):
     surface.blit(title, title.get_rect(center=(240, 24)))
     subtitle = small_font.render("Picker + Dropper  |  2 boxes  |  7 steps", True, (68, 81, 103))
     surface.blit(subtitle, subtitle.get_rect(center=(240, 48)))
-    surface.blit(pygame.surfarray.make_surface(grid.transpose(1, 0, 2)), (48, 64))
+    for x, color, label in (
+        (55, (255, 0, 0), "Empty goal"),
+        (260, (0, 255, 0), "Box delivered"),
+    ):
+        pygame.draw.rect(surface, color, (x, 74, 16, 16), width=3)
+        legend = small_font.render(label, True, (68, 81, 103))
+        surface.blit(legend, legend.get_rect(midleft=(x + 24, 82)))
+    surface.blit(pygame.surfarray.make_surface(grid.transpose(1, 0, 2)), (48, 112))
     text = label_font.render(caption, True, (24, 35, 54))
-    surface.blit(text, text.get_rect(center=(240, 470)))
+    surface.blit(text, text.get_rect(center=(240, 520)))
     delivered = sum(obj.position in env.goals and obj.carrying_agent is None for obj in env.objects)
     status = small_font.render(
         f"Step {step}/7    Delivered {delivered}/2    Team return {reward_total:+d}",
         True,
         (68, 81, 103),
     )
-    surface.blit(status, status.get_rect(center=(240, 495)))
+    surface.blit(status, status.get_rect(center=(240, 545)))
     return pygame.surfarray.array3d(surface).transpose(1, 0, 2).copy()
 
 
@@ -72,8 +79,10 @@ def record_demo(output_dir=None):
     durations = []
     total_reward = 0
     try:
-        frames.append(captioned_frame(env, 0, "Two roles working together", total_reward))
-        durations.append(1400)
+        frames.append(
+            captioned_frame(env, 0, "Deliver both boxes to the marked goals", total_reward)
+        )
+        durations.append(2400)
         for step, (actions, caption) in enumerate(DEMO_STEPS, start=1):
             _, reward, terminated, truncated, _ = env.step(actions)
             total_reward += reward

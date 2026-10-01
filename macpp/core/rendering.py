@@ -24,6 +24,11 @@ class Viewer:
 
         # Pre-calculate the icon size based on the cell size
         self.icon_size = max(1, int(self.env.cell_size * 0.8))
+        self.goal_label = None
+        if self.env.cell_size >= 48:
+            pygame.font.init()
+            font = pygame.font.Font(None, max(16, self.env.cell_size // 6))
+            self.goal_label = font.render("GOAL", True, (160, 35, 35))
 
         base_path = os.path.dirname(__file__)
         icon_path = os.path.join(base_path, "icons")
@@ -124,6 +129,13 @@ class Viewer:
             )
             border_color = GREEN if delivered else RED
             self._draw_rect(border_color, x, y, self.env.cell_size, self.env.cell_size, thickness=8)
+            occupied = any(agent.position == goal for agent in self.env.agents) or any(
+                obj.position == goal for obj in self.env.objects
+            )
+            if not occupied and self.goal_label is not None:
+                self.offscreen_surface.blit(
+                    self.goal_label, self.goal_label.get_rect(center=(x, y))
+                )
 
     def render(self, mode="human"):
         self.offscreen_surface.fill(WHITE)

@@ -3,9 +3,9 @@
 **A cooperative grid-world for multi-agent reinforcement learning research.**
 
 <p align="center">
-  <img src="docs/successful-episode.gif" width="480" alt="Two agents collect, transfer and deliver two boxes, completing an episode in seven steps." />
+  <img src="docs/successful-episode.gif" width="360" alt="Two agents collect, transfer and deliver two boxes, completing an episode in seven steps." />
   <br />
-  <em>A scripted successful episode: two complementary roles, two boxes, seven joint actions.</em>
+  <em>Two boxes delivered in seven joint actions. Red outlines mark empty goals; green outlines mark completed deliveries.</em>
   <br />
   <a href="docs/successful-episode.mp4">Watch / download MP4</a> · <a href="examples/record_demo.py">Reproduce the demo</a>
 </p>
@@ -130,7 +130,7 @@ Each joint step resolves in this order:
 6. Drops resolve again, allowing a dropper to receive and deliver a box on a goal in the same step.
 7. The episode terminates once every box is uncarried on a distinct goal, and each agent receives the completion bonus once.
 
-A picker can collect and pass in the same step if it chooses `PASS` while standing on an undelivered box. Agents carry at most one box. Any box can fill any goal. **Delivered boxes stay on their goals and cannot be picked up again.** A carried box on a goal does not count as delivered. Filled goals turn green; unfilled goals are red.
+A picker can collect and pass in the same step if it chooses `PASS` while standing on an undelivered box. Agents carry at most one box. Any box can fill any goal. **Delivered boxes stay on their goals and cannot be picked up again.** A carried box on a goal does not count as delivered. Red outlines mark unfilled delivery goals, with a `GOAL` label in empty cells at normal rendering sizes. The outlines turn green after delivery. Cardboard box icons represent the actual movable objects.
 
 Movement and pass tie-breaking favor lower agent indices. Random layouts are checked for valid placement, not guaranteed solvability; narrow or congested custom layouts may be unsolvable. Record and control layouts when comparing policies.
 
