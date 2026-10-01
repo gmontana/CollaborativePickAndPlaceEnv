@@ -20,6 +20,8 @@ Absolute positions, roles and object ownership are observable. This makes the en
 
 The environment is a compact research testbed. The included tabular and DQN agents are centralized examples, not tuned or empirically validated MARL baselines. The animation uses a scripted policy, not a trained agent.
 
+The environment was introduced in [*Investigating Relational State Abstraction in Collaborative MARL*](https://doi.org/10.1609/aaai.v39i20.35390) (Utke, Houssineau and Montana, AAAI 2025), where it is used to evaluate MARC, a multi-agent relational critic.
+
 ## Installation
 
 Python **3.10+** is required. CI is configured for Python 3.10–3.12.
@@ -244,7 +246,24 @@ A compatible extension should leave the existing interface, spaces, rewards and 
 
 ## Citation
 
-If you use this environment in research, cite the software using [CITATION.cff](CITATION.cff) and record the exact commit used.
+If you use this environment in research, please cite the paper that introduced it:
+
+> S. Utke, J. Houssineau and G. Montana. Investigating Relational State Abstraction in Collaborative MARL. *Proceedings of the AAAI Conference on Artificial Intelligence*, 39(20):20947–20955, 2025. [doi:10.1609/aaai.v39i20.35390](https://doi.org/10.1609/aaai.v39i20.35390)
+
+```bibtex
+@inproceedings{utke2025relational,
+  title     = {Investigating Relational State Abstraction in Collaborative {MARL}},
+  author    = {Utke, Sharlin and Houssineau, Jeremie and Montana, Giovanni},
+  booktitle = {Proceedings of the AAAI Conference on Artificial Intelligence},
+  volume    = {39},
+  number    = {20},
+  pages     = {20947--20955},
+  year      = {2025},
+  doi       = {10.1609/aaai.v39i20.35390}
+}
+```
+
+Also cite the software using [CITATION.cff](CITATION.cff) and record the exact commit used.
 
 ## License and contact
 
