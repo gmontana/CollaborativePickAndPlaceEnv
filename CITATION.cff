@@ -1,0 +1,14 @@
+cff-version: 1.2.0
+message: "If this environment supports your research, please cite this software and report the commit used."
+type: software
+title: "Collaborative Pick and Place: A Multi-Agent Reinforcement Learning Environment"
+authors:
+  - family-names: Montana
+    given-names: Giovanni
+repository-code: "https://github.com/gmontana/CollaborativePickAndPlaceEnv"
+license: MIT
+keywords:
+  - multi-agent reinforcement learning
+  - collaboration
+  - grid-world
+  - spatial coordination

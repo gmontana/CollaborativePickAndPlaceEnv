@@ -1,1 +1,5 @@
-include macpp/icons/*.png
+recursive-include macpp/core/icons *.png
+include CITATION.cff interactive.py
+recursive-include examples *.py
+recursive-include docs *.gif *.mp4
+recursive-include macpp/tests *.py

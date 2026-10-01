@@ -1,15 +1,16 @@
-from abc import ABC, abstractmethod
 import random
+from abc import ABC, abstractmethod
+
 import numpy as np
 
-class ExplorationStrategy(ABC):
 
+class ExplorationStrategy(ABC):
     @abstractmethod
     def select_action(self, agent, obs):
         pass
 
-class EpsilonGreedy(ExplorationStrategy):
 
+class EpsilonGreedy(ExplorationStrategy):
     def __init__(self, epsilon=1.0, min_epsilon=0.01, epsilon_decay=0.995):
         self.epsilon = epsilon
         self.min_epsilon = min_epsilon
@@ -19,21 +20,18 @@ class EpsilonGreedy(ExplorationStrategy):
         if random.random() < self.epsilon:
             return agent.env.action_space.sample().tolist()
         else:
-            best = agent.q_table.best_actions(obs_hash)
-            if best is None:
-                return agent.env.action_space.sample().tolist()
-            return best
+            return agent.act(obs_hash, explore=False)
 
     def decay(self):
         self.epsilon = max(self.min_epsilon, self.epsilon * self.epsilon_decay)
 
-class UCB(ExplorationStrategy):
 
+class UCB(ExplorationStrategy):
     def __init__(self, c=0.9):
         self.c = c
 
     def select_action(self, agent, obs):
-        max_ucb = float('-inf')
+        max_ucb = float("-inf")
         best_action = None
 
         # Generate all possible action combinations for the MultiDiscrete action space
@@ -41,10 +39,14 @@ class UCB(ExplorationStrategy):
 
         for action in action_combinations:
             q_value = agent.q_table.get_q_value(obs, action)
-            state_count = agent.state_visits.get(obs, 1)  # Avoid division by zero
+            state_count = max(1, agent.state_visits.get(obs, 0))
             state_action_key = (obs, tuple(action))
-            state_action_count = agent.state_action_visits.get(state_action_key, 1)
-            ucb_value = q_value + self.c * np.sqrt(np.log(state_count) / state_action_count)
+            state_action_count = agent.state_action_visits.get(state_action_key, 0)
+            ucb_value = (
+                float("inf")
+                if state_action_count == 0
+                else q_value + self.c * np.sqrt(np.log(state_count) / state_action_count)
+            )
 
             if ucb_value > max_ucb:
                 max_ucb = ucb_value

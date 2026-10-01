@@ -1,11 +1,11 @@
 import pygame
-from macpp.core.environment import MACPPEnv
-from macpp.core.environment import Action
+
+from macpp.core.environment import Action, MACPPEnv
 
 
 class InteractivePolicy:
-    '''
-    This class enables the manual control of a two-player game using the keyboard. 
+    """
+    This class enables the manual control of a two-player game using the keyboard.
 
     Attributes:
         actions (list): A list to store the actions chosen for each agent. The default value is [None, None].
@@ -15,7 +15,7 @@ class InteractivePolicy:
     Methods:
         action(): Returns a list of actions for both agents if actions are available, otherwise None.
         handle_key(key): Updates the action list based on the key event received.
-    '''
+    """
 
     def __init__(self):
         self.actions = [None, None]
@@ -26,7 +26,7 @@ class InteractivePolicy:
             pygame.K_LEFT: Action.LEFT,
             pygame.K_RIGHT: Action.RIGHT,
             pygame.K_SPACE: Action.PASS,
-            pygame.K_p: Action.WAIT
+            pygame.K_p: Action.WAIT,
         }
 
     def action(self):
@@ -54,9 +54,12 @@ def game_loop(env):
                 done = True
             if event.type == pygame.KEYDOWN:
                 policy.handle_key(event.key)
+        if done:
+            break
         actions = policy.action()
         if actions is not None:
-            _, reward, done, _ = env.step(actions)
+            _, reward, terminated, truncated, _ = env.step(actions)
+            done = terminated or truncated
             print(f"Actions: {actions}, Reward: {reward}")
             env.render()
         pygame.time.wait(100)
@@ -66,6 +69,12 @@ def game_loop(env):
 
 if __name__ == "__main__":
     env = MACPPEnv(
-        grid_size=(5, 5), n_agents=2, n_pickers=1, n_objects=3, debug_mode=True, cell_size=300
+        grid_size=(5, 5),
+        n_agents=2,
+        n_pickers=1,
+        n_objects=3,
+        debug_mode=True,
+        cell_size=100,
+        render_mode="human",
     )
     game_loop(env)

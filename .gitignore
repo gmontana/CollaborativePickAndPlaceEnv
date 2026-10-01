@@ -4,3 +4,11 @@
 /wandb
 /*.pyc
 .DS_Store
+__pycache__/
+.pytest_cache/
+.ruff_cache/
+.venv/
+build/
+dist/
+*.egg-info/
+macpp/agents/videos/

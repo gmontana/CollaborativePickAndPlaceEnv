@@ -1,15 +1,18 @@
+"""Cooperative grid-world with sequential movement and coordinated box transfers."""
+
 from __future__ import annotations
-from typing import TYPE_CHECKING
-import gym
-from enum import Enum
-from typing import List, Tuple, Dict, Any, Optional, Union, Callable
-from gym import spaces
-import random
-import pygame
-import numpy as np
-import time
-import sys
+
 import hashlib
+import json
+from copy import deepcopy
+from enum import Enum
+from numbers import Integral
+from pathlib import Path
+from typing import Callable, Optional
+
+import gymnasium as gym
+import numpy as np
+from gymnasium import spaces
 
 REWARD_STEP = -1
 REWARD_GOOD_PASS = 5
@@ -29,728 +32,490 @@ class Action(Enum):
 
     @staticmethod
     def is_valid(action):
-        return action in Action._value2member_map_
+        return (
+            isinstance(action, Integral)
+            and not isinstance(action, (bool, np.bool_))
+            and action in Action._value2member_map_
+        )
 
 
 class Object:
-    """
-    Represents an object in the environment.
-
-    Attributes:
-        position (Tuple[int, int]): The current position of the object.
-        id (int): A unique identifier for the object.
-        carrying_agent (Optional['Agent']): The agent carrying the object, or None if not carried.
-
-    Methods:
-        get_object_obs() -> Dict[str, Union[Tuple[int, int], int]]: Returns object observation.
-    """
-    def __init__(self,
-                 position: Tuple[int, int],
-                 id: int):
+    def __init__(self, position: tuple[int, int], id: int):
         self._position = position
         self.id = id
-        self._carrying_agent = None
-
-    def get_object_obs(self) -> Dict[str, Union[Tuple[int, int], int]]:
-        return {"id": self.id, "position": self.position}
+        self.carrying_agent: Optional[Agent] = None
 
     @property
-    def position(self) -> Tuple[int, int]:
-        if self._carrying_agent:
-            return self._carrying_agent.position
-        return self._position
+    def position(self):
+        return self.carrying_agent.position if self.carrying_agent else self._position
 
     @position.setter
-    def position(self, value: Tuple[int, int]) -> None:
+    def position(self, value):
         self._position = value
 
-    @property
-    def carrying_agent(self) -> Optional['Agent']:
-        return self._carrying_agent
-
-    @carrying_agent.setter
-    def carrying_agent(self, agent: Optional['Agent']) -> None:
-        self._carrying_agent = agent
+    def get_object_obs(self):
+        return {"id": self.id, "position": self.position}
 
 
 class Agent:
-    """
-    Represents an agent in the environment.
-
-    Attributes:
-        position (Tuple[int, int]): The current position of the agent.
-        picker (bool): True if the agent is a picker, False otherwise.
-        carrying_object (Optional['Object']): The object the agent is carrying, or None if not carrying.
-        reward (int): The reward earned by the agent.
-
-    Methods:
-        move_up(), move_down(grid_length), move_left(), move_right(grid_width): Move the agent.
-        pick_up(obj: Object): Pick up an object if the agent is a picker and not carrying.
-        drop(obj: Object): Drop an object if the agent is not a picker and carrying.
-        pass_object(other_agent: 'Agent'): Pass the carried object to another agent.
-        get_agent_obs(all_agents: list['Agent'], all_objects: list[Object], goals: Any) -> Dict[str, Any]: 
-            Get the agent's observation.
-        get_basic_agent_obs() -> Dict[str, Any]: Get a basic observation of the agent.
-    """
-    carrying_object: Optional[Object] = None
-
-    def __init__(self, 
-                 position: Tuple[int, int], 
-                 picker: bool, 
-                 carrying_object: Optional[Object] = None, 
-                 reward: int = 0) -> None:
-        self._position = position
+    def __init__(self, position, picker, carrying_object=None, reward=0):
+        self.position = position
         self.picker = picker
         self.carrying_object = carrying_object
         self.reward = reward
+        if carrying_object is not None:
+            if carrying_object.carrying_agent is not None:
+                raise ValueError("An object cannot be carried by two agents.")
+            carrying_object.carrying_agent = self
 
-    @property
-    def position(self) -> Tuple[int, int]:
-        return self._position
-
-    @position.setter
-    def position(self, value: Tuple[int, int]) -> None:
-        self._position = value
-        if self.carrying_object:
-            self.carrying_object.position = value
-
-    def move_up(self) -> None:
+    def move_up(self):
         x, y = self.position
         self.position = (x, max(0, y - 1))
 
-    def move_down(self, grid_length: int) -> None:
+    def move_down(self, grid_length):
         x, y = self.position
         self.position = (x, min(grid_length - 1, y + 1))
 
-    def move_left(self) -> None:
+    def move_left(self):
         x, y = self.position
         self.position = (max(0, x - 1), y)
 
-    def move_right(self, grid_width: int) -> None:
+    def move_right(self, grid_width):
         x, y = self.position
         self.position = (min(grid_width - 1, x + 1), y)
 
-    def pick_up(self, obj: Object) -> None:
-        if self.picker and self.carrying_object is None:
-            self.carrying_object = obj  
+    def pick_up(self, obj):
+        if (
+            self.picker
+            and self.carrying_object is None
+            and obj.carrying_agent is None
+            and obj.position == self.position
+        ):
+            self.carrying_object = obj
             obj.carrying_agent = self
             self.reward += REWARD_PICKUP
 
-    def drop(self, obj: Object) -> None:
-        if self.carrying_object is not None and not self.picker:
-            obj._position = self.position
-            obj.carrying_agent = None  
+    def drop(self, obj):
+        if not self.picker and self.carrying_object is obj:
+            obj.position = self.position
+            obj.carrying_agent = None
             self.carrying_object = None
             self.reward += REWARD_DROP
 
-    def pass_object(self, other_agent: 'Agent') -> None:
-        if self.carrying_object is not None:
+    def pass_object(self, other_agent):
+        if (
+            self.carrying_object is not None
+            and other_agent.carrying_object is None
+            and sum(abs(a - b) for a, b in zip(self.position, other_agent.position)) == 1
+        ):
             other_agent.carrying_object = self.carrying_object
             self.carrying_object.carrying_agent = other_agent
             self.carrying_object = None
 
-    def get_agent_obs(self, all_agents: list['Agent'], all_objects: list[Object], goals: Any) -> Dict[str, Any]:
-        if not isinstance(self.carrying_object, (Object, type(None))):
-            print(f"Unexpected type for carrying_object: {type(self.carrying_object)} with value {self.carrying_object}")
-            
-        obs = {
-            'self': {
-                'position': self.position,
-                'picker': self.picker,
-                'carrying_object': self.carrying_object.id if self.carrying_object else None
-            },
-            'agents': [other_agent.get_basic_agent_obs() for other_agent in all_agents if other_agent != self],
-            'objects': [obj.get_object_obs() for obj in all_objects],
-            'goals': goals
-        }
-        return obs
-
-
-
-    def get_basic_agent_obs(self) -> Dict[str, Any]:
-        carrying_object_id = self.carrying_object if isinstance(self.carrying_object, int) else self.carrying_object.id if self.carrying_object else None
+    def get_basic_agent_obs(self):
         return {
-            'position': self.position,
-            'picker': self.picker,
-            'carrying_object': carrying_object_id
+            "position": self.position,
+            "picker": int(self.picker),
+            "carrying_object": self.carrying_object.id if self.carrying_object else -1,
         }
 
+    def get_agent_obs(self, all_agents, all_objects, goals):
+        return {
+            "self": self.get_basic_agent_obs(),
+            "agents": tuple(
+                agent.get_basic_agent_obs() for agent in all_agents if agent is not self
+            ),
+            "objects": tuple(obj.get_object_obs() for obj in all_objects),
+            "goals": tuple(goals),
+        }
 
 
 class MACPPEnv(gym.Env):
-    """
-    Collaborative pick and place environment.
+    """All agents share a team reward and a fully observed world.
+
+    Moves resolve in agent-index order. Pickups and drops are automatic, while
+    a transfer requires both adjacent agents to choose PASS. Delivered boxes
+    stay on their goals. See README.md for the complete transition order.
     """
 
-    metadata = {"render.modes": ["human"]}
+    metadata = {"render_modes": ["human", "rgb_array"], "render_fps": 10}
 
     def __init__(
         self,
-        grid_size: Tuple[int, int],
+        grid_size: tuple[int, int],
         n_agents: int,
         n_pickers: int,
         n_objects: Optional[int] = 1,
         initial_state=None,
-        cell_size: Optional[int] = 300,
-        debug_mode: Optional[bool] = False,
-        create_video: Optional[bool] = False,
-        seed: Optional[int] = None
-    ) -> None:
-
-        """
-        Initialize the environment.
-
-        Args:
-            grid_size (Tuple[int, int]): Size of the grid.
-            n_agents (int): Number of agents.
-            n_pickers (int): Number of picker agents.
-            n_objects (Optional[int]): Number of objects. Default is 1.
-            initial_state: Initial state of the environment.
-            cell_size (Optional[int]): Size of grid cells. Default is 300.
-            debug_mode (Optional[bool]): Enable debug mode. Default is False.
-            create_video (Optional[bool]): Create video frames. Default is False.
-            seed (Optional[int]): Random seed for environment initialization.
-
-        Returns:
-            None
-        """
-
-        self.grid_width, self.grid_length = grid_size
-        self.cell_size = cell_size
-        self.n_agents = n_agents
-        self.n_pickers = n_pickers
-        self.initial_state = initial_state
-        self.create_video = create_video
+        cell_size: int = 100,
+        debug_mode: bool = False,
+        create_video: bool = False,
+        seed: Optional[int] = None,
+        render_mode: Optional[str] = None,
+    ):
+        super().__init__()
+        if not isinstance(grid_size, (tuple, list)) or len(grid_size) != 2:
+            raise ValueError("grid_size must contain (width, height).")
+        self.grid_width, self.grid_length = (
+            self._positive_int(value, "grid dimension") for value in grid_size
+        )
+        self.n_agents = self._positive_int(n_agents, "n_agents")
+        self.n_pickers = self._positive_int(n_pickers, "n_pickers")
+        self.n_objects = self._positive_int(
+            n_agents if n_objects is None else n_objects, "n_objects"
+        )
+        if not 0 < self.n_pickers < self.n_agents:
+            raise ValueError("At least one picker and one dropper are required.")
+        self.cell_size = self._positive_int(cell_size, "cell_size")
+        if render_mode is not None and render_mode not in self.metadata["render_modes"]:
+            raise ValueError(f"Unsupported render mode: {render_mode!r}")
+        # Random layouts allocate a distinct cell to every agent, object and goal.
+        if (
+            initial_state is None
+            and self.n_agents + 2 * self.n_objects > self.grid_width * self.grid_length
+        ):
+            raise ValueError("Grid must fit n_agents + 2 * n_objects distinct starting cells.")
+        self.initial_state = deepcopy(initial_state)
         self.debug_mode = debug_mode
-
-        # Check that there are at least two agents
-        if n_agents < 2:
-            raise ValueError(
-                "Invalid number of agents. There should be at least two agents.")
-
-        # Check if there are enough pickers and that n_pickers is not the same or larger than n_agents
-        if n_pickers <= 0 or n_pickers >= n_agents:
-            raise ValueError(
-                "Invalid number of pickers. There should be at least one picker and the number of pickers should be less than the total number of agents.")
-
-        # Set the number of objects and goals
-        if n_objects is None:
-            self.n_objects = self.n_agents
-        else:
-            self.n_objects = n_objects
-
-        # Check if the grid size is sufficiently large
-        total_cells = self.grid_width * self.grid_length
-        total_entities = self.n_agents + self.n_objects
-        if total_entities > total_cells:
-            raise ValueError(
-                "Grid size not sufficiently large to contain all the entities."
-            )
-
-        # The action space
-        self.action_set = set(action.value for action in Action)
+        self.create_video = create_video
+        self.render_mode = render_mode
+        self.renderer = None
+        self.frames = []
+        self.action_set = {action.value for action in Action}
         self.action_space = spaces.MultiDiscrete([len(Action)] * self.n_agents)
 
-        # An agent's observation space
-        agent_space = spaces.Dict(
-            {
-                "position": spaces.Tuple(
-                    (spaces.Discrete(self.grid_width),
-                     spaces.Discrete(self.grid_length))
-                ),
-                "picker": spaces.Discrete(2),  # 0 or 1
-                "carrying_object": spaces.Discrete(
-                    self.n_objects + 1
-                ),  # Including a value for "not carrying"
-            }
-        )
-
-        # An object's observation space
-        object_space = spaces.Dict(
-            {
-                "position": spaces.Tuple(
-                    (spaces.Discrete(self.grid_width),
-                     spaces.Discrete(self.grid_length))
-                ),
-                "id": spaces.Discrete(self.n_objects),
-            }
-        )
-
-        # A goal's observation space
-        goal_space = spaces.Tuple(
+        position_space = spaces.Tuple(
             (spaces.Discrete(self.grid_width), spaces.Discrete(self.grid_length))
         )
+        agent_space = spaces.Dict(
+            {
+                "position": position_space,
+                "picker": spaces.Discrete(2),
+                "carrying_object": spaces.Discrete(self.n_objects + 1, start=-1),
+            }
+        )
+        object_space = spaces.Dict(
+            {"position": position_space, "id": spaces.Discrete(self.n_objects)}
+        )
+        agent_observation_space = spaces.Dict(
+            {
+                "self": agent_space,
+                "agents": spaces.Tuple([agent_space] * (self.n_agents - 1)),
+                "objects": spaces.Tuple([object_space] * self.n_objects),
+                "goals": spaces.Tuple([position_space] * self.n_objects),
+            }
+        )
+        self.observation_space = spaces.Dict(
+            {f"agent_{i}": agent_observation_space for i in range(self.n_agents)}
+        )
+        self.reset(seed=seed)
 
-        # An agent's observation space
-        agent_observation_space = spaces.Dict({
-            "self": agent_space,
-            "agents": spaces.Tuple([agent_space] * (self.n_agents-1)),
-            "objects": spaces.Tuple([object_space] * self.n_objects),
-            "goals": spaces.Tuple([goal_space] * self.n_objects)
-        })
-
-        # The observation space
-        self.observation_space = spaces.Dict({
-            f"agent_{i}": agent_observation_space for i in range(self.n_agents)
-        })
-
-        self.done = False
-
-        # Initialise the environment either randomly or from a state
-        if initial_state is None:
-            self.random_reset()
-        else:
-            self.reset_from_obs(initial_state)
-
-        # Rendering
-        self._rendering_initialised = False
-        self.renderer = None
-
-        # If a video is required, create frames
-        if self.create_video and self.cell_size is not None:
-            self.offscreen_surface = pygame.Surface(
-                (self.grid_width * self.cell_size,
-                 self.grid_length * self.cell_size)
-            )
-            self.frames = []
-
-    # @property
-    # def action_space_n(self):
-    #     return np.prod(self.action_space.nvec)
+    @staticmethod
+    def _positive_int(value, name):
+        if not isinstance(value, Integral) or isinstance(value, (bool, np.bool_)) or value <= 0:
+            raise ValueError(f"{name} must be a positive integer.")
+        return int(value)
 
     @property
     def action_space_n(self):
-        return np.prod([len(Action)] * self.n_agents)
+        return len(Action) ** self.n_agents
 
     @property
     def num_agents(self):
         return self.n_agents
 
-    def _validate_actions(self, actions: List[int]) -> None:
-        for action in actions:
-            if action is None or not (0 <= action <= len(Action)-1):
-                raise ValueError(
-                    f"Invalid action: {action}.")
+    def _validate_actions(self, actions):
+        if isinstance(actions, np.ndarray) and actions.ndim != 1:
+            raise ValueError("Actions must be a one-dimensional sequence.")
+        if not isinstance(actions, (list, tuple, np.ndarray)) or len(actions) != self.n_agents:
+            raise ValueError(f"Expected exactly {self.n_agents} integer actions.")
+        if any(not Action.is_valid(action) for action in actions):
+            raise ValueError("Actions must be integers from 0 to 5.")
 
-    def get_obs(self) -> Dict[str, Dict[str, Any]]:
-        observations = {}
-        for idx, agent in enumerate(self.agents):
-            observations[f"agent_{idx}"] = agent.get_agent_obs(
-                self.agents, self.objects, self.goals)
-        return observations
+    def get_obs(self):
+        return {
+            f"agent_{i}": agent.get_agent_obs(self.agents, self.objects, self.goals)
+            for i, agent in enumerate(self.agents)
+        }
 
-    def reset(self, seed: Optional[int] = None, options: Optional[Any] = None) -> Tuple[Dict[str, Dict[str, Any]], Dict[str, Any]]:
-        """
-        Reset the environment to an initial state.
-
-        Args:
-            seed (Optional[int]): Random seed for environment initialization.
-            options (Optional[Any]): Additional options for resetting.
-
-        Returns:
-            Tuple containing initial observations and additional info.
-        """
-        if self.initial_state:
+    def reset(self, *, seed=None, options=None):
+        super().reset(seed=seed)
+        if self.initial_state is not None:
             self.reset_from_obs(self.initial_state)
         else:
-            self.random_reset(seed)
-
-        self.done = False
-        obs = self.get_obs()
-        
-        # Debug info
+            self.random_reset()
+        self.frames = []
         if self.debug_mode:
-            print("State from reset:")
             self._print_state()
+        if self.render_mode == "human":
+            self.render()
+        return self.get_obs(), {}
 
-        return obs, {}
-
-    def random_reset(self, seed: Optional[int] = None) -> None:
-        """
-        Initialise the environment with random allocations of agents and objects
-        """
-
-        if self.debug_mode:
-            print("Random reset.")
-        rng = np.random.default_rng(seed)
-        all_positions = [(x, y) for x in range(self.grid_width)
-                         for y in range(self.grid_length)]
-        rng.shuffle(all_positions)
-
-        # Randomly assign Picker flags to agents
-        picker_flags = [True] * self.n_pickers + [False] * (
-            self.n_agents - self.n_pickers
-        )
-        random.shuffle(picker_flags)
-
-        # Randomly allocate object positions
-        object_positions = random.sample(all_positions, self.n_objects)
-        for obj_pos in object_positions:
-            all_positions.remove(obj_pos)
-
-        # Randomly allocate agent positions
-        agent_positions = random.sample(all_positions, self.n_agents)
-        for agent_pos in agent_positions:
-            all_positions.remove(agent_pos)
-
-        # Randomly allocate goal positions.
-        goal_positions = random.sample(all_positions, self.n_objects)
-
-        # Initialize agents
-        self.agents = []
-        for _ in range(self.n_agents):
-            agent_position = agent_positions.pop()
-            self.agents.append(
-                Agent(
-                    position=agent_position,
-                    picker=picker_flags.pop(),
-                    carrying_object=None,
-                    reward=0
-                )
-            )
-
-        # Initialize objects
-        self.objects = [
-            Object(position=obj_pos, id=i) for i, obj_pos in enumerate(object_positions)
+    def random_reset(self, seed=None):
+        """Reset using only this environment's RNG; optionally reseed it."""
+        if self.n_agents + 2 * self.n_objects > self.grid_width * self.grid_length:
+            raise ValueError("Grid must fit n_agents + 2 * n_objects distinct starting cells.")
+        if seed is not None:
+            super().reset(seed=seed)
+        cells = self.np_random.permutation(self.grid_width * self.grid_length)
+        positions = [
+            (int(cell // self.grid_length), int(cell % self.grid_length)) for cell in cells
         ]
+        roles = self.np_random.permutation(
+            [True] * self.n_pickers + [False] * (self.n_agents - self.n_pickers)
+        )
+        self.objects = [Object(positions[i], i) for i in range(self.n_objects)]
+        offset = self.n_objects
+        self.agents = [Agent(positions[offset + i], bool(roles[i])) for i in range(self.n_agents)]
+        offset += self.n_agents
+        self.goals = positions[offset : offset + self.n_objects]
+        self.done = False
+        self.frames = []
 
-        # Assign goals
-        self.goals = goal_positions
+    def _validate_position(self, position):
+        if (
+            not isinstance(position, (list, tuple))
+            or len(position) != 2
+            or any(not isinstance(v, Integral) or isinstance(v, (bool, np.bool_)) for v in position)
+            or not 0 <= position[0] < self.grid_width
+            or not 0 <= position[1] < self.grid_length
+        ):
+            raise ValueError(f"Invalid grid position: {position!r}")
+        return tuple(int(v) for v in position)
 
-    def reset_from_obs(self, obs: Dict[str, Dict[str, Any]]) -> None:
+    def reset_from_obs(self, obs):
+        """Load a validated global state, not a per-agent observation dictionary.
+
+        Agent keys must be agent_0, ..., agent_N; input dictionary order does not
+        affect identity. None or -1 represents an empty hand in this input format.
+        Validation finishes before the live state is replaced.
         """
-        Reset the environment to a predefined initial state.
-        """
+        if not isinstance(obs, dict) or not {"agents", "objects", "goals"} <= obs.keys():
+            raise ValueError("State must contain agents, objects and goals.")
+        agent_states, object_states, goal_states = obs["agents"], obs["objects"], obs["goals"]
+        if not isinstance(agent_states, dict) or set(agent_states) != {
+            f"agent_{i}" for i in range(self.n_agents)
+        }:
+            raise ValueError("State must contain exactly agent_0 through agent_{n_agents-1}.")
+        if not isinstance(object_states, (list, tuple)) or len(object_states) != self.n_objects:
+            raise ValueError("State object count must match n_objects.")
+        if not isinstance(goal_states, (list, tuple)) or len(goal_states) != self.n_objects:
+            raise ValueError("There must be exactly one goal per object.")
+        try:
+            object_ids = [obj["id"] for obj in object_states]
+            if any(
+                not isinstance(i, Integral) or isinstance(i, (bool, np.bool_)) for i in object_ids
+            ) or sorted(object_ids) != list(range(self.n_objects)):
+                raise ValueError("Object IDs must be unique integers from 0 to n_objects - 1.")
+            objects = {
+                int(obj["id"]): Object(self._validate_position(obj["position"]), int(obj["id"]))
+                for obj in object_states
+            }
+            goals = [self._validate_position(goal) for goal in goal_states]
+            if len(set(goals)) != len(goals):
+                raise ValueError("Goal positions must be distinct.")
+            agents = []
+            for i in range(self.n_agents):
+                state = agent_states[f"agent_{i}"]
+                position = self._validate_position(state["position"])
+                picker = state["picker"]
+                if not isinstance(picker, (bool, np.bool_, Integral)) or picker not in (0, 1):
+                    raise ValueError("Picker flags must be booleans or 0/1.")
+                object_id = state["carrying_object"]
+                if object_id is not None and (
+                    not isinstance(object_id, Integral)
+                    or isinstance(object_id, (bool, np.bool_))
+                    or object_id not in range(-1, self.n_objects)
+                ):
+                    raise ValueError("Carried object ID must be None, -1 or a valid object ID.")
+                obj = None if object_id is None or object_id == -1 else objects[object_id]
+                if obj is not None and obj.position != position:
+                    raise ValueError("A carried object's position must match its carrier.")
+                agents.append(Agent(position, bool(picker), obj))
+            if sum(agent.picker for agent in agents) != self.n_pickers:
+                raise ValueError("State picker count must match n_pickers.")
+            if len({agent.position for agent in agents}) != self.n_agents:
+                raise ValueError("Agent positions must be distinct.")
+            if len({obj.position for obj in objects.values()}) != self.n_objects:
+                raise ValueError("Object positions must be distinct.")
+        except (KeyError, TypeError) as exc:
+            raise ValueError("Malformed state entry.") from exc
+        self.agents = agents
+        self.objects = [objects[i] for i in range(self.n_objects)]
+        self.goals = goals
+        self.done = False
+        self.frames = []
 
-        if self.debug_mode:
-            print("Reset from state.")
-
-        agent_states = obs['agents']
-        object_states = obs['objects']
-        goal_states = obs['goals']
-
-        # Initialize objects first
-        self.objects = []
-        for object_state in object_states:
-            obj = Object(
-                position=tuple(object_state['position']),
-                id=object_state['id']
-            )
-            self.objects.append(obj)
-
-        # Reset agents
-        self.agents = []
-        for agent_state in agent_states.values():
-            # If the agent is carrying an object, find and assign it
-            carrying_object = None
-            if agent_state['carrying_object'] is not None:
-                for obj in self.objects:
-                    if obj.id == agent_state['carrying_object']:
-                        carrying_object = obj
-                        break
-
-            agent = Agent(
-                position=tuple(agent_state['position']),
-                picker=agent_state['picker'],
-                carrying_object=carrying_object,  
-                reward=0  
-            )
-            self.agents.append(agent)
-
-            # Now set the carrying agent properly
-            if carrying_object:
-                carrying_object.carrying_agent = agent
-
-        # Reset goals
-        self.goals = [tuple(goal) for goal in goal_states]
-
-    def _print_state(self):
-        print("-" * 30)
-        for idx, agent in enumerate(self.agents, start=1):
-            carrying_status = (
-                "Carrying" if agent.carrying_object is not None else "Not Carrying"
-            )
-            carrying_object = (
-                f"Object ID: {agent.carrying_object}"
-                if agent.carrying_object is not None
-                else "None"
-            )
-            print(
-                f"- Agent {idx:<2}: Position: {agent.position}, "
-                f"Picker: {str(agent.picker):<5}, Status: {carrying_status:<12}, {carrying_object}, "
-                f"Reward: {agent.reward}"
-            )
-
-        for idx, obj in enumerate(self.objects, start=1):
-            print(f"- Object {idx}: Position: {obj.position}, ID: {obj.id}")
-
-        if not self.goals:
-            print("- No goal positions set.")
-        else:
-            for idx, goal in enumerate(self.goals):
-                print(f"- Goal {idx + 1}: Position {goal}")
-        print("-" * 30)
-
-    def _random_position(self):
-        return (random.randint(0, self.grid_width - 1), random.randint(0, self.grid_length - 1))
-
-    def step(self, actions: List[int]) -> Tuple[Dict[str, Dict[str, Any]], int, bool, Dict[str, Any]]:
-        """
-        Perform one time step in the environment.
-
-        Args:
-            actions (List[int]): List of actions for each agent.
-
-        Returns:
-            Tuple containing observations, total reward, termination flag, and additional info.
-        """
-        # Check that no invalid actions are taken
-        if self.debug_mode:
-            self._validate_actions(actions)
-            print(f"\nExecuting actions: {actions}\n")
-
-        # Negative reward given at every step
+    def step(self, actions):
+        if self.done:
+            raise RuntimeError("Episode has ended; call reset() before stepping again.")
+        self._validate_actions(actions)
         for agent in self.agents:
             agent.reward = REWARD_STEP
-            if self.debug_mode:
-                print(f'Rewarded for step: {REWARD_STEP}')
-
-        # Execute the actions
         self._handle_moves(actions)
         self._handle_drops()
         self._handle_pickups()
         self._handle_passes(actions)
         self._handle_drops()
-
-        # Check for termination
-        if self.check_termination():
+        self.done = self.check_termination()
+        if self.done:
             for agent in self.agents:
                 agent.reward += REWARD_COMPLETION
-                if self.debug_mode:
-                    print(f'Rewarded for completion: {REWARD_COMPLETION}')
-            self.done = True
-
-        # Collect frames for the video when required
         if self.create_video:
-            self.frames.append(
-                pygame.surface.array3d(self.offscreen_surface))
-
-        # Debug info
+            self.frames.append(self._render_frame("rgb_array"))
+        if self.render_mode == "human":
+            self.render()
         if self.debug_mode:
             self._print_state()
+        return self.get_obs(), sum(self._get_rewards()), self.done, False, {}
 
-        total_reward = sum(self._get_rewards())
-        if self.debug_mode:
-            print(f'Total reward: {total_reward}')
-            for idx, agent in enumerate(self.agents):
-                print(f"Agent {idx} Reward: {agent.reward}")
-
-        obs = self.get_obs()
-
-        return obs, total_reward, self.done, {}
-
-    def _get_rewards(self) -> List[int]:
+    def _get_rewards(self):
         return [agent.reward for agent in self.agents]
 
-    def _move_agent(self, agent: Agent, action: int) -> Tuple[int, int]:
-        """
-        Move an agent based on the specified action.
-
-        Args:
-            agent (Agent): The agent to move.
-            action (int): The action representing the direction of movement.
-
-        Returns:
-            Tuple[int, int]: The new position of the agent after the move.
-        """
+    def _move_agent(self, agent, action):
         x, y = agent.position
-        if action == Action.UP.value:
-            y = max(0, y - 1)
-        elif action == Action.DOWN.value:
-            y = min(self.grid_length - 1, y + 1)
-        elif action == Action.LEFT.value:
-            x = max(0, x - 1)
-        elif action == Action.RIGHT.value:
-            x = min(self.grid_width - 1, x + 1)
-
-        new_position = (x, y)
-
-        # If the new position contains an agent, move is not allowed
-        if any(other_agent.position == new_position for other_agent in self.agents if other_agent != agent):
+        dx, dy = {0: (0, -1), 1: (0, 1), 2: (-1, 0), 3: (1, 0)}.get(action, (0, 0))
+        position = (
+            min(max(x + dx, 0), self.grid_width - 1),
+            min(max(y + dy, 0), self.grid_length - 1),
+        )
+        if any(other is not agent and other.position == position for other in self.agents):
             return agent.position
-
-        # If the agent is carrying an object, and the new position contains an object, move is not allowed
-        if agent.carrying_object is not None and any(obj.position == new_position for obj in self.objects):
+        if agent.carrying_object is not None and any(
+            obj is not agent.carrying_object and obj.position == position for obj in self.objects
+        ):
             return agent.position
+        agent.position = position
+        return position
 
-        agent.position = new_position
-        return new_position
+    def _handle_moves(self, actions):
+        for agent, action in zip(self.agents, actions):
+            self._move_agent(agent, action)
 
-    def _handle_moves(self, actions: List[int]) -> None:
-        for idx, agent_action in enumerate(actions):
-            agent = self.agents[idx]
-            self._move_agent(agent, agent_action)
-
-            # If the agent is carrying an object, update the object's position
-            if agent.carrying_object is not None:
-                carried_obj = next((obj for obj in self.objects if obj.id == agent.carrying_object.id), None)
-                if carried_obj:
-                    carried_obj.carrying_agent = agent
-
-    def _handle_pickups(self) -> None:
+    def _handle_pickups(self):
         for agent in self.agents:
             if agent.picker and agent.carrying_object is None:
                 for obj in self.objects:
-                    if obj.position == agent.position and not obj.carrying_agent:
-                        agent.pick_up(obj) 
-                        if self.debug_mode:
-                            print(f'Rewarded for pickup: {REWARD_PICKUP}')
+                    if (
+                        obj.carrying_agent is None
+                        and obj.position == agent.position
+                        and obj.position not in self.goals
+                    ):
+                        agent.pick_up(obj)
                         break
 
-    def _handle_drops(self) -> None:
+    def _handle_drops(self):
         for agent in self.agents:
-            if agent.carrying_object is not None and not agent.picker:
-                if agent.position in self.goals:
-                    # Check if the goal position already has an object
-                    if not any(obj.position == agent.position and obj != agent.carrying_object for obj in self.objects):
-                        agent.carrying_object.position = agent.position
-                        agent.carrying_object.carrying_agent = None  
-                        agent.carrying_object = None
-                        agent.reward += REWARD_DROP
-                        if self.debug_mode:
-                            print(f'Rewarded for dropoff: {REWARD_DROP}')
+            if (
+                agent.carrying_object is not None
+                and not agent.picker
+                and agent.position in self.goals
+            ):
+                if not any(
+                    obj is not agent.carrying_object and obj.position == agent.position
+                    for obj in self.objects
+                ):
+                    agent.drop(agent.carrying_object)
 
-    def _handle_passes(self, actions: List[int]) -> None:
-        """
-        Handle simultaneous object passes between agents based on their actions and positions.
-
-        The function plans all valid passes before executing any to ensure consistency in agent states.
-        It prioritizes passes from picker agents to non-picker agents.
-
-        Args:
-        actions (List[int]): A list of actions corresponding to each agent.
-        """
-        # Identify eligible givers and receivers 
-        eligible_givers = [
-            (idx, agent) for idx, (agent, action) in enumerate(zip(self.agents, actions))
-            if action == Action.PASS.value and agent.carrying_object is not None
-        ]
-        eligible_receivers = [
-            (idx, agent) for idx, (agent, action) in enumerate(zip(self.agents, actions))
-            if action == Action.PASS.value and agent.carrying_object is None
-        ]
-
-        # Plan the possible passes
-        planned_passes = []
-        involved_agents = set()
-        for (giver_idx, giver) in eligible_givers:
-            if giver in involved_agents:
-                continue  # Skip if giver is already involved in a planned pass
-            for adj_pos in self._get_adjacent_positions(giver.position):
-                for (receiver_idx, receiver) in eligible_receivers:
-                    if receiver in involved_agents:
-                        continue  # Skip if receiver is already involved in a planned pass
-                    if receiver.position == adj_pos and giver_idx != receiver_idx:
-                        if self._can_receive_object(giver, Action.PASS.value, receiver, Action.PASS.value):
-                            planned_passes.append((giver, receiver, giver.picker and not receiver.picker))
-                            involved_agents.add(giver)
-                            involved_agents.add(receiver)
-                            break 
-
-        # Sort planned passes to prioritize picker to non-picker passes
-        planned_passes.sort(key=lambda x: x[2], reverse=True)
-
-        # Execute passes
-        for giver, receiver, _ in planned_passes:
-            if giver.carrying_object is not None and receiver.carrying_object is None:
-                giver.pass_object(receiver)
-                self._reward_agents(giver, receiver)
-
-    def _can_receive_object(self, giver: Agent, giver_action: int, receiver: Agent, receiver_action: int) -> bool:
+    def _can_receive_object(self, giver, giver_action, receiver, receiver_action):
         return (
-            giver.carrying_object is not None and
-            giver_action == Action.PASS.value and
-            receiver_action == Action.PASS.value and
-            receiver.carrying_object is None and
-            not any(obj.position == receiver.position for obj in self.objects)
+            giver is not receiver
+            and giver.carrying_object is not None
+            and giver_action == receiver_action == Action.PASS.value
+            and receiver.carrying_object is None
+            and receiver.position in self._get_adjacent_positions(giver.position)
+            and not any(obj.position == receiver.position for obj in self.objects)
         )
 
-    def _reward_agents(self, giver: Agent, receiver: Agent) -> None:
-        if giver.reward is not None and receiver.reward is not None:
-            if giver.picker and not receiver.picker:
-                giver.reward += REWARD_GOOD_PASS
-                receiver.reward += REWARD_GOOD_PASS
-                self._log_reward("good", REWARD_GOOD_PASS)
-            elif not giver.picker and receiver.picker:
-                giver.reward += REWARD_BAD_PASS
-                receiver.reward += REWARD_BAD_PASS
-                self._log_reward("bad", REWARD_BAD_PASS)
-        else:
-            print("Warning: Attempted to update reward of agent with None reward.")
+    def _handle_passes(self, actions):
+        # Rank all candidates BEFORE reserving participants. Stable iteration
+        # breaks ties by giver index, then receiver index. Each participates once.
+        candidates = [
+            (giver, receiver)
+            for i, giver in enumerate(self.agents)
+            for j, receiver in enumerate(self.agents)
+            if self._can_receive_object(giver, actions[i], receiver, actions[j])
+        ]
+        candidates.sort(key=lambda pair: not (pair[0].picker and not pair[1].picker))
+        involved = set()
+        for giver, receiver in candidates:
+            if giver in involved or receiver in involved:
+                continue
+            giver.pass_object(receiver)
+            self._reward_agents(giver, receiver)
+            involved.update((giver, receiver))
 
+    def _reward_agents(self, giver, receiver):
+        reward = (
+            REWARD_GOOD_PASS
+            if giver.picker and not receiver.picker
+            else (REWARD_BAD_PASS if not giver.picker and receiver.picker else 0)
+        )
+        giver.reward += reward
+        receiver.reward += reward
 
-    def _log_reward(self, pass_type: str, reward_amount: int) -> None:
-        if self.debug_mode:
-            print(f'Rewarded for {pass_type} pass: {reward_amount}')
-
-    def _get_adjacent_positions(self, position: Tuple[int, int]) -> List[Tuple[int, int]]:
+    def _get_adjacent_positions(self, position):
         x, y = position
         return [(x + 1, y), (x - 1, y), (x, y + 1), (x, y - 1)]
 
-    def check_termination(self) -> bool:
-        for obj in self.objects:
-            if obj.position not in self.goals or obj.carrying_agent is not None:
-                return False
-        return True
+    def check_termination(self):
+        return all(
+            obj.position in self.goals and obj.carrying_agent is None for obj in self.objects
+        )
 
-    def _init_render(self) -> None:
-        from macpp.core.rendering import Viewer
-        self.renderer = Viewer(self)
-        if self.debug_mode:
-            print("Rendering initialised.")
-        self._rendering_initialised = True
+    def _print_state(self):
+        print(self.get_obs())
+        print("Agent rewards:", self._get_rewards())
 
-    def render(self, mode: str = 'human') -> Union[None, np.ndarray]:
-        """
-        Render the environment.
+    @staticmethod
+    def obs_to_hash(obs):
+        """Stable state key for the bundled tabular agents."""
+        return hashlib.sha256(json.dumps(obs, sort_keys=True).encode()).hexdigest()
 
-        Args:
-            mode (str): Rendering mode ('human' or other).
+    def _render_frame(self, mode):
+        if self.renderer is None:
+            from macpp.core.rendering import Viewer
 
-        Returns:
-            Rendered image or None.
-        """
-        if not self._rendering_initialised:
-            self._init_render()
-        return self.renderer.render()
+            self.renderer = Viewer(self)
+        return self.renderer.render(mode)
 
-    def close(self) -> None:
-        """
-        Close the environment, release resources.
-        """
-        if self.renderer:
+    def render(self):
+        if self.render_mode is None:
+            return None
+        return self._render_frame(self.render_mode)
+
+    def save_video(self, filename, fps=None):
+        """Save frames captured with create_video=True; requires the video extra."""
+        if not self.frames:
+            raise ValueError("No frames to save; step with create_video=True first.")
+        import imageio.v2 as imageio
+
+        path = Path(filename)
+        path.parent.mkdir(parents=True, exist_ok=True)
+        imageio.mimsave(
+            path, self.frames, fps=fps or self.metadata["render_fps"], macro_block_size=1
+        )
+
+    def close(self):
+        if self.renderer is not None:
             self.renderer.close()
-        # Save the video frames
-        if self.create_video:
-            pass
+            self.renderer = None
 
-    def _get_state_space_size(self) -> int:
-        agent_space_size = self.grid_width * \
-            self.grid_length * 2 * (self.n_objects + 1)
-        object_space_size = self.grid_width * self.grid_length * self.n_objects
-        goal_space_size = self.grid_width * self.grid_length
-        state_space_size = (agent_space_size ** self.n_agents) * (
-            object_space_size ** self.n_objects) * (goal_space_size ** self.n_objects)
-        return state_space_size
+    def _get_action_space_size(self):
+        return self.action_space_n
 
-    def _get_action_space_size(self) -> int:
-        single_agent_action_space = len(Action)
-        action_space_size = single_agent_action_space ** self.n_agents
-        return action_space_size
+    def _get_state_space_size(self):
+        """Legacy combinatorial upper bound, including physically invalid states."""
+        cells = self.grid_width * self.grid_length
+        agent_states = cells * 2 * (self.n_objects + 1)
+        object_states = cells * self.n_objects
+        return agent_states**self.n_agents * object_states**self.n_objects * cells**self.n_objects
 
 
-def make_env(width: int, length: int, n_agents: int, n_pickers: int, n_objects: Optional[int] = None) -> Callable[[], MACPPEnv]:
+def make_env(
+    width: int, length: int, n_agents: int, n_pickers: int, n_objects: Optional[int] = None
+) -> Callable[[], MACPPEnv]:
     def _init():
         return MACPPEnv((width, length), n_agents, n_pickers, n_objects)
-    return _init
 
+    return _init
